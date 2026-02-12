@@ -585,7 +585,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     <Ionicons name="logo-whatsapp" size={28} color="#25D366" style={{ marginRight: 10 }} />
                                     <View>
                                         <Text style={{ fontWeight: 'bold', fontSize: 17, color: activeColors.text }}>WhatsApp</Text>
-                                        <Text style={{ fontSize: 11, color: activeColors.textSecondary }}>{waBackendUrl.replace('http://', '').split(':')[0]}</Text>
+                                        <Text style={{ fontSize: 11, color: activeColors.textSecondary }}>{(waBackendUrl || '').split('://')[1]?.split(':')[0] || 'Unknown'}</Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity
