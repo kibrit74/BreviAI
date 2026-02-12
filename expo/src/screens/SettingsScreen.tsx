@@ -117,13 +117,25 @@ export default function SettingsScreen({ navigation }: any) {
             const customUrl = userSettingsService.getCustomVariables()['WHATSAPP_BACKEND_URL'];
             const url = customUrl ? customUrl.value : waBackendUrl;
 
-            const response = await fetch(`${url}/status`, {
-                headers: { 'x-auth-key': 'breviai-secret-password' }
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+            const response = await fetch(`${url}/whatsapp/status`, {
+                headers: { 'x-auth-key': 'breviai-secret-password' },
+                signal: controller.signal
             });
-            const data = await response.json();
-            setWaStatus(data);
+            clearTimeout(timeoutId);
+
+            const text = await response.text();
+            try {
+                const data = JSON.parse(text);
+                setWaStatus(data);
+            } catch (jsonError) {
+                console.warn('WA Status JSON Error:', text.substring(0, 100)); // Log first 100 chars
+                setWaStatus({ status: 'error', ready: false });
+            }
         } catch (error) {
-            console.warn('WA Status Error:', error);
+            console.warn('WA Status Fetch Error:', error);
             setWaStatus({ status: 'error', ready: false });
         } finally {
             setIsWaLoading(false);
@@ -603,7 +615,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: activeColors.card, padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: activeColors.border }}
                                         onPress={() => {
-                                            Linking.openURL(waBackendUrl + '/qr');
+                                            Linking.openURL(waBackendUrl + '/whatsapp/qr');
                                         }}
                                     >
                                         <Text style={{ color: activeColors.primary, fontWeight: '600' }}>Tarayıcıda Aç</Text>
@@ -629,7 +641,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: '#25D366', padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: "#25D366", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                                         onPress={() => {
-                                            fetch(`${waBackendUrl}/send`, {
+                                            fetch(`${waBackendUrl}/whatsapp/send`, {
                                                 method: 'POST',
                                                 headers: {
                                                     'Content-Type': 'application/json',
