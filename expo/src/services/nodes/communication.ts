@@ -254,7 +254,19 @@ export async function executeWhatsAppSend(
             const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.117.34.89:3001');
             const authKey = variableManager.resolveString(config.backendAuthKey || 'breviai-secret-password');
 
-            console.log('[WHATSAPP Backend] Sending via:', backendUrl);
+            // Format phone number: remove +, spaces, dashes
+            let cleanPhone = phoneNumber.replace(/[\s\-\+\(\)]/g, '');
+
+            // Auto-fix Turkish numbers: 0532... -> 90532...
+            if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+                cleanPhone = '90' + cleanPhone.substring(1);
+            }
+            // Auto-fix if user entered 532... -> 90532...
+            if (cleanPhone.length === 10 && cleanPhone.startsWith('5')) {
+                cleanPhone = '90' + cleanPhone;
+            }
+
+            console.log('[WHATSAPP Backend] Sending via:', backendUrl, 'to:', cleanPhone);
 
             const response = await fetch(`${backendUrl}/send`, {
                 method: 'POST',
@@ -263,7 +275,7 @@ export async function executeWhatsAppSend(
                     'x-auth-key': authKey
                 },
                 body: JSON.stringify({
-                    phone: phoneNumber,
+                    phone: cleanPhone,
                     message: message
                 })
             });

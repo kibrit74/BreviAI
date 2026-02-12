@@ -110,6 +110,24 @@ class CronManager {
                 // The app should listen to the 'cron_result' webhook or poll logs
                 return { triggered: true, payload: action };
 
+            case 'scrape_and_whatsapp':
+                // { type: 'scrape_and_whatsapp', url: '...', selector: '...', phone: '...', message: '...' }
+                try {
+                    console.log(`[Cron] Scrape & Send: ${action.url} -> ${action.phone}`);
+                    const scrapeResult = await browserService.service.scrape(action.url, action.selector);
+
+                    // Simple template replacement
+                    let msg = action.message || 'Scraped Data: {{data}}';
+                    // Limit data length to avoid giant messages
+                    const cleanData = (typeof scrapeResult === 'string' ? scrapeResult : JSON.stringify(scrapeResult)).substring(0, 2000);
+                    msg = msg.replace('{{data}}', cleanData);
+
+                    return await whatsappService.sendMessage(action.phone, msg);
+                } catch (err) {
+                    console.error('[Cron] Scrape & Send failed:', err);
+                    throw err;
+                }
+
             default:
                 throw new Error(`Unknown action type: ${action.type}`);
         }

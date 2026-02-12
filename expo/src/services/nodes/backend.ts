@@ -15,7 +15,24 @@ export async function executeCronCreate(
     const name = variableManager.resolveString(config.name);
     const schedule = variableManager.resolveString(config.schedule);
     const actionType = variableManager.resolveString(config.actionType || 'log');
-    const actionPayload = variableManager.resolveString(config.actionPayload || '{}');
+    const actionPayload = config.actionPayload || {};
+    let resolvedPayload: any = {};
+
+    if (typeof actionPayload === 'string') {
+        try {
+            const resolvedString = variableManager.resolveString(actionPayload);
+            resolvedPayload = JSON.parse(resolvedString);
+        } catch (e) {
+            console.error('[CronCreate] Failed to parse actionPayload string:', e);
+            resolvedPayload = {};
+        }
+    } else {
+        // Recursively resolve values in the object
+        resolvedPayload = Object.entries(actionPayload).reduce((acc, [key, value]) => {
+            acc[key] = typeof value === 'string' ? variableManager.resolveString(value) : value;
+            return acc;
+        }, {} as Record<string, any>);
+    }
 
     console.log('[CronCreate] Creating job:', { name, schedule, actionType });
 
@@ -34,7 +51,7 @@ export async function executeCronCreate(
                 schedule,
                 action: {
                     type: actionType,
-                    ...JSON.parse(typeof actionPayload === 'string' ? actionPayload : JSON.stringify(actionPayload)),
+                    ...resolvedPayload,
                 },
             }),
             signal: controller.signal

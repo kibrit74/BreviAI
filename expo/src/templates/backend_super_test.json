@@ -1,7 +1,7 @@
 {
     "id": "backend-super-test",
     "name": "🧪 Backend Süper Güç Testi",
-    "description": "Dolar kurunu web'den çekip her 1 dakikada bir WhatsApp ile gönderir. (Versiyon: 2.0)",
+    "description": "Dolar kurunu web'den çekip WhatsApp ile gönderir ve 2 dakikada bir çalışacak şekilde sunucuya kaydeder.",
     "icon": "server",
     "color": "#6366F1",
     "nodes": [
@@ -42,14 +42,14 @@
                 "x": 100,
                 "y": 400
             },
-            "label": "Dolar Kurunu Çek"
+            "label": "Dolar Kurunu Çek (Test)"
         },
         {
             "id": "4",
             "type": "WHATSAPP_SEND",
             "config": {
                 "phoneNumber": "{{hedefNumara}}",
-                "message": "💰 Güncel Dolar Kuru: {{dolarKuru}}\n\n📅 Tarih: {{_date}}\n⏰ Saat: {{_time}}\n\n🤖 BreviAI Otomatik Bildirim",
+                "message": "💰 Güncel Dolar Kuru: {{dolarKuru}}\n\n📅 Tarih: {{_date}}\n⏰ Saat: {{_time}}\n\n🤖 BreviAI Otomatik Bildirim (İlk Test)",
                 "mode": "backend",
                 "backendUrl": "http://136.117.34.89:3001/whatsapp",
                 "backendAuthKey": "breviai-secret-password"
@@ -58,33 +58,39 @@
                 "x": 100,
                 "y": 550
             },
-            "label": "WhatsApp'tan Kuru Gönder"
+            "label": "WhatsApp'tan Gönder (Test)"
         },
         {
             "id": "5",
-            "type": "DELAY",
+            "type": "CRON_CREATE",
             "config": {
-                "duration": 1,
-                "unit": "min"
+                "name": "Dolar Kuru Takibi ({{hedefNumara}})",
+                "schedule": "*/2 * * * *",
+                "actionType": "scrape_and_whatsapp",
+                "actionPayload": {
+                    "url": "https://www.google.com/finance/quote/USD-TRY",
+                    "phone": "{{hedefNumara}}",
+                    "message": "💰 Güncel Dolar Kuru: {{data}}\n\n📅 Tarih: {{_date}} {{_time}}\n\n🤖 BreviAI Otomatik Bildirim (Zamanlanmış)"
+                }
             },
             "position": {
                 "x": 100,
                 "y": 700
             },
-            "label": "1 Dakika Bekle"
+            "label": "Zamanlanmış Görev Oluştur"
         },
         {
             "id": "6",
             "type": "SHOW_TEXT",
             "config": {
-                "title": "✅ Döngü Devam Ediyor",
-                "content": "Son gönderilen kur: {{dolarKuru}}\nHedef numara: {{hedefNumara}}\n\nTekrar dolar kuru çekilecek ve gönderilecek..."
+                "title": "✅ Görev Başlatıldı",
+                "content": "İlk test mesajı gönderildi ve backend üzerinde her 2 dakikada bir çalışacak görev oluşturuldu.\n\nHedef: {{hedefNumara}}\nURL: Google Finance USD/TRY\n\nBu pencereyi kapatabilirsiniz, görev sunucuda çalışmaya devam edecek."
             },
             "position": {
                 "x": 100,
                 "y": 850
             },
-            "label": "Durum Bilgisi"
+            "label": "Bilgi Ver"
         }
     ],
     "edges": [
@@ -116,12 +122,6 @@
             "id": "e5",
             "sourceNodeId": "5",
             "targetNodeId": "6",
-            "sourcePort": "default"
-        },
-        {
-            "id": "e6",
-            "sourceNodeId": "6",
-            "targetNodeId": "3",
             "sourcePort": "default"
         }
     ]
