@@ -110,12 +110,43 @@ export default function SettingsScreen({ navigation }: any) {
     const [isWaLoading, setIsWaLoading] = React.useState(false);
     const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001'); // Default GCP
 
+    // Load saved WA URL on mount
+    React.useEffect(() => {
+        const loadWaUrl = async () => {
+            try {
+                const saved = await AsyncStorage.getItem('whatsapp_backend_url');
+                if (saved && (saved.startsWith('http') || saved.includes('.'))) {
+                    setWaBackendUrl(saved);
+                }
+            } catch (e) {
+                console.log('Failed to load WA URL');
+            }
+        };
+        loadWaUrl();
+    }, []);
+
+    // Save WA URL on change (debounced)
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            if (waBackendUrl && waBackendUrl.length > 8 && waBackendUrl.startsWith('http')) {
+                AsyncStorage.setItem('whatsapp_backend_url', waBackendUrl.trim().replace(/\/$/, ''));
+            }
+        }, 1000); // 1s debounce
+        return () => clearTimeout(timer);
+    }, [waBackendUrl]);
+
+    const resetWaUrl = () => {
+        const defaultUrl = 'http://136.117.34.89:3001';
+        setWaBackendUrl(defaultUrl);
+        AsyncStorage.setItem('whatsapp_backend_url', defaultUrl);
+        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Remote) ayarlandı.');
+    };
+
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
         try {
             // Check if user has a custom override
-            const customUrl = userSettingsService.getCustomVariables()['WHATSAPP_BACKEND_URL'];
-            const url = customUrl ? customUrl.value : waBackendUrl;
+            const url = waBackendUrl;
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
@@ -581,17 +612,38 @@ export default function SettingsScreen({ navigation }: any) {
                         {/* WhatsApp Section */}
                         <View style={{ marginBottom: 20, backgroundColor: theme === 'dark' ? '#075E54' + '40' : '#25D366' + '15', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: theme === 'dark' ? '#075E54' : '#25D366' }}>
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                                     <Ionicons name="logo-whatsapp" size={28} color="#25D366" style={{ marginRight: 10 }} />
-                                    <View>
+                                    <View style={{ flex: 1 }}>
                                         <Text style={{ fontWeight: 'bold', fontSize: 17, color: activeColors.text }}>WhatsApp</Text>
-                                        <Text style={{ fontSize: 11, color: activeColors.textSecondary }}>{(waBackendUrl || '').split('://')[1]?.split(':')[0] || 'Unknown'}</Text>
+                                        <TextInput
+                                            style={{
+                                                fontSize: 11,
+                                                color: activeColors.text,
+                                                borderBottomWidth: 1,
+                                                borderBottomColor: activeColors.border,
+                                                paddingVertical: 2,
+                                                marginTop: 2
+                                            }}
+                                            value={waBackendUrl}
+                                            onChangeText={setWaBackendUrl}
+                                            placeholder="http://localhost:3001"
+                                            placeholderTextColor={activeColors.textSecondary}
+                                        />
+                                        <Text style={{ fontSize: 10, color: activeColors.textSecondary, marginTop: 2 }}>
+                                            URL'yi düzenlemek için tıklayın (Örn: http://192.168.1.35:3001)
+                                        </Text>
+                                        <TouchableOpacity onPress={resetWaUrl} style={{ marginTop: 4 }}>
+                                            <Text style={{ fontSize: 10, color: activeColors.primary, textDecorationLine: 'underline' }}>
+                                                Varsayılana Sıfırla (Remote)
+                                            </Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                                 <TouchableOpacity
                                     onPress={checkWhatsAppStatus}
                                     disabled={isWaLoading}
-                                    style={{ padding: 8, backgroundColor: activeColors.card, borderRadius: 20 }}
+                                    style={{ padding: 8, backgroundColor: activeColors.card, borderRadius: 20, marginLeft: 10 }}
                                 >
                                     {isWaLoading ? <ActivityIndicator size="small" color="#25D366" /> : <Ionicons name="refresh" size={20} color={activeColors.textSecondary} />}
                                 </TouchableOpacity>
