@@ -1,0 +1,166 @@
+{
+    "name": "LinkedIn İş İlanı Arama (Gelişmiş)",
+    "description": "Kullanıcıdan arama kriteri ve API anahtarı alarak LinkedIn ilanlarını çeker.",
+    "nodes": [
+        {
+            "id": "1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "position": {
+                "x": 100,
+                "y": 50
+            },
+            "config": {}
+        },
+        {
+            "id": "2",
+            "type": "TEXT_INPUT",
+            "label": "Arama Kriteri Girin",
+            "position": {
+                "x": 100,
+                "y": 200
+            },
+            "config": {
+                "title": "Arama Yapılacak Pozisyon/Kelime",
+                "placeholder": "Örn: Yazılım Mühendisi",
+                "variableName": "searchQuery"
+            }
+        },
+        {
+            "id": "3",
+            "type": "TEXT_INPUT",
+            "label": "ScraperAPI Key (Opsiyonel)",
+            "position": {
+                "x": 100,
+                "y": 350
+            },
+            "config": {
+                "title": "ScraperAPI Anahtarı (Varsa)",
+                "placeholder": "API Key giriniz (Boş bırakılabilir)",
+                "defaultValue": "sk_sZzZ3u5A6cs3eCe1DLhQ2L424am1m7DIrB62u5EXTOQJoChj",
+                "variableName": "apiKey"
+            }
+        },
+        {
+            "id": "4",
+            "type": "HTTP_REQUEST",
+            "label": "LinkedIn Ara",
+            "position": {
+                "x": 100,
+                "y": 500
+            },
+            "config": {
+                "url": "http://api.scraperapi.com",
+                "method": "GET",
+                "queryParameters": {
+                    "api_key": "{{apiKey}}",
+                    "url": "https://www.linkedin.com/jobs/search?keywords={{searchQuery}}&location=Türkiye"
+                },
+                "headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                },
+                "variableName": "linkedinResponse"
+            }
+        },
+        {
+            "id": "5",
+            "type": "HTML_EXTRACT",
+            "label": "İlanları Ayıkla",
+            "position": {
+                "x": 100,
+                "y": 650
+            },
+            "config": {
+                "htmlSource": "{{linkedinResponse.data}}",
+                "variableName": "extractedJobs",
+                "extracts": [
+                    {
+                        "key": "titles",
+                        "selector": ".base-search-card__title",
+                        "valueType": "text",
+                        "returnArray": true
+                    },
+                    {
+                        "key": "companies",
+                        "selector": ".base-search-card__subtitle",
+                        "valueType": "text",
+                        "returnArray": true
+                    },
+                    {
+                        "key": "links",
+                        "selector": ".base-card__full-link",
+                        "valueType": "attr",
+                        "attribute": "href",
+                        "returnArray": true
+                    }
+                ]
+            }
+        },
+        {
+            "id": "6",
+            "type": "AGENT_AI",
+            "label": "Sonuçları Listele",
+            "position": {
+                "x": 100,
+                "y": 800
+            },
+            "config": {
+                "prompt": "Elimde şu JSON verisi var: {{extractedJobs}}\n\nBu verideki 'titles', 'companies' ve 'links' dizilerini kullanarak, her bir ilanı alt alta, okunabilir bir liste formatında yaz.\n\nÖrnek Format:\n1. **[Pozisyon Adı]** - [Şirket]\n   [Link]\n\nEğer veri yoksa 'İlan bulunamadı' de. Sadece listeyi ver, ekstra açıklama yapma.",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-exp",
+                "variableName": "jobList"
+            }
+        },
+        {
+            "id": "7",
+            "type": "SHOW_TEXT",
+            "label": "İlan Sonuçları",
+            "position": {
+                "x": 100,
+                "y": 950
+            },
+            "config": {
+                "title": "{{searchQuery}} İlanları",
+                "content": "{{jobList}}"
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "1",
+            "targetNodeId": "2",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "2",
+            "targetNodeId": "3",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "3",
+            "targetNodeId": "4",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "4",
+            "targetNodeId": "5",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e5",
+            "sourceNodeId": "5",
+            "targetNodeId": "6",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e6",
+            "sourceNodeId": "6",
+            "targetNodeId": "7",
+            "sourcePort": "default"
+        }
+    ]
+}

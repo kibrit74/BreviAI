@@ -1,0 +1,244 @@
+{
+    "id": "smart-email-assistant-v1",
+    "name": "📧 Akıllı E-posta Asistanı",
+    "description": "Gmail ve Outlook e-postalarını okur, VIP kişilerden gelenleri önemli olarak bildirir, AI ile cevap önerileri üretir",
+    "icon": "📧",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "TIME_TRIGGER",
+            "label": "Her 15dk Kontrol Et",
+            "config": {
+                "hour": 9,
+                "minute": 0,
+                "repeat": true,
+                "interval": 15
+            },
+            "position": {
+                "x": 250,
+                "y": 50
+            }
+        },
+        {
+            "id": "gmail-read",
+            "type": "GMAIL_READ",
+            "label": "Gmail Okunmamışları Al",
+            "config": {
+                "maxResults": 10,
+                "query": "is:unread",
+                "variableName": "gmailEmails"
+            },
+            "position": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": "outlook-read",
+            "type": "OUTLOOK_READ",
+            "label": "Outlook Okunmamışları Al",
+            "config": {
+                "folderName": "Inbox",
+                "maxResults": 10,
+                "unreadOnly": true,
+                "variableName": "outlookEmails"
+            },
+            "position": {
+                "x": 400,
+                "y": 200
+            }
+        },
+        {
+            "id": "merge-var",
+            "type": "VARIABLE",
+            "label": "E-postaları Birleştir",
+            "config": {
+                "operation": "set",
+                "name": "allEmails",
+                "value": "Gmail Mailleri:\n{{gmailEmails}}\n\n---\n\nOutlook Mailleri:\n{{outlookEmails}}"
+            },
+            "position": {
+                "x": 250,
+                "y": 350
+            }
+        },
+        {
+            "id": "agent-categorize",
+            "type": "AGENT_AI",
+            "label": "E-postaları Kategorile",
+            "config": {
+                "prompt": "Sen bir e-posta asistanısın. Aşağıdaki e-postaları analiz et ve JSON formatında kategorize et.\n\n## VIP Kişi Listesi (ÖNEMLİ - bu kişilerden gelen mailler 'vip' olarak işaretle):\n- yavuz.obuz (herhangi bir domainle)\n- patron@\n- muhasebe@\n- ceo@, cfo@, cto@\n- Kullanıcı bu listeyi düzenleyebilir\n\n## Kategoriler:\n1. **vip** - VIP listesindeki kişilerden gelen\n2. **urgent** - Acil/öncelikli (konu başlığında ACİL, URGENT, ÖNEMLİ vb.)\n3. **finance** - Fatura, ödeme, banka ile ilgili\n4. **social** - Sosyal medya bildirimleri\n5. **newsletter** - Bülten, reklam, promosyon\n6. **other** - Diğer\n\n## Çıktı Formatı (JSON):\n{\n  \"summary\": \"Toplam X mail: Y önemli, Z acil\",\n  \"vipCount\": 0,\n  \"urgentCount\": 0,\n  \"categories\": [\n    {\n      \"category\": \"vip\",\n      \"emails\": [\n        {\n          \"from\": \"kimden\",\n          \"subject\": \"konu\",\n          \"preview\": \"ilk 100 karakter\",\n          \"priority\": \"high\"\n        }\n      ]\n    }\n  ]\n}\n\n## E-postalar:\n{{allEmails}}",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-exp",
+                "temperature": 0.2,
+                "maxTokens": 3000,
+                "variableName": "categorized",
+                "outputFormat": "json"
+            },
+            "position": {
+                "x": 250,
+                "y": 500
+            }
+        },
+        {
+            "id": "check-vip",
+            "type": "IF_ELSE",
+            "label": "VIP Mail Var mı?",
+            "config": {
+                "left": "{{categorized.vipCount}}",
+                "operator": ">",
+                "right": "0"
+            },
+            "position": {
+                "x": 250,
+                "y": 650
+            }
+        },
+        {
+            "id": "vip-notify",
+            "type": "NOTIFICATION",
+            "label": "⚡ VIP Mail Bildirimi",
+            "config": {
+                "type": "notification",
+                "title": "⚡ ÖNEMLİ MAIL GELDİ!",
+                "message": "VIP kişiden {{categorized.vipCount}} yeni mail var!\n{{categorized.summary}}"
+            },
+            "position": {
+                "x": 100,
+                "y": 800
+            }
+        },
+        {
+            "id": "normal-notify",
+            "type": "NOTIFICATION",
+            "label": "📬 Normal Mail Bildirimi",
+            "config": {
+                "type": "notification",
+                "title": "📬 Yeni Mailler",
+                "message": "{{categorized.summary}}"
+            },
+            "position": {
+                "x": 400,
+                "y": 800
+            }
+        },
+        {
+            "id": "agent-reply",
+            "type": "AGENT_AI",
+            "label": "Cevap Önerileri Üret",
+            "config": {
+                "prompt": "Sen profesyonel bir e-posta asistanısın. Aşağıdaki kategorize edilmiş e-postalar için cevap önerileri üret.\n\n## Kurallar:\n- Sadece 'vip' ve 'urgent' kategorisindeki maillere cevap önerisi yaz\n- Her mail için 2 alternatif cevap öner: biri kısa/hızlı, diğeri detaylı/profesyonel\n- Türkçe yaz, resmi ve profesyonel ton kullan\n- Eğer mail bir fatura/ödeme bildirimi ise, onay cevabı öner\n- Eğer toplantı daveti ise, kabul ve reddetme seçenekleri sun\n\n## Çıktı Formatı:\n📩 Kimden: [gönderen]\n📋 Konu: [konu]\n\n✏️ Hızlı Cevap:\n[kısa cevap metni]\n\n📝 Detaylı Cevap:\n[uzun cevap metni]\n\n---\n(sonraki mail için tekrarla)\n\n## Kategorize Edilmiş E-postalar:\n{{categorized}}",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-exp",
+                "temperature": 0.5,
+                "maxTokens": 3000,
+                "variableName": "replyDrafts"
+            },
+            "position": {
+                "x": 250,
+                "y": 950
+            }
+        },
+        {
+            "id": "file-save",
+            "type": "FILE_WRITE",
+            "label": "Raporu Dosyaya Kaydet",
+            "config": {
+                "filename": "email_rapor_{{_currentDate}}.txt",
+                "content": "═══════════════════════════════════════\n  📧 GÜNLÜK E-POSTA RAPORU\n  📅 {{_currentDate}} {{_currentTime}}\n═══════════════════════════════════════\n\n📊 ÖZET:\n{{categorized.summary}}\n\n═══════════════════════════════════════\n  ✏️ CEVAP ÖNERİLERİ\n═══════════════════════════════════════\n\n{{replyDrafts}}\n\n═══════════════════════════════════════\n  📋 TÜM KATEGORİLER\n═══════════════════════════════════════\n\n{{categorized}}"
+            },
+            "position": {
+                "x": 250,
+                "y": 1100
+            }
+        },
+        {
+            "id": "final-notify",
+            "type": "NOTIFICATION",
+            "label": "✅ Rapor Hazır",
+            "config": {
+                "type": "notification",
+                "title": "✅ E-posta Raporu Hazır",
+                "message": "Cevap önerileri ve kategori raporu kaydedildi. Dosyadan kontrol edebilirsiniz."
+            },
+            "position": {
+                "x": 250,
+                "y": 1250
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "gmail-read",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "outlook-read",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "gmail-read",
+            "targetNodeId": "merge-var",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "outlook-read",
+            "targetNodeId": "merge-var",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e5",
+            "sourceNodeId": "merge-var",
+            "targetNodeId": "agent-categorize",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e6",
+            "sourceNodeId": "agent-categorize",
+            "targetNodeId": "check-vip",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e7",
+            "sourceNodeId": "check-vip",
+            "targetNodeId": "vip-notify",
+            "sourcePort": "true"
+        },
+        {
+            "id": "e8",
+            "sourceNodeId": "check-vip",
+            "targetNodeId": "normal-notify",
+            "sourcePort": "false"
+        },
+        {
+            "id": "e9",
+            "sourceNodeId": "vip-notify",
+            "targetNodeId": "agent-reply",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e10",
+            "sourceNodeId": "normal-notify",
+            "targetNodeId": "agent-reply",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e11",
+            "sourceNodeId": "agent-reply",
+            "targetNodeId": "file-save",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e12",
+            "sourceNodeId": "file-save",
+            "targetNodeId": "final-notify",
+            "sourcePort": "default"
+        }
+    ]
+}

@@ -1,0 +1,104 @@
+{
+    "name": "WhatsApp Backend Test",
+    "description": "WhatsApp backend servisi ile mesaj gönderim testi",
+    "category": "communication",
+    "icon": "logo-whatsapp",
+    "color": "#25D366",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "config": {},
+            "position": {
+                "x": 200,
+                "y": 50
+            }
+        },
+        {
+            "id": "input-tel",
+            "type": "OVERLAY_INPUT",
+            "label": "Telefon No",
+            "config": {
+                "title": "📱 Telefon Numarası",
+                "message": "Mesaj göndermek istediğiniz numarayı girin",
+                "placeholder": "05551234567",
+                "variableName": "telefon"
+            },
+            "position": {
+                "x": 200,
+                "y": 170
+            }
+        },
+        {
+            "id": "input-mesaj",
+            "type": "OVERLAY_INPUT",
+            "label": "Mesaj",
+            "config": {
+                "title": "💬 Mesaj İçeriği",
+                "message": "Göndermek istediğiniz mesajı yazın",
+                "placeholder": "Merhaba, test mesajı!",
+                "variableName": "mesaj_icerik"
+            },
+            "position": {
+                "x": 200,
+                "y": 290
+            }
+        },
+        {
+            "id": "whatsapp-1",
+            "type": "WHATSAPP_SEND",
+            "label": "WhatsApp Backend Gönder",
+            "config": {
+                "mode": "backend",
+                "backendUrl": "http://136.117.34.89:3001",
+                "backendAuthKey": "breviai-secret-password",
+                "phoneNumber": "{{telefon}}",
+                "message": "{{mesaj_icerik}}",
+                "variableName": "wp_sonuc"
+            },
+            "position": {
+                "x": 200,
+                "y": 410
+            }
+        },
+        {
+            "id": "sonuc-1",
+            "type": "SHOW_OVERLAY",
+            "label": "Sonuç",
+            "config": {
+                "message": "📋 Gönderim Sonucu:\n\nDurum: {{wp_sonuc.success}}\nMesaj ID: {{wp_sonuc.messageId}}\nToplam: {{wp_sonuc.totalSent}}"
+            },
+            "position": {
+                "x": 200,
+                "y": 530
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "input-tel",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "input-tel",
+            "targetNodeId": "input-mesaj",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "input-mesaj",
+            "targetNodeId": "whatsapp-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "whatsapp-1",
+            "targetNodeId": "sonuc-1",
+            "sourcePort": "default"
+        }
+    ]
+}

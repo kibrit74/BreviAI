@@ -1,0 +1,100 @@
+{
+    "id": "load-debtor-data-v2",
+    "name": "Borçlu Verilerini Yükle (Gelişmiş)",
+    "description": "Google Sheets'ten borçlu verilerini vektör hafızaya yükler - tüm alanlarla",
+    "icon": "📊",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "config": {},
+            "position": {
+                "x": 100,
+                "y": 50
+            }
+        },
+        {
+            "id": "clear-1",
+            "type": "CLEAR_MEMORY",
+            "label": "Hafızayı Temizle",
+            "config": {},
+            "position": {
+                "x": 100,
+                "y": 150
+            }
+        },
+        {
+            "id": "sheets-1",
+            "type": "SHEETS_READ",
+            "label": "Tabloyu Oku",
+            "config": {
+                "spreadsheetId": "130umhKeTjQ15GQ_0OKxhSdUfKYjACWNGxSTVb4cZYfE",
+                "range": "A1:K1000",
+                "variableName": "sheet_data"
+            },
+            "position": {
+                "x": 100,
+                "y": 250
+            }
+        },
+        {
+            "id": "bulk-1",
+            "type": "BULK_ADD_TO_MEMORY",
+            "label": "Toplu Ekle",
+            "config": {
+                "data": "sheet_data",
+                "contractColumn": 0,
+                "durumColumn": 1,
+                "phoneColumn": 5,
+                "muhatabColumn": 6,
+                "nameColumn": 6,
+                "debtColumn": 9,
+                "variableName": "bulk_result"
+            },
+            "position": {
+                "x": 100,
+                "y": 350
+            }
+        },
+        {
+            "id": "notify-1",
+            "type": "NOTIFICATION",
+            "label": "Bildir",
+            "config": {
+                "title": "Hafıza Güncellendi",
+                "message": "{{bulk_result.addedCount}} kayıt eklendi"
+            },
+            "position": {
+                "x": 100,
+                "y": 450
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "clear-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "clear-1",
+            "targetNodeId": "sheets-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "sheets-1",
+            "targetNodeId": "bulk-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "bulk-1",
+            "targetNodeId": "notify-1",
+            "sourcePort": "default"
+        }
+    ]
+}

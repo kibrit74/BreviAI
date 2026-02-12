@@ -1,0 +1,13 @@
+{
+    "name": "brevi-settings",
+    "version": "1.0.0",
+    "main": "index.ts",
+    "description": "Native module for BreviAI settings",
+    "author": "BreviAI",
+    "peerDependencies": {
+        "expo": "*"
+    },
+    "devDependencies": {
+        "expo-modules-core": "~2.0.0"
+    }
+}

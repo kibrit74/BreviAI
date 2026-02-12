@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">BreviAI Accessibility Service allows the app to perform automation tasks like clicking buttons and reading screen content.</string>
+</resources>

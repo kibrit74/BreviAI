@@ -1,0 +1,164 @@
+{
+    "id": "call-transcribe-yavuz",
+    "name": "📞 Yavuz OBUZ Arama Transkripsiyon",
+    "description": "Yavuz OBUZ aradığında hoparlörü açıp konuşmayı ses kaydına alır, AI agent ile transkript çıkarır",
+    "icon": "📞",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "CALL_TRIGGER",
+            "label": "Yavuz OBUZ Arayınca",
+            "config": {
+                "callState": "connected",
+                "phoneFilter": "",
+                "variableName": "callerInfo"
+            },
+            "position": {
+                "x": 100,
+                "y": 50
+            }
+        },
+        {
+            "id": "notify-start",
+            "type": "NOTIFICATION",
+            "label": "Kayıt Başladı Bildirimi",
+            "config": {
+                "type": "notification",
+                "title": "📞 Arama Kaydı",
+                "message": "Yavuz OBUZ araması algılandı. Ses kaydı başlıyor..."
+            },
+            "position": {
+                "x": 100,
+                "y": 150
+            }
+        },
+        {
+            "id": "speaker-on",
+            "type": "VOLUME_CONTROL",
+            "label": "Hoparlörü Aç (Ses %80)",
+            "config": {
+                "level": 80,
+                "type": "media"
+            },
+            "position": {
+                "x": 100,
+                "y": 250
+            }
+        },
+        {
+            "id": "record-1",
+            "type": "AUDIO_RECORD",
+            "label": "Konuşmayı Kaydet (5dk)",
+            "config": {
+                "duration": 300,
+                "variableName": "audioFile"
+            },
+            "position": {
+                "x": 100,
+                "y": 350
+            }
+        },
+        {
+            "id": "stt-1",
+            "type": "SPEECH_TO_TEXT",
+            "label": "Sesi Yazıya Çevir",
+            "config": {
+                "language": "tr-TR",
+                "variableName": "transcription",
+                "continuous": true
+            },
+            "position": {
+                "x": 100,
+                "y": 450
+            }
+        },
+        {
+            "id": "agent-1",
+            "type": "AGENT_AI",
+            "label": "Transkripti Düzenle",
+            "config": {
+                "prompt": "Aşağıdaki telefon görüşmesi transkriptini düzgün bir formata sok. Konuşmacıları ayır (Arayan ve Ben). Önemli noktaları ve alınan kararları vurgula. Transkript:\n\n{{transcription}}",
+                "provider": "gemini",
+                "model": "gemini-2.0-flash-exp",
+                "temperature": 0.3,
+                "maxTokens": 2000,
+                "variableName": "formattedTranscript"
+            },
+            "position": {
+                "x": 100,
+                "y": 550
+            }
+        },
+        {
+            "id": "file-1",
+            "type": "FILE_WRITE",
+            "label": "Transkripti Kaydet",
+            "config": {
+                "filename": "arama_yavuz_obuz_{{_currentDate}}.txt",
+                "content": "📞 ARAMA TRANSKRİPTİ\n━━━━━━━━━━━━━━━━━━━━━━\nTarih: {{_currentDate}} {{_currentTime}}\nArayan: Yavuz OBUZ\n━━━━━━━━━━━━━━━━━━━━━━\n\n{{formattedTranscript}}"
+            },
+            "position": {
+                "x": 100,
+                "y": 650
+            }
+        },
+        {
+            "id": "notify-end",
+            "type": "NOTIFICATION",
+            "label": "Tamamlandı Bildirimi",
+            "config": {
+                "type": "notification",
+                "title": "✅ Transkript Hazır",
+                "message": "Yavuz OBUZ ile yapılan görüşme kaydedildi ve transkripti çıkarıldı."
+            },
+            "position": {
+                "x": 100,
+                "y": 750
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "notify-start",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "notify-start",
+            "targetNodeId": "speaker-on",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "speaker-on",
+            "targetNodeId": "record-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "record-1",
+            "targetNodeId": "stt-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e5",
+            "sourceNodeId": "stt-1",
+            "targetNodeId": "agent-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e6",
+            "sourceNodeId": "agent-1",
+            "targetNodeId": "file-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e7",
+            "sourceNodeId": "file-1",
+            "targetNodeId": "notify-end",
+            "sourcePort": "default"
+        }
+    ]
+}

@@ -1,0 +1,62 @@
+{
+    "id": "debug-list-memory",
+    "name": "Hafızayı Listele (Debug)",
+    "description": "Vektör hafızadaki tüm kayıtları konsola yazdırır",
+    "icon": "🔍",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "config": {},
+            "position": {
+                "x": 100,
+                "y": 100
+            }
+        },
+        {
+            "id": "agent-1",
+            "type": "AGENT_AI",
+            "label": "Hafızayı Listele",
+            "config": {
+                "prompt": "Görev: Hafızadaki TÜM kayıtları listele.\n\n1. search_memory tool'unu kullanarak geniş bir arama yap (örn: 'Sözleşme' veya '*' veya boş)\n2. Bulunan TÜM sonuçları listele\n3. Her kayıt için şunları göster:\n   - Sözleşme numarası\n   - Ad\n   - Telefon\n   - Borç\n   - Muhatap (varsa)\n   - Durum (varsa)\n\nTüm sonuçları güzel formatlanmış bir liste olarak döndür.",
+                "model": "gemini-2.0-flash",
+                "variableName": "hafiza_listesi",
+                "tools": [
+                    "search_memory"
+                ]
+            },
+            "position": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": "notify-1",
+            "type": "NOTIFICATION",
+            "label": "Sonuç Göster",
+            "config": {
+                "title": "Hafıza Listesi",
+                "message": "Konsola bakın - {{hafiza_listesi}}"
+            },
+            "position": {
+                "x": 100,
+                "y": 300
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "agent-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "agent-1",
+            "targetNodeId": "notify-1",
+            "sourcePort": "default"
+        }
+    ]
+}

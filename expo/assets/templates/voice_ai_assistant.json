@@ -1,0 +1,68 @@
+{
+    "name": "📞 Sesli AI Sekreter",
+    "description": "Arama geldiğinde hoparlörü açıp Gemini ile gerçek zamanlı karşılık veren AI asistan",
+    "category": "communication",
+    "icon": "call-outline",
+    "color": "#EF4444",
+    "nodes": [
+        {
+            "id": "trigger-call",
+            "type": "CALL_TRIGGER",
+            "label": "Arama Geldi",
+            "config": {
+                "callState": "Incoming",
+                "variableName": "callerInfo"
+            },
+            "position": {
+                "x": 100,
+                "y": 50
+            }
+        },
+        {
+            "id": "realtime-ai",
+            "type": "REALTIME_AI",
+            "label": "Sesli AI (Hoparlör)",
+            "config": {
+                "systemPrompt": "Sen bir AI telefon sekretersin. Arayan kişiyle Türkçe konuşuyorsun.\n\nKurallar:\n- Kısa ve profesyonel cevaplar ver (1-2 cümle)\n- Aramayı karşıla: 'Merhaba, BreviAI asistanı, size nasıl yardımcı olabilirim?'\n- Arayan kişinin ismini ve mesajını not al\n- Gerektiğinde bilgi sor\n- Arayan: {{_callerNumber}}",
+                "voice": "Kore",
+                "model": "gemini-2.5-flash-live-001",
+                "tools": true,
+                "speakerMode": true,
+                "maxDuration": 120,
+                "variableName": "konusmaMetni"
+            },
+            "position": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": "notify-end",
+            "type": "NOTIFICATION",
+            "label": "Görüşme Bitti",
+            "config": {
+                "type": "notification",
+                "title": "📞 Arama Tamamlandı",
+                "message": "Arayan: {{_callerNumber}}\n{{konusmaMetni}}"
+            },
+            "position": {
+                "x": 100,
+                "y": 400
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-call",
+            "targetNodeId": "realtime-ai",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "realtime-ai",
+            "targetNodeId": "notify-end",
+            "sourcePort": "default"
+        }
+    ]
+}

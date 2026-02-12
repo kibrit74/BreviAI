@@ -1,0 +1,18 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Native
+# Native
+# Native
+/android/
+/ios/
+
+# Force inclusion of local module native code
+# Force inclusion of local modules
+!/modules/**
+/modules/**/build/
+/modules/**/.gradle/
+local.properties
+

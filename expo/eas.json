@@ -1,0 +1,40 @@
+{
+    "cli": {
+        "version": ">= 7.0.0",
+        "appVersionSource": "remote"
+    },
+    "build": {
+        "development": {
+            "developmentClient": true,
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk",
+                "gradleCommand": ":app:assembleDebug"
+            }
+        },
+        "preview": {
+            "distribution": "internal",
+            "android": {
+                "buildType": "apk"
+            },
+            "env": {
+                "EXPO_PUBLIC_API_URL": "https://breviai.vercel.app",
+                "EXPO_PUBLIC_SUPABASE_URL": "https://inhzwjvhnispiqbjhkpg.supabase.co",
+                "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluaHp3anZobmlzcGlxYmpoa3BnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2MDk3MTQsImV4cCI6MjA4MzE4NTcxNH0.SaauRA9Tgtubys4vgmVIkiSiepj9pSPP_LNASEphSCc"
+            }
+        },
+        "production": {
+            "android": {
+                "buildType": "app-bundle"
+            }
+        }
+    },
+    "submit": {
+        "production": {
+            "android": {
+                "serviceAccountKeyPath": "./google-services.json",
+                "track": "internal"
+            }
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "hukuk-buro-ai",
+  "private_key_id": "8c5b3a4c275d92dcad22741d816c532fdde31055",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDhS1vszCY/XKC4\nQ21FOB5Q9rWPyhNFnER4kAI3xESUJLLHc6/GmwJAPd5QtjpXJ23H8W7o5lhk2kZs\nACAdlimAE4XeoCG/erR5M+Bkcp/6TiVv0+VmAoQTwhynCTYJ2F4EmO+wGak3aTO1\n6b5mvbo7AGnTBwrsL27bCQKQD5ehiTMsEkd+VS70iO+3OcAKub4wZCeHwijJ4JKx\nlA7xWJR8sS3aeNc12uRq4r3japZ9jQ2jXfewH+2k1NMyqtukPw5JR/bYDl71RieP\nW9H50tzyJ3I5M4QxjkYpvGs5Q08jBIv/PV+eG6ecjTBY7rj0/1QkktWX/pBxxZ3Q\nvVIdB7yFAgMBAAECggEAWzac/Za7x3xzj5aw90zcrU/tO02Hlu/JIvy/ASAD2eyv\nuyPB30lj1GmYCBp3LVEH1+MOUdnsoMxkpZY5anEg1TtSQEuZzkHaLpYLu+9SiM85\nxfhG0JGlMrCs1A3dJIhGrFrU8/m3snjz2CtODJ+09e1ZavhXej9MBP81W+kMLXgx\n2XjCljd0MK4VfY04JWcSbNvd8Qlwbhx1BRw4kGZQhxjB7HZvOoxztBkwq2wJ/5n0\njyGyNSbqkLNAUTE7syCxFXatdqfiKixNNmB30paed+kqlVD9hbBex6RH5Z8AWPTz\ndK09mdSPvjEBz4ILo9A3rxiSLIbq2sZ3/a28okNawwKBgQDxherCSYUmdXC3ppdQ\n/6eFm7z3uw/00qHO+dxpOVtL+8lPQWrPtO0vm1OgATZw/2Nr88pGNVYEnzrQ9IFU\nmMnsmbLf/DXF8WT/Yiwdj9lW0MM8pgQEHHfeHMAI6qzMNxEb5NqmyzcwU/TyAmiR\nCGpkGxjb33h7Q9Nc87RChWNUPwKBgQDuzGsCQHPoj0gXdSgpFAq4ocqD9O9bubhF\nvtrNuoI8YGrlfUdwX+udcn0orIxTpzdQ5CIHlNtd1M7FCQnx+1EzINcAZQQH3gyg\nv4OEPXQoFt5pxs6zoYDcJazLuVThRYqCjJWdCoqlP/i9YViK8d2ULbF6lfVRV/r1\nUlJA+gAuOwKBgFJTZoERVGyWjXRcOannau/U9SWwQrEd9v+5FZNcdK1CxwzX7JOe\nRVb76BZbM3Zy5y3N7L3fwlFTAVZmcYsnhXS7s0g8DQxKyzVt/kGZXekEwffzUt0f\n4w/31tFzRLFbd959NLa0ADzd8VlozsHZD4LN5bxUwRmrNemyPFiMZR47AoGAfRey\nesR+s3XTYw5pUlOAZkXCy6tUc+1vHYIkJp8sOCqd9MfS04g76geejt8Mx4mSDZrk\nRKpy281t34OjpRJs7+alGjzQhrqITPDmGTEEFzgbnLebcjgJQ8msoi/cygFe1JKG\nkXSDOpuvVq2W73pSA5yIG1pQ3yLCgR51njoYPB8CgYEApjZkuWAYDZBGNQ+iIEMk\nKsEi0lnkCmxHE47fe5A+pHcAaGhWDu9l5dnDjcrV0ilqKeqAlFPmqIDy3xm1Phoj\n2BCPI4LO1TtV2VIyAYHYccAOf9kXKMHNnEAm2UiIOTYEGoreZHLWq85+q/uqF5bB\njWZMwgY++/XJbFldAOYk+UA=\n-----END PRIVATE KEY-----\n",
+  "client_email": "n8n-speech-to-text@hukuk-buro-ai.iam.gserviceaccount.com",
+  "client_id": "112441218111795068996",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/n8n-speech-to-text%40hukuk-buro-ai.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

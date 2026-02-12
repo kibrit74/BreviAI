@@ -1,0 +1,249 @@
+{
+    "id": "rag-debtor-tracking-v3",
+    "name": "🧠 Borçlu Takip Sistemi",
+    "description": "Doğal dil ile borçlu sorgulama, bilgi gösterme ve WhatsApp ile mesaj gönderme. Tam kapsamlı borçlu takip otomasyonu.",
+    "icon": "🧠",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "config": {},
+            "position": {
+                "x": 250,
+                "y": 50
+            }
+        },
+        {
+            "id": "overlay-input-1",
+            "type": "OVERLAY_INPUT",
+            "label": "Sorgu Gir",
+            "config": {
+                "placeholder": "Örn: 'Yavuz Obuz borcu ne?', 'Ali Veli'ye mesaj gönder', '0532... kim?'",
+                "variableName": "arama_sorgusu"
+            },
+            "position": {
+                "x": 250,
+                "y": 150
+            }
+        },
+        {
+            "id": "agent-1",
+            "type": "AGENT_AI",
+            "label": "Borçlu Asistan",
+            "config": {
+                "model": "gemini-2.0-flash",
+                "tools": [
+                    "search_memory"
+                ],
+                "outputFormat": "json",
+                "variableName": "sonuc",
+                "prompt": "Sen bir borçlu takip asistanısın. Kullanıcının sorgusunu analiz et ve hafızadan arama yap.\n\nKullanıcı Sorgusu: {{arama_sorgusu}}\n\n## Görevlerin:\n\n### 1. Sorguyu Anla\nKullanıcı şunları sorabilir:\n- İsim ile arama: \"Yavuz Obuz\", \"Ali Veli'nin borcu\"\n- Sözleşme no ile: \"sözleşme 12345\", \"no 67890\"\n- Telefon ile: \"0532...\", \"+90...\"\n- Mesaj gönderme: \"Yavuz Obuz'a gönder\", \"Ali'ye borç bilgisi gönder\"\n- Genel sorgu: \"borcu en yüksek kim?\", \"toplam kaç borçlu var?\"\n\n### 2. Hafızadan Ara\nsearch_memory tool'unu kullanarak ilgili kayıtları bul. Birden fazla sonuç gelebilir, hepsini değerlendir.\n\n### 3. Aksiyon Belirle\n- Eğer kullanıcı \"gönder\", \"mesaj at\", \"whatsapp\", \"bildir\" gibi kelimeler kullandıysa → action_type = \"mesaj_gönder\"\n- Eğer sadece bilgi soruyorsa (\"borcu ne?\", \"kim bu?\", sözleşme arama) → action_type = \"bilgi_göster\"\n- Eğer hiç sonuç bulamadıysan → action_type = \"bulunamadı\"\n\n### 4. Mobil Bankacılık Şablonu (mesaj_gönder durumunda)\nWhatsApp mesajı şu formatta olmalı:\n\nMOBİL BANKACILIK\nMobil bankacılık ile ödemek için; hesaba giriş yapın Ödemeler → FATURA ÖDEME → Elektrik → Ayedaş Dağıtım veya İstanbul Anadolu Yakası Elektrik Dağıtım sekmesinden sözleşme numarası : [SÖZLEŞME_NO] girin karşınıza borç bilgisi çıkacak [BORÇ_TUTARI] TL seçip ödeyebilirsiniz.\n\n### 5. JSON Çıktı Formatı\nHer zaman şu formatta JSON döndür:\n{\n  \"action_type\": \"mesaj_gönder\" | \"bilgi_göster\" | \"bulunamadı\",\n  \"found\": true | false,\n  \"results_count\": 1,\n  \"name\": \"Ad Soyad\",\n  \"contract\": \"Sözleşme No\",\n  \"debt\": \"Borç Tutarı\",\n  \"phone_number\": \"+90... veya boş string\",\n  \"muhatap\": \"Muhatap tanımı (varsa)\",\n  \"durum\": \"Durum tanıtıcısı (varsa)\",\n  \"whatsapp_message\": \"Mobil bankacılık şablonlu mesaj (sadece mesaj_gönder ise)\",\n  \"summary\": \"Kısa özet bilgi (tüm durumlar için)\",\n  \"all_results\": \"Birden fazla sonuç varsa tüm sonuçların listesi (opsiyonel)\"\n}\n\n## Önemli Kurallar:\n- Telefon numarası varsa başında +90 olmalı (0532 → +90532)\n- Borç tutarını TL formatında yaz\n- Birden fazla sonuç varsa hepsini all_results alanında listele\n- has_phone yerine phone_number boş/dolu kontrolü yap\n- Bulunamadıysa summary alanına anlamlı bir mesaj yaz"
+            },
+            "position": {
+                "x": 250,
+                "y": 280
+            }
+        },
+        {
+            "id": "switch-1",
+            "type": "SWITCH",
+            "label": "Aksiyon Yönlendir",
+            "config": {
+                "variableName": "sonuc.action_type",
+                "cases": [
+                    {
+                        "value": "mesaj_gönder",
+                        "portId": "case_1"
+                    },
+                    {
+                        "value": "bilgi_göster",
+                        "portId": "case_2"
+                    }
+                ],
+                "defaultPortId": "case_3"
+            },
+            "position": {
+                "x": 250,
+                "y": 420
+            }
+        },
+        {
+            "id": "overlay-info-1",
+            "type": "SHOW_OVERLAY",
+            "label": "WhatsApp Önizleme",
+            "config": {
+                "message": "📤 WhatsApp Gönderiliyor...\n\n👤 {{sonuc.name}}\n📄 Sözleşme: {{sonuc.contract}}\n💰 Borç: {{sonuc.debt}} TL\n📱 Tel: {{sonuc.phone_number}}"
+            },
+            "position": {
+                "x": 50,
+                "y": 540
+            }
+        },
+        {
+            "id": "whatsapp-1",
+            "type": "WHATSAPP_SEND",
+            "label": "WhatsApp Gönder",
+            "config": {
+                "phoneNumber": "{{sonuc.phone_number}}",
+                "message": "{{sonuc.whatsapp_message}}"
+            },
+            "position": {
+                "x": 50,
+                "y": 660
+            }
+        },
+        {
+            "id": "overlay-success-1",
+            "type": "SHOW_OVERLAY",
+            "label": "Gönderim Onayı",
+            "config": {
+                "message": "✅ WhatsApp mesajı gönderildi!\n\n👤 {{sonuc.name}}\n📄 Sözleşme: {{sonuc.contract}}\n💰 Borç: {{sonuc.debt}} TL"
+            },
+            "position": {
+                "x": 50,
+                "y": 780
+            }
+        },
+        {
+            "id": "overlay-detail-1",
+            "type": "SHOW_OVERLAY",
+            "label": "Borçlu Detay",
+            "config": {
+                "message": "📋 Borçlu Bilgileri:\n\n👤 Ad: {{sonuc.name}}\n📄 Sözleşme: {{sonuc.contract}}\n💰 Borç: {{sonuc.debt}} TL\n📱 Telefon: {{sonuc.phone_number}}\n📝 Muhatap: {{sonuc.muhatap}}\n🏷️ Durum: {{sonuc.durum}}\n\n{{sonuc.summary}}\n\n{{sonuc.all_results}}"
+            },
+            "position": {
+                "x": 250,
+                "y": 540
+            }
+        },
+        {
+            "id": "overlay-notfound-1",
+            "type": "SHOW_OVERLAY",
+            "label": "Bulunamadı",
+            "config": {
+                "message": "❌ Borçlu Bulunamadı\n\nArama: \"{{arama_sorgusu}}\"\n\n{{sonuc.summary}}\n\n💡 İpucu: Ad, sözleşme numarası veya telefon numarası ile tekrar deneyin."
+            },
+            "position": {
+                "x": 450,
+                "y": 540
+            }
+        },
+        {
+            "id": "menu-devam-1",
+            "type": "SHOW_MENU",
+            "label": "Devam Et?",
+            "config": {
+                "title": "Başka bir işlem yapmak ister misiniz?",
+                "options": [
+                    "🔍 Yeni Sorgu",
+                    "❌ Çık"
+                ],
+                "variableName": "devam_secim"
+            },
+            "position": {
+                "x": 250,
+                "y": 900
+            }
+        },
+        {
+            "id": "if-devam-1",
+            "type": "IF_ELSE",
+            "label": "Devam mı?",
+            "config": {
+                "conditions": [
+                    {
+                        "left": "{{devam_secim}}",
+                        "operator": "==",
+                        "right": "🔍 Yeni Sorgu"
+                    }
+                ],
+                "logicOperator": "AND"
+            },
+            "position": {
+                "x": 250,
+                "y": 1020
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e-start",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "overlay-input-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-input-agent",
+            "sourceNodeId": "overlay-input-1",
+            "targetNodeId": "agent-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-agent-switch",
+            "sourceNodeId": "agent-1",
+            "targetNodeId": "switch-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-switch-whatsapp",
+            "sourceNodeId": "switch-1",
+            "targetNodeId": "overlay-info-1",
+            "sourcePort": "case_1"
+        },
+        {
+            "id": "e-switch-detail",
+            "sourceNodeId": "switch-1",
+            "targetNodeId": "overlay-detail-1",
+            "sourcePort": "case_2"
+        },
+        {
+            "id": "e-switch-notfound",
+            "sourceNodeId": "switch-1",
+            "targetNodeId": "overlay-notfound-1",
+            "sourcePort": "case_3"
+        },
+        {
+            "id": "e-info-wa",
+            "sourceNodeId": "overlay-info-1",
+            "targetNodeId": "whatsapp-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-wa-success",
+            "sourceNodeId": "whatsapp-1",
+            "targetNodeId": "overlay-success-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-success-menu",
+            "sourceNodeId": "overlay-success-1",
+            "targetNodeId": "menu-devam-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-detail-menu",
+            "sourceNodeId": "overlay-detail-1",
+            "targetNodeId": "menu-devam-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-notfound-menu",
+            "sourceNodeId": "overlay-notfound-1",
+            "targetNodeId": "menu-devam-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-menu-check",
+            "sourceNodeId": "menu-devam-1",
+            "targetNodeId": "if-devam-1",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-devam-loop",
+            "sourceNodeId": "if-devam-1",
+            "targetNodeId": "overlay-input-1",
+            "sourcePort": "true"
+        }
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "platforms": [
+        "android"
+    ],
+    "android": {
+        "package": "com.breviai.brevisettings",
+        "modules": [
+            "com.breviai.brevisettings.BreviSettingsModule"
+        ]
+    }
+}
