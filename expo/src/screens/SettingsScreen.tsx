@@ -108,12 +108,21 @@ export default function SettingsScreen({ navigation }: any) {
     // WhatsApp State
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001'); // Default GCP
+    const [waBackendUrl, setWaBackendUrl] = React.useState('http://10.0.2.2:3001'); // Default to Local (Android)
 
     // Load saved WA URL on mount
     React.useEffect(() => {
         const loadWaUrl = async () => {
             try {
+                // Priority 1: Check UserSettings variables (set via .env or custom vars)
+                const envUrl = userSettingsService.getCustomVariable('WHATSAPP_BACKEND_URL');
+                if (envUrl && (envUrl.startsWith('http') || envUrl.includes('.'))) {
+                    console.log('[Settings] Loaded WA URL from Variables:', envUrl);
+                    setWaBackendUrl(envUrl);
+                    return;
+                }
+
+                // Priority 2: Check AsyncStorage (manual overrides)
                 const saved = await AsyncStorage.getItem('whatsapp_backend_url');
                 if (saved && (saved.startsWith('http') || saved.includes('.'))) {
                     setWaBackendUrl(saved);
@@ -136,10 +145,10 @@ export default function SettingsScreen({ navigation }: any) {
     }, [waBackendUrl]);
 
     const resetWaUrl = () => {
-        const defaultUrl = 'http://136.117.34.89:3001';
+        const defaultUrl = 'http://10.0.2.2:3001';
         setWaBackendUrl(defaultUrl);
         AsyncStorage.setItem('whatsapp_backend_url', defaultUrl);
-        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Remote) ayarlandı.');
+        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Localhost) ayarlandı.');
     };
 
     const checkWhatsAppStatus = async () => {
@@ -214,6 +223,16 @@ export default function SettingsScreen({ navigation }: any) {
         setClaudeKey(settings.claudeApiKey);
         setOpenWeatherKey(settings.openWeatherApiKey);
         setGoogleAuth(googleService.getAuthState());
+
+        // Sync WA URL from Settings
+        const envUrl = settings.customVariables['WHATSAPP_BACKEND_URL']?.value;
+        if (envUrl && (envUrl.startsWith('http') || envUrl.includes('.'))) {
+            console.log('[Settings] Syncing WA URL from Loaded Vars:', envUrl);
+            setWaBackendUrl(envUrl);
+        } else {
+            // If no custom var, we might check async storage here, but the separate useEffect does that on mount.
+            // However, to be safe, if we have a var, we FORCE it here.
+        }
     };
 
     const openApiKeyModal = (provider: AIProvider) => {
@@ -635,7 +654,7 @@ export default function SettingsScreen({ navigation }: any) {
                                         </Text>
                                         <TouchableOpacity onPress={resetWaUrl} style={{ marginTop: 4 }}>
                                             <Text style={{ fontSize: 10, color: activeColors.primary, textDecorationLine: 'underline' }}>
-                                                Varsayılana Sıfırla (Remote)
+                                                Varsayılana Sıfırla (Localhost)
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -693,7 +712,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: '#25D366', padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: "#25D366", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                                         onPress={() => {
-                                            const safeUrl = (waBackendUrl || 'http://136.117.34.89:3001');
+                                            const safeUrl = (waBackendUrl || 'http://10.0.2.2:3001');
                                             console.log('[WA Debug] Sending test message...');
                                             console.log('[WA Debug] URL:', safeUrl);
                                             console.log('[WA Debug] User:', waStatus?.user);
@@ -703,6 +722,9 @@ export default function SettingsScreen({ navigation }: any) {
                                                 return;
                                             }
 
+                                            // Default phone number if user is undefined (e.g. still initializing)
+                                            const targetPhone = waStatus?.user?.number || '905555555555';
+
                                             try {
                                                 fetch(`${safeUrl}/whatsapp/send`, {
                                                     method: 'POST',
@@ -711,21 +733,29 @@ export default function SettingsScreen({ navigation }: any) {
                                                         'x-auth-key': 'breviai-secret-password'
                                                     },
                                                     body: JSON.stringify({
-                                                        phone: waStatus?.user?.number || 'Unknown',
+                                                        phone: targetPhone,
                                                         message: '🔔 BreviAI Test Mesajı\n\nBu mesaj bağlantının çalıştığını doğrulamak için gönderildi.'
                                                     })
                                                 })
-                                                    .then(r => r.json())
+                                                    .then(async r => {
+                                                        const text = await r.text();
+                                                        console.log('[WA Debug] Raw Response:', text);
+                                                        try {
+                                                            return JSON.parse(text);
+                                                        } catch {
+                                                            return { error: 'Invalid JSON response', raw: text };
+                                                        }
+                                                    })
                                                     .then(d => {
-                                                        console.log('[WA Debug] Response:', d);
+                                                        console.log('[WA Debug] Parsed Response:', d);
                                                         if (d.success) Alert.alert('✅ Başarılı', 'Test mesajı gönderildi!');
-                                                        else Alert.alert('Hata', (d.error && typeof d.error === 'string') ? d.error : 'Gönderilemedi');
+                                                        else Alert.alert('Hata', (d.error && typeof d.error === 'string') ? d.error : JSON.stringify(d));
                                                     })
                                                     .catch(e => {
                                                         console.error('[WA Debug] Fetch Error:', e);
                                                         Alert.alert('Hata', e.message || 'Bilinmeyen bir iletişim hatası.');
                                                     });
-                                            } catch (err) {
+                                            } catch (err: any) {
                                                 console.error('[WA Debug] Critical Error:', err);
                                                 Alert.alert('Kritik Hata', 'Mesaj gönderilirken bir hata oluştu.');
                                             }
