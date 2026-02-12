@@ -108,7 +108,7 @@ export default function SettingsScreen({ navigation }: any) {
     // WhatsApp State
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('http://10.0.2.2:3001'); // Default to Local (Android)
+    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001'); // Default to Remote
 
     // Load saved WA URL on mount
     React.useEffect(() => {
@@ -145,10 +145,10 @@ export default function SettingsScreen({ navigation }: any) {
     }, [waBackendUrl]);
 
     const resetWaUrl = () => {
-        const defaultUrl = 'http://10.0.2.2:3001';
+        const defaultUrl = 'http://136.117.34.89:3001';
         setWaBackendUrl(defaultUrl);
         AsyncStorage.setItem('whatsapp_backend_url', defaultUrl);
-        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Localhost) ayarlandı.');
+        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Remote) ayarlandı.');
     };
 
     const checkWhatsAppStatus = async () => {
@@ -654,7 +654,7 @@ export default function SettingsScreen({ navigation }: any) {
                                         </Text>
                                         <TouchableOpacity onPress={resetWaUrl} style={{ marginTop: 4 }}>
                                             <Text style={{ fontSize: 10, color: activeColors.primary, textDecorationLine: 'underline' }}>
-                                                Varsayılana Sıfırla (Localhost)
+                                                Varsayılana Sıfırla (Remote)
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
