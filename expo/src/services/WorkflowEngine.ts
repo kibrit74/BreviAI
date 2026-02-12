@@ -932,6 +932,14 @@ export class WorkflowEngine {
                 case 'CRON_CREATE':
                     output = await executeCronCreate(node.config as any, this.variableManager);
                     break;
+                case 'CRON_DELETE':
+                    const { executeCronDelete } = require('./nodes/backend');
+                    output = await executeCronDelete(node.config as any, this.variableManager);
+                    break;
+                case 'CRON_LIST':
+                    const { executeCronList } = require('./nodes/backend');
+                    output = await executeCronList(node.config as any, this.variableManager);
+                    break;
 
                 default:
                     console.warn(`Unknown node type: ${node.type}`);

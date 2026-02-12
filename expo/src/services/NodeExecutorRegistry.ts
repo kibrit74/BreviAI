@@ -164,6 +164,8 @@ import {
 
 import {
     executeCronCreate,
+    executeCronDelete,
+    executeCronList,
     executeBrowserScrape
 } from './nodes/backend';
 
@@ -330,6 +332,8 @@ const executorRegistry: Partial<Record<NodeType, ExecutorEntry>> = {
 
     // Backend Services
     'CRON_CREATE': { executor: executeCronCreate },
+    'CRON_DELETE': { executor: executeCronDelete },
+    'CRON_LIST': { executor: executeCronList },
     'BROWSER_SCRAPE': { executor: executeBrowserScrape },
 };
 

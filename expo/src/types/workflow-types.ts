@@ -133,6 +133,8 @@ export type NodeType =
     | 'IMAGE_EDIT'
     // Backend Services
     | 'CRON_CREATE'
+    | 'CRON_DELETE'
+    | 'CRON_LIST'
     | 'BROWSER_SCRAPE'
     // Google (4)
     | 'GMAIL_SEND'
@@ -750,6 +752,15 @@ export interface CronCreateConfig {
     actionType: 'log' | 'webhook' | 'workflow';
     actionPayload: string; // JSON string
     variableName?: string;
+}
+
+export interface CronDeleteConfig {
+    jobId: string; // ID of the cron job to delete (supports {{variable}})
+    variableName?: string; // Optional: store result
+}
+
+export interface CronListConfig {
+    variableName: string; // Store list of active cron jobs
 }
 
 export interface BrowserScrapeConfig {
@@ -2374,6 +2385,26 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         color: '#8B5CF6',
         hasInputPort: true,
         outputPorts: ['default'],
+    },
+    CRON_DELETE: {
+        type: 'CRON_DELETE',
+        category: 'device',
+        name: 'Görevi Sil',
+        description: 'Zamanlanmış görevi iptal eder',
+        icon: 'trash',
+        color: '#EF4444',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
+    CRON_LIST: {
+        type: 'CRON_LIST',
+        category: 'device',
+        name: 'Görevleri Listele',
+        description: 'Aktif zamanlanmış görevleri listeler',
+        icon: 'list',
+        color: '#6366F1',
+        hasInputPort: true,
+        outputPorts: ['default'],
     }
 };
 
@@ -2501,6 +2532,8 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         // Backend nodes
         case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', variableName: 'scrapedData' };
         case 'CRON_CREATE': return { name: 'My Cron', schedule: '*/5 * * * *', actionType: 'log', actionPayload: '{}' };
+        case 'CRON_DELETE': return { jobId: '', variableName: 'cronDeleteResult' };
+        case 'CRON_LIST': return { variableName: 'cronJobs' };
 
         default: return {} as NodeConfig;
     }

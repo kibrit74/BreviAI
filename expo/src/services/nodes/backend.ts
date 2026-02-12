@@ -1,4 +1,4 @@
-import { CronCreateConfig, BrowserScrapeConfig } from '../../types/workflow-types';
+import { CronCreateConfig, BrowserScrapeConfig, CronDeleteConfig, CronListConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 
 const BACKEND_URL = 'http://136.117.34.89:3001';
@@ -71,6 +71,101 @@ export async function executeCronCreate(
         }
         console.error('[CronCreate] Error:', error);
         throw new Error(`Cron creation failed: ${error.message}`);
+    }
+}
+
+/**
+ * Execute CRON_DELETE node
+ * Deletes a scheduled task from the backend
+ */
+export async function executeCronDelete(
+    config: CronDeleteConfig,
+    variableManager: VariableManager
+): Promise<any> {
+    const jobId = variableManager.resolveString(config.jobId);
+
+    if (!jobId) {
+        throw new Error('Job ID is required to delete a cron job');
+    }
+
+    console.log('[CronDelete] Deleting job:', jobId);
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${BACKEND_URL}/cron/delete/${encodeURIComponent(jobId)}`, {
+            method: 'DELETE',
+            headers: {
+                'x-auth-key': AUTH_KEY,
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Backend error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (config.variableName) {
+            variableManager.set(config.variableName, data);
+        }
+
+        return { success: true, deletedJobId: jobId, data };
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out after 10 seconds');
+        }
+        console.error('[CronDelete] Error:', error);
+        throw new Error(`Cron deletion failed: ${error.message}`);
+    }
+}
+
+/**
+ * Execute CRON_LIST node
+ * Lists all active scheduled tasks from the backend
+ */
+export async function executeCronList(
+    config: CronListConfig,
+    variableManager: VariableManager
+): Promise<any> {
+    console.log('[CronList] Fetching active jobs...');
+
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(`${BACKEND_URL}/cron/list`, {
+            method: 'GET',
+            headers: {
+                'x-auth-key': AUTH_KEY,
+            },
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            throw new Error(`Backend error: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const jobs = data.jobs || [];
+
+        if (config.variableName) {
+            variableManager.set(config.variableName, jobs);
+        }
+
+        console.log(`[CronList] Found ${jobs.length} active jobs`);
+        return { success: true, jobs, count: jobs.length };
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out after 10 seconds');
+        }
+        console.error('[CronList] Error:', error);
+        throw new Error(`Cron list failed: ${error.message}`);
     }
 }
 
