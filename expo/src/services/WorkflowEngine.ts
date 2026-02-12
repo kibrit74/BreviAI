@@ -129,6 +129,10 @@ import {
     executeGestureTrigger
 } from './nodes/sensors';
 import { executeCameraCapture } from './nodes/camera';
+import {
+    executeCronCreate,
+    executeBrowserScrape
+} from './nodes/backend';
 import { debugLog } from './DebugLogger';
 import { userSettingsService } from './UserSettingsService';
 import { getToolByName } from './ToolRegistry';
@@ -919,6 +923,14 @@ export class WorkflowEngine {
                     break;
                 case 'REMEMBER_INFO':
                     output = await executeRememberInfo(node.config as any, this.variableManager);
+                    break;
+
+                // Backend Services
+                case 'BROWSER_SCRAPE':
+                    output = await executeBrowserScrape(node.config as any, this.variableManager);
+                    break;
+                case 'CRON_CREATE':
+                    output = await executeCronCreate(node.config as any, this.variableManager);
                     break;
 
                 default:

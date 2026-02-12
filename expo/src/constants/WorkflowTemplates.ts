@@ -397,5 +397,70 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         edges: [
             { id: 'e1', sourceNodeId: '1', targetNodeId: '2', sourcePort: 'default' }
         ]
+    },
+    {
+        id: 'backend-super-test',
+        name: '🧪 Backend Süper Güç Testi',
+        description: 'Browser Scrape ve Cron Create özelliklerini test eder. (Versiyon: 1.0)',
+        icon: 'server',
+        color: '#6366F1',
+        nodes: [
+            {
+                id: '1',
+                type: 'MANUAL_TRIGGER',
+                config: {},
+                position: { x: 100, y: 100 },
+                label: 'Testi Başlat'
+            },
+            {
+                id: '2',
+                type: 'BROWSER_SCRAPE',
+                config: {
+                    url: 'https://time.is/UTC',
+                    waitForSelector: '#time',
+                    variableName: 'serverTime'
+                },
+                position: { x: 100, y: 250 },
+                label: 'Web Kaynağını Oku'
+            },
+            {
+                id: '3',
+                type: 'SHOW_TEXT',
+                config: {
+                    title: 'Sunucudan Gelen Veri',
+                    content: 'Backend Sunucusu time.is sitesine bağlandı.\n\nOkunan UTC Zamanı: {{serverTime}}\n\nŞimdi otomatik bir görev planlanıyor...'
+                },
+                position: { x: 100, y: 400 },
+                label: 'Sonucu Göster'
+            },
+            {
+                id: '4',
+                type: 'CRON_CREATE',
+                config: {
+                    name: 'Otomatik Kontrol (Test)',
+                    schedule: '*/5 * * * *',
+                    actionType: 'log',
+                    actionPayload: '{"message": "BreviAI Backend is Alive!"}'
+                },
+                position: { x: 100, y: 550 },
+                label: '5 Dk\'da Bir Logla'
+            },
+            {
+                id: '5',
+                type: 'SHOW_TEXT',
+                config: {
+                    title: 'Test Başarılı!',
+                    content: '1. Web Scraping: ✅ (Veri alındı)\n2. Cron Job: ✅ (Her 5 dakikada bir sunucu loguna yazacak)\n\nSüper güçlerin aktif!'
+                },
+                position: { x: 100, y: 700 },
+                label: 'Bitiş Raporu'
+            }
+        ],
+        edges: [
+            { id: 'e1', sourceNodeId: '1', targetNodeId: '2', sourcePort: 'default' },
+            { id: 'e2', sourceNodeId: '2', targetNodeId: '3', sourcePort: 'default' },
+            { id: 'e3', sourceNodeId: '3', targetNodeId: '4', sourcePort: 'default' },
+            { id: 'e4', sourceNodeId: '4', targetNodeId: '5', sourcePort: 'default' }
+        ]
     }
 ];

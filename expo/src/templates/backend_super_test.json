@@ -1,0 +1,128 @@
+{
+    "id": "backend-super-test",
+    "name": "🧪 Backend Süper Güç Testi",
+    "description": "Dolar kurunu web'den çekip her 1 dakikada bir WhatsApp ile gönderir. (Versiyon: 2.0)",
+    "icon": "server",
+    "color": "#6366F1",
+    "nodes": [
+        {
+            "id": "1",
+            "type": "MANUAL_TRIGGER",
+            "config": {},
+            "position": {
+                "x": 100,
+                "y": 100
+            },
+            "label": "Testi Başlat"
+        },
+        {
+            "id": "2",
+            "type": "TEXT_INPUT",
+            "config": {
+                "prompt": "WhatsApp mesajı göndermek istediğiniz telefon numarasını girin (ülke kodu ile, örn: 905551234567)",
+                "placeholder": "905551234567",
+                "defaultValue": "",
+                "variableName": "hedefNumara"
+            },
+            "position": {
+                "x": 100,
+                "y": 250
+            },
+            "label": "Telefon Numarası Al"
+        },
+        {
+            "id": "3",
+            "type": "BROWSER_SCRAPE",
+            "config": {
+                "url": "https://www.google.com/finance/quote/USD-TRY",
+                "waitForSelector": "",
+                "variableName": "dolarKuru"
+            },
+            "position": {
+                "x": 100,
+                "y": 400
+            },
+            "label": "Dolar Kurunu Çek"
+        },
+        {
+            "id": "4",
+            "type": "WHATSAPP_SEND",
+            "config": {
+                "phoneNumber": "{{hedefNumara}}",
+                "message": "💰 Güncel Dolar Kuru: {{dolarKuru}}\n\n📅 Tarih: {{_date}}\n⏰ Saat: {{_time}}\n\n🤖 BreviAI Otomatik Bildirim",
+                "mode": "backend",
+                "backendUrl": "http://136.117.34.89:3001/whatsapp",
+                "backendAuthKey": "breviai-secret-password"
+            },
+            "position": {
+                "x": 100,
+                "y": 550
+            },
+            "label": "WhatsApp'tan Kuru Gönder"
+        },
+        {
+            "id": "5",
+            "type": "DELAY",
+            "config": {
+                "duration": 1,
+                "unit": "min"
+            },
+            "position": {
+                "x": 100,
+                "y": 700
+            },
+            "label": "1 Dakika Bekle"
+        },
+        {
+            "id": "6",
+            "type": "SHOW_TEXT",
+            "config": {
+                "title": "✅ Döngü Devam Ediyor",
+                "content": "Son gönderilen kur: {{dolarKuru}}\nHedef numara: {{hedefNumara}}\n\nTekrar dolar kuru çekilecek ve gönderilecek..."
+            },
+            "position": {
+                "x": 100,
+                "y": 850
+            },
+            "label": "Durum Bilgisi"
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "1",
+            "targetNodeId": "2",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "2",
+            "targetNodeId": "3",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "3",
+            "targetNodeId": "4",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "4",
+            "targetNodeId": "5",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e5",
+            "sourceNodeId": "5",
+            "targetNodeId": "6",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e6",
+            "sourceNodeId": "6",
+            "targetNodeId": "3",
+            "sourcePort": "default"
+        }
+    ]
+}

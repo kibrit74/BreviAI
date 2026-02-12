@@ -5156,6 +5156,110 @@ const CameraCaptureFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
     </>
 );
 
+// ═══════════════════════════════════════════════════════════════
+// BROWSER SCRAPE FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Web Adresi (URL)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.url || ''}
+                onChangeText={(t) => updateConfig('url', t)}
+                placeholder="https://example.com"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+                keyboardType="url"
+            />
+            <Text style={styles.fieldHint}>Verilerin çekileceği web sayfası adresi.</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>CSS Seçici (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.waitForSelector || ''}
+                onChangeText={(t) => updateConfig('waitForSelector', t)}
+                placeholder="#content, .main-text"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+            />
+            <Text style={styles.fieldHint}>Sayfada beklenecek HTML elemanının CSS seçicisi.</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName || ''}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="scrapedData"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>Çekilen veri bu değişkene atanır.</Text>
+        </View>
+    </>
+);
+
+// ═══════════════════════════════════════════════════════════════
+// CRON CREATE FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const CronCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Görev Adı</Text>
+            <TextInput
+                style={styles.input}
+                value={config.name || ''}
+                onChangeText={(t) => updateConfig('name', t)}
+                placeholder="Otomatik Kontrol"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Zamanlama (Cron İfadesi)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.schedule || ''}
+                onChangeText={(t) => updateConfig('schedule', t)}
+                placeholder="*/5 * * * *"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+            />
+            <Text style={styles.fieldHint}>Cron formatı: dakika saat gün ay haftanın_günü{"\n"}Örnek: "*/5 * * * *" = Her 5 dakikada bir{"\n"}"0 8 * * *" = Her gün saat 08:00{"\n"}"0 0 * * 1" = Her Pazartesi gece yarısı</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Aksiyon Türü</Text>
+            <View style={styles.buttonRow}>
+                {['log', 'http', 'notification'].map(action => (
+                    <TouchableOpacity
+                        key={action}
+                        style={[styles.unitButton, (config.actionType || 'log') === action && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('actionType', action)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.actionType || 'log') === action && styles.unitButtonTextSelected]}>
+                            {action === 'log' ? '📝 Log' : action === 'http' ? '🌐 HTTP' : '🔔 Bildirim'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Aksiyon Verisi (JSON)</Text>
+            <ExpandableTextInput
+                value={config.actionPayload || ''}
+                onChangeText={(t) => updateConfig('actionPayload', t)}
+                placeholder='{"message": "Görev çalıştı!"}'
+                label="Aksiyon Verisi"
+                minHeight={100}
+                hint="Aksiyona gönderilecek JSON formatında veri."
+            />
+        </View>
+    </>
+);
+
+
 const CodeExecutionFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
         <View style={styles.field}>
@@ -5391,6 +5495,10 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <GoogleTranslateFields config={config} updateConfig={updateConfig} />;
             case 'WEB_AUTOMATION':
                 return <WebAutomationFields config={config} updateConfig={updateConfig} />;
+            case 'BROWSER_SCRAPE':
+                return <BrowserScrapeFields config={config} updateConfig={updateConfig} />;
+            case 'CRON_CREATE':
+                return <CronCreateFields config={config} updateConfig={updateConfig} />;
             case 'IMAGE_GENERATOR':
                 return <ImageGeneratorFields config={config} updateConfig={updateConfig} />;
             case 'IMAGE_EDIT':

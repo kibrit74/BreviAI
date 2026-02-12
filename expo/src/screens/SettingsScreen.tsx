@@ -713,7 +713,7 @@ export default function SettingsScreen({ navigation }: any) {
                                             }
 
                                             // Default phone number if user is undefined (e.g. still initializing)
-                                            const targetPhone = waStatus?.user?.number || '905555555555';
+                                            const targetPhone = waStatus?.user?.number || '905332852323';
 
                                             try {
                                                 fetch(`${safeUrl}/whatsapp/send`, {

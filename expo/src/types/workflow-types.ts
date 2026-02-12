@@ -2353,6 +2353,27 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         color: '#00C853',
         hasInputPort: true,
         outputPorts: ['default']
+    },
+    // Backend nodes
+    BROWSER_SCRAPE: {
+        type: 'BROWSER_SCRAPE',
+        category: 'web',
+        name: 'Web Kazıma',
+        description: 'Backend üzerinden web sitesini okur (JS destekli)',
+        icon: 'globe',
+        color: '#06B6D4',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
+    CRON_CREATE: {
+        type: 'CRON_CREATE',
+        category: 'device',
+        name: 'Zamanlanmış Görev',
+        description: 'Sunucuda periyodik görev oluşturur',
+        icon: 'timer',
+        color: '#8B5CF6',
+        hasInputPort: true,
+        outputPorts: ['default'],
     }
 };
 
@@ -2476,6 +2497,10 @@ function getDefaultConfig(type: NodeType): NodeConfig {
 
         // Location (Missing)
         case 'GEOFENCE_CREATE': return { latitude: 0, longitude: 0, radius: 100, identifier: 'home_fence', name: 'Ev' };
+
+        // Backend nodes
+        case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', variableName: 'scrapedData' };
+        case 'CRON_CREATE': return { name: 'My Cron', schedule: '*/5 * * * *', actionType: 'log', actionPayload: '{}' };
 
         default: return {} as NodeConfig;
     }

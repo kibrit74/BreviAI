@@ -12,10 +12,10 @@ export async function executeCronCreate(
     config: CronCreateConfig,
     variableManager: VariableManager
 ): Promise<any> {
-    const name = variableManager.resolve(config.name);
-    const schedule = variableManager.resolve(config.schedule);
-    const actionType = variableManager.resolve(config.actionType || 'log');
-    const actionPayload = variableManager.resolve(config.actionPayload || '{}');
+    const name = variableManager.resolveString(config.name);
+    const schedule = variableManager.resolveString(config.schedule);
+    const actionType = variableManager.resolveString(config.actionType || 'log');
+    const actionPayload = variableManager.resolveString(config.actionPayload || '{}');
 
     console.log('[CronCreate] Creating job:', { name, schedule, actionType });
 
@@ -64,14 +64,14 @@ export async function executeBrowserScrape(
     config: BrowserScrapeConfig,
     variableManager: VariableManager
 ): Promise<any> {
-    const url = variableManager.resolve(config.url);
-    const waitForSelector = config.waitForSelector ? variableManager.resolve(config.waitForSelector) : undefined;
+    const url = variableManager.resolveString(config.url);
+    const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
 
     console.log('[BrowserScrape] Scraping URL:', url);
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for scraping
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for scraping
 
         const response = await fetch(`${BACKEND_URL}/browser/scrape`, {
             method: 'POST',
@@ -92,14 +92,20 @@ export async function executeBrowserScrape(
         }
 
         const data = await response.json();
+        const result = data.data?.result || data;
 
-        // Return the text content as the result
-        return data.data?.result || data;
+        // Store result in the configured variable name
+        if (config.variableName) {
+            variableManager.set(config.variableName, result);
+        }
+
+        return { success: true, data: result };
     } catch (error: any) {
         if (error.name === 'AbortError') {
-            throw new Error('Scraping request timed out after 30 seconds');
+            throw new Error('Scraping request timed out after 60 seconds');
         }
         console.error('[BrowserScrape] Error:', error);
         throw new Error(`Scraping failed: ${error.message}`);
     }
 }
+

@@ -88,11 +88,29 @@ export const pasteNodes = async (
             if (systemClipboard) {
                 try {
                     const parsed = JSON.parse(systemClipboard.trim());
+
+                    // Try to extract nodes/edges from various JSON formats
+                    let extractedNodes: any[] | null = null;
+                    let extractedEdges: any[] = [];
+
                     if ((parsed.type === 'breviai_workflow' || parsed.nodes) && Array.isArray(parsed.nodes)) {
+                        // Format 1: { type: 'breviai_workflow', nodes: [...], edges: [...] }
+                        // Format 2: { nodes: [...], edges: [...] } (direct)
+                        // Format 3: { id, name, nodes: [...], edges: [...] } (template format)
                         console.log('[Clipboard] Valid workflow data found in system clipboard');
+                        extractedNodes = parsed.nodes;
+                        extractedEdges = parsed.edges || [];
+                    } else if (parsed.template_json && Array.isArray(parsed.template_json.nodes)) {
+                        // Format 4: { template_json: { nodes: [...], edges: [...] } } (store/export format)
+                        console.log('[Clipboard] Valid template_json wrapper found in system clipboard');
+                        extractedNodes = parsed.template_json.nodes;
+                        extractedEdges = parsed.template_json.edges || [];
+                    }
+
+                    if (extractedNodes && extractedNodes.length > 0) {
                         clipboardData = {
-                            nodes: parsed.nodes,
-                            edges: parsed.edges || []
+                            nodes: extractedNodes,
+                            edges: extractedEdges
                         };
                     } else {
                         console.log('[Clipboard] Content is JSON but not a valid workflow');
@@ -120,17 +138,33 @@ export const pasteNodes = async (
     // Create new nodes with fresh IDs and adjusted positions
     const newNodes: WorkflowNode[] = clipboardData.nodes.map(node => {
         const newPosition = {
-            x: node.position.x + offset.x,
-            y: node.position.y + offset.y
+            x: (node.position?.x || 100) + offset.x,
+            y: (node.position?.y || 100) + offset.y
         };
-        const newNode = createNode(node.type, newPosition);
+
+        const newId = `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        let newNode: WorkflowNode;
+
+        try {
+            newNode = createNode(node.type, newPosition);
+        } catch (e) {
+            // Fallback for unregistered node types
+            console.warn(`[Clipboard] createNode failed for type "${node.type}", using fallback`);
+            newNode = {
+                id: newId,
+                type: node.type,
+                label: node.type,
+                config: {} as any,
+                position: newPosition,
+            };
+        }
+
         idMapping.set(node.id, newNode.id);
 
         return {
             ...newNode,
-            label: node.label,
+            label: node.label || newNode.label,
             config: { ...node.config },
-            // Position is already set by createNode
         };
     });
 
@@ -207,8 +241,14 @@ export const hasClipboardContent = async (): Promise<boolean> => {
         if (systemClipboard) {
             try {
                 const parsed = JSON.parse(systemClipboard.trim());
-                // Accept if it has nodes array, even if type is missing (for flexibility)
-                return (parsed.type === 'breviai_workflow' || parsed.nodes) && Array.isArray(parsed.nodes) && parsed.nodes.length > 0;
+                // Accept breviai_workflow, direct nodes array, or template_json wrapper
+                if ((parsed.type === 'breviai_workflow' || parsed.nodes) && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+                    return true;
+                }
+                if (parsed.template_json && Array.isArray(parsed.template_json.nodes) && parsed.template_json.nodes.length > 0) {
+                    return true;
+                }
+                return false;
             } catch (e) {
                 return false;
             }
