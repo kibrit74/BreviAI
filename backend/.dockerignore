@@ -1,0 +1,9 @@
+node_modules
+.next
+.vercel
+.git
+.wwebjs_auth
+backend_deploy.zip
+test-db.js
+test-db.ts
+test-search-local.mjs
