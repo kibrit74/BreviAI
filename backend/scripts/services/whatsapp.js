@@ -104,10 +104,17 @@ initClient();
 // ═══════════════════════════════════════════════════
 
 async function sendMessage(phone, message) {
+    console.log(`[WhatsApp] sendMessage called for phone: ${phone}`);
     if (!clientReady) throw new Error('Client not ready');
 
     // Format phone number
     let chatId = phone.replace(/[^\d]/g, '');
+    console.log(`[WhatsApp] Parsed chatId: ${chatId}`);
+
+    if (chatId.length < 5) {
+        throw new Error(`Invalid phone number: ${phone} (parsed: ${chatId})`);
+    }
+
     if (!chatId.endsWith('@c.us')) {
         chatId += '@c.us';
     }
@@ -154,6 +161,8 @@ router.get('/qr', (req, res) => {
 
 router.post('/send', async (req, res) => {
     const { phone, message } = req.body;
+    console.log('[WhatsApp] /send request:', { phone, message });
+
     if (!phone || !message) {
         return res.status(400).json({ error: 'phone and message required' });
     }
@@ -162,8 +171,9 @@ router.post('/send', async (req, res) => {
         await sendMessage(phone, message);
         res.json({ success: true, to: phone });
     } catch (err) {
-        console.error('[WhatsApp] Send error:', err);
-        res.status(500).json({ error: err.message });
+        console.error('[WhatsApp] Send error details:', err);
+        const errorMessage = (err && err.message) ? err.message : String(err);
+        res.status(500).json({ error: errorMessage, stack: err.stack });
     }
 });
 

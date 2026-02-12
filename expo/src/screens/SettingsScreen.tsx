@@ -641,23 +641,42 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: '#25D366', padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: "#25D366", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                                         onPress={() => {
-                                            fetch(`${waBackendUrl}/whatsapp/send`, {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json',
-                                                    'x-auth-key': 'breviai-secret-password'
-                                                },
-                                                body: JSON.stringify({
-                                                    phone: waStatus.user?.number,
-                                                    message: '🔔 BreviAI Test Mesajı\n\nBu mesaj bağlantının çalıştığını doğrulamak için gönderildi.'
+                                            const safeUrl = (waBackendUrl || 'http://136.117.34.89:3001');
+                                            console.log('[WA Debug] Sending test message...');
+                                            console.log('[WA Debug] URL:', safeUrl);
+                                            console.log('[WA Debug] User:', waStatus?.user);
+
+                                            if (!safeUrl) {
+                                                Alert.alert('Hata', 'WhatsApp URL tanımlı değil.');
+                                                return;
+                                            }
+
+                                            try {
+                                                fetch(`${safeUrl}/whatsapp/send`, {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'Content-Type': 'application/json',
+                                                        'x-auth-key': 'breviai-secret-password'
+                                                    },
+                                                    body: JSON.stringify({
+                                                        phone: waStatus?.user?.number || 'Unknown',
+                                                        message: '🔔 BreviAI Test Mesajı\n\nBu mesaj bağlantının çalıştığını doğrulamak için gönderildi.'
+                                                    })
                                                 })
-                                            })
-                                                .then(r => r.json())
-                                                .then(d => {
-                                                    if (d.success) Alert.alert('✅ Başarılı', 'Test mesajı gönderildi!');
-                                                    else Alert.alert('Hata', d.error || 'Gönderilemedi');
-                                                })
-                                                .catch(e => Alert.alert('Hata', e.message));
+                                                    .then(r => r.json())
+                                                    .then(d => {
+                                                        console.log('[WA Debug] Response:', d);
+                                                        if (d.success) Alert.alert('✅ Başarılı', 'Test mesajı gönderildi!');
+                                                        else Alert.alert('Hata', (d.error && typeof d.error === 'string') ? d.error : 'Gönderilemedi');
+                                                    })
+                                                    .catch(e => {
+                                                        console.error('[WA Debug] Fetch Error:', e);
+                                                        Alert.alert('Hata', e.message || 'Bilinmeyen bir iletişim hatası.');
+                                                    });
+                                            } catch (err) {
+                                                console.error('[WA Debug] Critical Error:', err);
+                                                Alert.alert('Kritik Hata', 'Mesaj gönderilirken bir hata oluştu.');
+                                            }
                                         }}
                                     >
                                         <Ionicons name="send" size={18} color="white" />
