@@ -47,6 +47,7 @@ export async function executeCronCreate(
                 'x-auth-key': AUTH_KEY,
             },
             body: JSON.stringify({
+                id: name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 40) + '_' + Date.now(),
                 name,
                 schedule,
                 action: {

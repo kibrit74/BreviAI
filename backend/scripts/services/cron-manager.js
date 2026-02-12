@@ -114,13 +114,18 @@ class CronManager {
                 // { type: 'scrape_and_whatsapp', url: '...', selector: '...', phone: '...', message: '...' }
                 try {
                     console.log(`[Cron] Scrape & Send: ${action.url} -> ${action.phone}`);
-                    const scrapeResult = await browserService.service.scrape(action.url, action.selector);
+                    const scrapeResult = await browserService.scrape(action.url, action.selector);
 
                     // Simple template replacement
                     let msg = action.message || 'Scraped Data: {{data}}';
                     // Limit data length to avoid giant messages
                     const cleanData = (typeof scrapeResult === 'string' ? scrapeResult : JSON.stringify(scrapeResult)).substring(0, 2000);
                     msg = msg.replace('{{data}}', cleanData);
+
+                    // Resolve date/time templates
+                    const now = new Date();
+                    msg = msg.replace(/\{\{_date\}\}/g, now.toLocaleDateString('tr-TR'));
+                    msg = msg.replace(/\{\{_time\}\}/g, now.toLocaleTimeString('tr-TR'));
 
                     return await whatsappService.sendMessage(action.phone, msg);
                 } catch (err) {

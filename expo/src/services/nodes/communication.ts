@@ -160,8 +160,8 @@ export async function executeWhatsAppSend(
             if (!token) return { success: false, error: 'WhatsApp Cloud API token gerekli. Meta Developer hesabınızdan alabilirsiniz.' };
             if (!phoneNumberId) return { success: false, error: 'Phone Number ID gerekli. Meta Developer Dashboard → WhatsApp → API Setup kısmından alabilirsiniz.' };
 
-            // Format phone number: remove +, spaces, dashes
-            const cleanPhone = phoneNumber.replace(/[\s\-\+\(\)]/g, '');
+            // Format phone number: remove ALL non-digit characters
+            const cleanPhone = phoneNumber.replace(/[^\d]/g, '');
             console.log('[WHATSAPP Cloud] Sending to:', cleanPhone);
 
             const apiUrl = `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`;
@@ -251,11 +251,11 @@ export async function executeWhatsAppSend(
     // ═══════════════════════════════════════════════════════════
     if (mode === 'backend') {
         try {
-            const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.117.34.89:3001');
+            const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.117.34.89:3001/whatsapp');
             const authKey = variableManager.resolveString(config.backendAuthKey || 'breviai-secret-password');
 
-            // Format phone number: remove +, spaces, dashes
-            let cleanPhone = phoneNumber.replace(/[\s\-\+\(\)]/g, '');
+            // Format phone number: remove ALL non-digit characters (handles ÷, +, spaces, etc.)
+            let cleanPhone = phoneNumber.replace(/[^\d]/g, '');
 
             // Auto-fix Turkish numbers: 0532... -> 90532...
             if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
