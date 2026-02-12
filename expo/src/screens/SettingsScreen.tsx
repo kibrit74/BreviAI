@@ -223,16 +223,6 @@ export default function SettingsScreen({ navigation }: any) {
         setClaudeKey(settings.claudeApiKey);
         setOpenWeatherKey(settings.openWeatherApiKey);
         setGoogleAuth(googleService.getAuthState());
-
-        // Sync WA URL from Settings
-        const envUrl = settings.customVariables['WHATSAPP_BACKEND_URL']?.value;
-        if (envUrl && (envUrl.startsWith('http') || envUrl.includes('.'))) {
-            console.log('[Settings] Syncing WA URL from Loaded Vars:', envUrl);
-            setWaBackendUrl(envUrl);
-        } else {
-            // If no custom var, we might check async storage here, but the separate useEffect does that on mount.
-            // However, to be safe, if we have a var, we FORCE it here.
-        }
     };
 
     const openApiKeyModal = (provider: AIProvider) => {
