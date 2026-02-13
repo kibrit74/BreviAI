@@ -99,7 +99,7 @@ export default function SettingsScreen({ navigation }: any) {
     // WhatsApp State
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('https://3001-cs-7187c8a9-80bd-4591-9c3e-3d8ab41e7c17.cs-europe-west4-pear.cloudshell.dev'); // Default to current Cloud Shell instance
+    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001');
 
     // Collapsible Sections State
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
@@ -116,8 +116,10 @@ export default function SettingsScreen({ navigation }: any) {
     React.useEffect(() => {
         const loadWaUrl = async () => {
             try {
+                const defaultCloudShell = 'http://136.117.34.89:3001';
                 // Priority 1: Check UserSettings variables (set via .env or custom vars)
                 const envUrl = userSettingsService.getCustomVariable('WHATSAPP_BACKEND_URL');
+
                 if (envUrl && (envUrl.startsWith('http') || envUrl.includes('.'))) {
                     console.log('[Settings] Loaded WA URL from Variables:', envUrl);
                     setWaBackendUrl(envUrl);
@@ -128,6 +130,8 @@ export default function SettingsScreen({ navigation }: any) {
                 const saved = await AsyncStorage.getItem('whatsapp_backend_url');
                 if (saved && (saved.startsWith('http') || saved.includes('.'))) {
                     setWaBackendUrl(saved);
+                } else {
+                    setWaBackendUrl(defaultCloudShell);
                 }
             } catch (e) {
                 console.log('Failed to load WA URL');
@@ -140,7 +144,10 @@ export default function SettingsScreen({ navigation }: any) {
     React.useEffect(() => {
         const timer = setTimeout(() => {
             if (waBackendUrl && waBackendUrl.length > 8 && waBackendUrl.startsWith('http')) {
-                AsyncStorage.setItem('whatsapp_backend_url', waBackendUrl.trim().replace(/\/$/, ''));
+                // Only save if NOT localhost to avoid persisting bad defaults
+                if (!waBackendUrl.includes('10.0.2.2') && !waBackendUrl.includes('localhost')) {
+                    AsyncStorage.setItem('whatsapp_backend_url', waBackendUrl.trim().replace(/\/$/, ''));
+                }
             }
         }, 1000); // 1s debounce
         return () => clearTimeout(timer);
@@ -150,18 +157,39 @@ export default function SettingsScreen({ navigation }: any) {
         setIsWaLoading(true);
         try {
             // Check if user has a custom override
-            const url = waBackendUrl;
+            let url = waBackendUrl.trim();
+
+            // Clean up common URL mistakes
+            if (url.endsWith('/')) url = url.slice(0, -1);
+            if (url.endsWith('/whatsapp/qr')) url = url.replace(/\/whatsapp\/qr$/, '');
+            if (url.endsWith('/whatsapp')) url = url.replace(/\/whatsapp$/, '');
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
             const response = await fetch(`${url}/whatsapp/status`, {
-                headers: { 'x-auth-key': 'breviai-secret-password' },
+                headers: {
+                    'x-auth-key': 'breviai-secret-password',
+                    'Bypass-Tunnel-Reminder': 'true', // Skip localtunnel warning page
+                    'ngrok-skip-browser-warning': 'true' // Skip ngrok warning page
+                },
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
 
             const text = await response.text();
+
+            // Check for Cloud Shell Authentication Wall (HTML Response)
+            if (text.trim().startsWith('<!doctype html') || text.includes('accounts.google.com')) {
+                console.warn('Cloud Shell Auth Wall detected!');
+                setWaStatus({ status: 'error', ready: false });
+                Alert.alert(
+                    '⚠️ Bağlantı Hatası: Cloud Shell Koruması',
+                    'Cloud Shell "Önizleme" modu dışarıdan erişimi engelliyor.\n\nLütfen Cloud Shell terminalinde sağ üstteki "Web Preview" -> "Change port" -> 3001 yazıp "Change and Preview" butonuna basarak portu herkese açık hale getirdiğinizden emin olun (eğer mümkünse). Aksi takdirde ngrok kullanmanız gerekebilir.'
+                );
+                return;
+            }
+
             try {
                 const data = JSON.parse(text);
                 setWaStatus(data);
@@ -692,7 +720,7 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: '#25D366', padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: "#25D366", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
                                         onPress={() => {
-                                            const safeUrl = (waBackendUrl || 'http://10.0.2.2:3001');
+                                            const safeUrl = (waBackendUrl || 'http://0.0.0.0:3001');
                                             console.log('[WA Debug] Sending test message...');
                                             console.log('[WA Debug] URL:', safeUrl);
                                             console.log('[WA Debug] User:', waStatus?.user);
