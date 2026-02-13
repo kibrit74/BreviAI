@@ -95,6 +95,12 @@ export default function SettingsScreen({ navigation }: any) {
     // Microsoft account state
     const [microsoftAuth, setMicrosoftAuth] = React.useState<MicrosoftAuthState>(microsoftService.getAuthState());
 
+
+    // WhatsApp State
+    const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
+    const [isWaLoading, setIsWaLoading] = React.useState(false);
+    const [waBackendUrl, setWaBackendUrl] = React.useState('https://3001-cs-7187c8a9-80bd-4591-9c3e-3d8ab41e7c17.cs-europe-west4-pear.cloudshell.dev'); // Default to current Cloud Shell instance
+
     // Collapsible Sections State
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
         'preferences': false,       // General settings
@@ -105,10 +111,6 @@ export default function SettingsScreen({ navigation }: any) {
         'tts_settings': false,
     });
 
-    // WhatsApp State
-    const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
-    const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('http://localhost:3001'); // Default to Localhost
 
     // Load saved WA URL on mount
     React.useEffect(() => {
@@ -143,13 +145,6 @@ export default function SettingsScreen({ navigation }: any) {
         }, 1000); // 1s debounce
         return () => clearTimeout(timer);
     }, [waBackendUrl]);
-
-    const resetWaUrl = () => {
-        const defaultUrl = 'http://localhost:3001';
-        setWaBackendUrl(defaultUrl);
-        AsyncStorage.setItem('whatsapp_backend_url', defaultUrl);
-        Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Remote) ayarlandı.');
-    };
 
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
@@ -636,17 +631,12 @@ export default function SettingsScreen({ navigation }: any) {
                                             }}
                                             value={waBackendUrl}
                                             onChangeText={setWaBackendUrl}
-                                            placeholder="http://localhost:3001"
+                                            placeholder="https://3001-cs-...cloudshell.dev"
                                             placeholderTextColor={activeColors.textSecondary}
                                         />
                                         <Text style={{ fontSize: 10, color: activeColors.textSecondary, marginTop: 2 }}>
-                                            Sunucu adresi (Varsayılan: http://localhost:3001)
+                                            Cloud Shell veya Sunucu URL'sini girin (Sonunda '/' olmasın)
                                         </Text>
-                                        <TouchableOpacity onPress={resetWaUrl} style={{ marginTop: 4 }}>
-                                            <Text style={{ fontSize: 10, color: activeColors.primary, textDecorationLine: 'underline' }}>
-                                                Varsayılana Sıfırla (Localhost)
-                                            </Text>
-                                        </TouchableOpacity>
                                     </View>
                                 </View>
                                 <TouchableOpacity
