@@ -766,6 +766,7 @@ export interface CronListConfig {
 export interface BrowserScrapeConfig {
     url: string;
     waitForSelector?: string;
+    selector?: string; // CSS selector to extract text from
     variableName: string;
 }
 
@@ -1040,7 +1041,11 @@ export type NodeConfig =
     | BulkAddToMemoryConfig
     | ClearMemoryConfig
     | RememberInfoConfig
-    | HtmlExtractConfig;
+    | HtmlExtractConfig
+    | CronCreateConfig
+    | CronDeleteConfig
+    | CronListConfig
+    | BrowserScrapeConfig;
 
 export interface CodeExecutionConfig {
     code: string;
@@ -2530,7 +2535,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'GEOFENCE_CREATE': return { latitude: 0, longitude: 0, radius: 100, identifier: 'home_fence', name: 'Ev' };
 
         // Backend nodes
-        case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', variableName: 'scrapedData' };
+        case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', selector: '', variableName: 'scrapedData' };
         case 'CRON_CREATE': return { name: 'My Cron', schedule: '*/5 * * * *', actionType: 'log', actionPayload: '{}' };
         case 'CRON_DELETE': return { jobId: '', variableName: 'cronDeleteResult' };
         case 'CRON_LIST': return { variableName: 'cronJobs' };

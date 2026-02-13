@@ -179,6 +179,7 @@ export async function executeBrowserScrape(
 ): Promise<any> {
     const url = variableManager.resolveString(config.url);
     const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
+    const selector = config.selector ? variableManager.resolveString(config.selector) : undefined;
 
     console.log('[BrowserScrape] Scraping URL:', url);
 
@@ -195,6 +196,7 @@ export async function executeBrowserScrape(
             body: JSON.stringify({
                 url,
                 waitForSelector,
+                selector,
             }),
             signal: controller.signal
         });

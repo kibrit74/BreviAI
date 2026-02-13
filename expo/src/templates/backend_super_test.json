@@ -36,6 +36,7 @@
             "config": {
                 "url": "https://www.google.com/finance/quote/USD-TRY",
                 "waitForSelector": "",
+                "selector": ".YMlKec.fxKbKc",
                 "variableName": "dolarKuru"
             },
             "position": {
