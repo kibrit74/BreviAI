@@ -16,19 +16,17 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
-COPY package*.json ./
-# We only need dependencies for the script
-RUN npm install whatsapp-web.js qrcode express cors node-cron
-
-# Bundle app source
-COPY scripts/ ./scripts/
 
 # Environment variables
 ENV PORT=3001
 # Skip downloading Chromium since we installed Google Chrome
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV CHROME_PATH=/usr/bin/google-chrome-stable
+
+# Install app dependencies
+COPY package*.json ./
+# We only need dependencies for the script
+RUN npm install whatsapp-web.js qrcode express cors node-cron
 
 # Create volume directory for session persistence
 RUN mkdir -p .wwebjs_auth && chmod 777 .wwebjs_auth
