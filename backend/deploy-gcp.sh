@@ -25,22 +25,14 @@ gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command '
     git checkout main
     git pull origin main
 
-    echo "🐳 Building Docker image..."
+    echo "📦 Installing dependencies..."
     cd backend
-    docker build -t whatsapp-service -f Dockerfile.whatsapp .
+    export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+    export CHROME_PATH=/usr/bin/google-chrome-stable
+    npm install --no-audit --no-fund --loglevel=error
 
-    echo "🔄 Restarting container..."
-    docker stop whatsapp-service || true
-    docker rm whatsapp-service || true
-
-    echo "🚀 Starting service..."
-    docker run -d \
-        --name whatsapp-service \
-        --restart unless-stopped \
-        -p 3001:3001 \
-        -v /opt/breviai/.wwebjs_auth:/usr/src/app/.wwebjs_auth \
-        -e WA_AUTH_KEY=breviai-secret-password \
-        whatsapp-service
+    echo "🔄 Restarting PM2 service..."
+    pm2 restart whatsapp-service || pm2 start scripts/breviai-hub.js --name whatsapp-service
 
     echo "✅ Remote deployment commands finished."
 '
