@@ -70,7 +70,7 @@ app.get('/', (req, res) => {
 });
 
 // Start Server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n✅ BreviAI Hub listening on port ${PORT}`);
-    console.log(`   http://localhost:${PORT}`);
+    console.log(`   http://0.0.0.0:${PORT}`);
 });
