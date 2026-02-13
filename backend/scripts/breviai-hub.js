@@ -20,6 +20,9 @@ const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
 app.use(cors());
 app.use(express.json());
 
+// Serve static files (public) - Allow access without auth
+app.use('/public', express.static(path.join(__dirname, 'public')));
+
 // Auth Middleware
 function authMiddleware(req, res, next) {
     const key = req.headers['x-auth-key'] || req.query.key;

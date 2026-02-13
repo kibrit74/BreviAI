@@ -197,6 +197,9 @@ router.get('/qr', (req, res) => {
                 <body>
                     <div class="container">
                         <div class="info-section">
+                            <div style="text-align: center; margin-bottom: 2rem;">
+                                <img src="/public/logo.png" alt="BreviAI Logo" style="height: 60px; width: auto;" />
+                            </div>
                             <h1>Nasıl Bağlanır?</h1>
                             <ul class="steps">
                                 <li>
