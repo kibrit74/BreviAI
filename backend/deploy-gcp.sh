@@ -28,6 +28,7 @@ gcloud compute ssh $INSTANCE_NAME --zone=$ZONE --command '
     echo "📦 Installing dependencies..."
     cd backend
     export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+    export PUPPETEER_SKIP_DOWNLOAD=true
     export CHROME_PATH=/usr/bin/google-chrome-stable
     npm install --no-audit --no-fund --loglevel=error
 

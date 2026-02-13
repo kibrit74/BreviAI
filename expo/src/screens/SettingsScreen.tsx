@@ -108,7 +108,7 @@ export default function SettingsScreen({ navigation }: any) {
     // WhatsApp State
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001'); // Default to Remote
+    const [waBackendUrl, setWaBackendUrl] = React.useState('http://localhost:3001'); // Default to Localhost
 
     // Load saved WA URL on mount
     React.useEffect(() => {
@@ -145,7 +145,7 @@ export default function SettingsScreen({ navigation }: any) {
     }, [waBackendUrl]);
 
     const resetWaUrl = () => {
-        const defaultUrl = 'http://136.117.34.89:3001';
+        const defaultUrl = 'http://localhost:3001';
         setWaBackendUrl(defaultUrl);
         AsyncStorage.setItem('whatsapp_backend_url', defaultUrl);
         Alert.alert('Sıfırlandı', 'URL varsayılan sunucuya (Remote) ayarlandı.');
@@ -640,11 +640,11 @@ export default function SettingsScreen({ navigation }: any) {
                                             placeholderTextColor={activeColors.textSecondary}
                                         />
                                         <Text style={{ fontSize: 10, color: activeColors.textSecondary, marginTop: 2 }}>
-                                            URL'yi düzenlemek için tıklayın (Örn: http://192.168.1.35:3001)
+                                            Sunucu adresi (Varsayılan: http://localhost:3001)
                                         </Text>
                                         <TouchableOpacity onPress={resetWaUrl} style={{ marginTop: 4 }}>
                                             <Text style={{ fontSize: 10, color: activeColors.primary, textDecorationLine: 'underline' }}>
-                                                Varsayılana Sıfırla (Remote)
+                                                Varsayılana Sıfırla (Localhost)
                                             </Text>
                                         </TouchableOpacity>
                                     </View>

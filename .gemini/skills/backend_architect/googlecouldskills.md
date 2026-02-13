@@ -180,3 +180,59 @@ Ama öğrenme açısından VM + Docker süreci daha öğreticidir.
 
 İstersen bu skill dosyasını Cloud Run versiyonu için de yazabilirim.
 O mimari daha modern ve production-friendly.
+
+---
+
+### 🚀 Alternatif 2: Ultra Hızlı & Hafif Deployment (PM2 ile VM Üzerinde)
+
+Eğer Docker build süreleri çok uzun sürüyorsa veya "e2-micro" sunucularda RAM sorunu yaşıyorsanız, Node.js uygulamasını doğrudan sunucu üzerinde PM2 ile çalıştırmak çok daha performanslıdır.
+
+#### Avantajları:
+- **Build Süresi Yok:** Sadece `git pull` ve `npm install` ile güncellenir.
+- **Daha Az RAM:** Docker katmanları olmadığı için daha az bellek tüketir.
+- **Hızlı Restart:** Saniyeler içinde güncellenir.
+
+#### Kurulum:
+
+1. **Hazırlık Scripti (`setup-pm2.sh`):**
+   Bu script Swap alanı ekler, Node.js ve Chrome kurar.
+
+```bash
+#!/bin/bash
+# 2GB Swap Ekle (RAM yetersizliğine çözüm)
+if [ ! -f /swapfile ]; then
+    sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
+    sudo chmod 600 /swapfile
+    sudo mkswap /swapfile
+    sudo swapon /swapfile
+fi
+
+# Node.js 18 ve Chrome Kur
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs google-chrome-stable
+
+# PM2 Kur
+sudo npm install -g pm2
+
+# Bağımlılıkları Yükle (RAM Belleği Temizleyerek)
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+export PUPPETEER_SKIP_DOWNLOAD=true
+export CHROME_PATH=/usr/bin/google-chrome-stable
+
+sync && sudo sysctl -w vm.drop_caches=3
+npm install --no-audit --no-fund --loglevel=error
+
+# Uygulamayı Başlat
+pm2 start scripts/breviai-hub.js --name whatsapp-service --max-memory-restart 500M
+pm2 save
+pm2 startup
+```
+
+2. **Güncelleme (Deployment):**
+   Sadece kodları çekip servisi yeniden başlatmak yeterlidir.
+
+```bash
+git pull origin main
+npm install # Sadece yeni paket varsa
+pm2 restart whatsapp-service
+```
