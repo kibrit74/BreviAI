@@ -26,7 +26,8 @@ ENV CHROME_PATH=/usr/bin/google-chrome-stable
 # Install app dependencies
 COPY package*.json ./
 # We only need dependencies for the script
-RUN npm install whatsapp-web.js qrcode express cors node-cron
+RUN npm install qrcode express cors node-cron --no-audit --no-fund --loglevel=verbose
+RUN npm install whatsapp-web.js --no-audit --no-fund --loglevel=verbose
 
 # Create volume directory for session persistence
 RUN mkdir -p .wwebjs_auth && chmod 777 .wwebjs_auth
