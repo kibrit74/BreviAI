@@ -67,11 +67,7 @@
                 "name": "Dolar Kuru Takibi ({{hedefNumara}})",
                 "schedule": "*/2 * * * *",
                 "actionType": "scrape_and_whatsapp",
-                "actionPayload": {
-                    "url": "https://www.google.com/finance/quote/USD-TRY",
-                    "phone": "{{hedefNumara}}",
-                    "message": "💰 Güncel Dolar Kuru: {{data}}\n\n📅 Tarih: {{_date}} {{_time}}\n\n🤖 BreviAI Otomatik Bildirim (Zamanlanmış)"
-                }
+                "actionPayload": "{\n        \"url\": \"https://www.google.com/finance/quote/USD-TRY\",\n        \"selector\": \".YMlKec.fxKbKc\",\n        \"phone\": \"{{hedefNumara}}\",\n        \"message\": \"💰 Güncel Dolar Kuru: {{data}}\\n\\n📅 Tarih: {{_date}} {{_time}}\\n\\n🤖 BreviAI Otomatik Bildirim (Zamanlanmış)\"\n      }"
             },
             "position": {
                 "x": 100,

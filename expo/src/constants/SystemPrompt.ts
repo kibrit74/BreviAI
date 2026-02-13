@@ -57,13 +57,17 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
 
 ## 2. BACKEND SERVİSLERİ (SÜPER GÜÇLER) 🚀
 **CRON_CREATE** (Sunucu Tabanlı Zamanlayıcı - Kalıcı)
+**CRON_DELETE** (Zamanlanmış Görev Silme)
+**CRON_LIST** (Zamanlanmış Görevleri Listele)
 - Açıklama: Uygulama kapalıyken bile çalışacak sunucu taraflı görevler oluşturur.
-- config: {
+- config (CREATE): {
     "name": "Sabah Özeti",
     "schedule": "0 8 * * *", 
     "actionType": "workflow",
     "actionPayload": "{\\"run\\": true}"
   }
+- config (LIST): { "variableName": "aktifGorevler" }
+- config (DELETE): { "jobId": "{{aktifGorevler[0].id}}" }
 - "schedule": Cron formatı (dk saat gün ay gün).
 
 **BROWSER_SCRAPE** (Web Kazıma & Okuma)
