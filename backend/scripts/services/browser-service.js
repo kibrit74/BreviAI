@@ -12,7 +12,7 @@ const router = express.Router();
 
 // Resource constraints
 const MAX_CONCURRENT_PAGES = 3;
-const TIMEOUT_MS = 60000;
+const TIMEOUT_MS = 120000; // Increased to 2 minutes
 
 class BrowserService {
     constructor() {
@@ -75,6 +75,9 @@ class BrowserService {
         this.activePages++;
         const page = await this.browser.newPage();
 
+        // Set standard User Agent to avoid detection
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
         // Optimize page
         await page.setRequestInterception(true);
         page.on('request', (req) => {
@@ -102,10 +105,12 @@ class BrowserService {
             page = await this.getPage();
             console.log(`[Browser] Scraping ${url}...`);
 
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS });
+            // Use 'domcontentloaded' for faster response, 'networkidle2' is too slow for dynamic sites
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
 
             if (selector) {
-                await page.waitForSelector(selector, { timeout: 10000 });
+                // Wait for selector (explicitly required for dynamic content)
+                await page.waitForSelector(selector, { timeout: 30000 });
             }
 
             let result;
@@ -146,7 +151,7 @@ class BrowserService {
             page = await this.getPage();
             console.log(`[Browser] Screenshotting ${url}...`);
 
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS });
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
 
             const buffer = await page.screenshot({
                 fullPage,
