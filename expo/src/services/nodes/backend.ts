@@ -207,7 +207,7 @@ export async function executeBrowserScrape(
         }
 
         const data = await response.json();
-        const result = data.data?.result || data;
+        const result = data.data || data.result || data;
 
         // Store result in the configured variable name
         if (config.variableName) {

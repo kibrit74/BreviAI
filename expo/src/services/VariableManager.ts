@@ -60,6 +60,23 @@ export class VariableManager {
             return '';
         }
         return String(template).replace(/\{\{([\w\.]+)\}\}/g, (match, varPath) => {
+            // Built-in system variables (resolved dynamically)
+            if (varPath === '_date') {
+                const now = new Date();
+                return `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth() + 1).toString().padStart(2, '0')}.${now.getFullYear()}`;
+            }
+            if (varPath === '_time') {
+                const now = new Date();
+                return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            }
+            if (varPath === '_datetime') {
+                const now = new Date();
+                return `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth() + 1).toString().padStart(2, '0')}.${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            }
+            if (varPath === '_timestamp') {
+                return Date.now().toString();
+            }
+
             const value = this.resolveValue(match); // Use resolveValue to handle dot notation
             if (value === undefined) {
                 return match; // Keep original if not found
