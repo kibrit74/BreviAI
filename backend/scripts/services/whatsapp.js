@@ -2,6 +2,7 @@ const express = require('express');
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const fs = require('fs');
+const path = require('path');
 const webhookService = require('./webhook');
 
 const router = express.Router();
@@ -71,28 +72,54 @@ function setupEvents() {
     });
 
     client.on('authenticated', () => {
-        console.log('[WhatsApp] Authenticated');
+        console.log('[WhatsApp] ✅ Authenticated successfully!');
+        connectionStatus = 'authenticated';
         currentQR = null;
+    });
+
+    client.on('auth_failure', (msg) => {
+        console.error('[WhatsApp] ❌ Auth FAILED:', msg);
+        clientReady = false;
+        connectionStatus = 'auth_failed';
+        lastError = 'Auth failed: ' + msg;
+        currentQR = null;
+    });
+
+    client.on('loading_screen', (percent, message) => {
+        console.log(`[WhatsApp] Loading: ${percent}% - ${message}`);
+        connectionStatus = 'loading';
     });
 
     client.on('ready', () => {
-        console.log('[WhatsApp] Ready!');
+        console.log('[WhatsApp] 🟢 Ready! Client is fully connected.');
         clientReady = true;
         connectionStatus = 'ready';
         currentQR = null;
+        try {
+            console.log('[WhatsApp] User:', client.info?.pushname, '| Number:', client.info?.wid?.user);
+        } catch (e) { }
     });
 
     client.on('disconnected', (reason) => {
-        console.log('[WhatsApp] Disconnected:', reason);
+        console.log('[WhatsApp] 🔴 Disconnected:', reason);
         clientReady = false;
         connectionStatus = 'disconnected';
         lastError = reason;
-        // Re-init handled by LocalAuth usually, but sometimes needs manual
+        // Auto re-init after disconnect
+        console.log('[WhatsApp] Will attempt to re-initialize in 5 seconds...');
+        setTimeout(() => {
+            console.log('[WhatsApp] Re-initializing after disconnect...');
+            initClient();
+        }, 5000);
     });
 
     client.on('message', async (msg) => {
         console.log(`[WhatsApp] Message from ${msg.from}`);
-        await webhookService.sendWhatsAppMessage(msg);
+        try {
+            await webhookService.sendWhatsAppMessage(msg);
+        } catch (e) {
+            console.error('[WhatsApp] Webhook error:', e.message);
+        }
     });
 }
 
@@ -285,6 +312,63 @@ router.post('/send', async (req, res) => {
         console.error('[WhatsApp] Send error details:', err);
         const errorMessage = (err && err.message) ? err.message : String(err);
         res.status(500).json({ error: errorMessage, stack: err.stack });
+    }
+});
+
+// POST /restart — Restart the WhatsApp client (useful when stuck)
+router.post('/restart', async (req, res) => {
+    console.log('[WhatsApp] 🔄 Restart requested...');
+    try {
+        clientReady = false;
+        connectionStatus = 'initializing';
+        currentQR = null;
+        lastError = null;
+
+        try {
+            if (client) await client.destroy();
+        } catch (e) {
+            console.log('[WhatsApp] Destroy warning (safe to ignore):', e.message);
+        }
+
+        // Small delay then re-init
+        setTimeout(() => initClient(), 2000);
+
+        res.json({ success: true, message: 'Client restarting. Check /status in a few seconds.' });
+    } catch (err) {
+        console.error('[WhatsApp] Restart error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /clear-session — Clear auth data and restart (nuclear option)
+router.post('/clear-session', async (req, res) => {
+    console.log('[WhatsApp] 🗑️ Clear session requested...');
+    try {
+        clientReady = false;
+        connectionStatus = 'initializing';
+        currentQR = null;
+        lastError = null;
+
+        try {
+            if (client) await client.destroy();
+        } catch (e) {
+            console.log('[WhatsApp] Destroy warning:', e.message);
+        }
+
+        // Remove auth data
+        const authPath = path.resolve('./.wwebjs_auth/');
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            console.log('[WhatsApp] Auth data cleared:', authPath);
+        }
+
+        // Re-init after cleanup
+        setTimeout(() => initClient(), 3000);
+
+        res.json({ success: true, message: 'Session cleared and client restarting. A new QR will appear.' });
+    } catch (err) {
+        console.error('[WhatsApp] Clear session error:', err);
+        res.status(500).json({ error: err.message });
     }
 });
 

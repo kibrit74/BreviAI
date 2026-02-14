@@ -1,7 +1,7 @@
 import { CronCreateConfig, BrowserScrapeConfig, CronDeleteConfig, CronListConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 
-const BACKEND_URL = 'http://136.117.34.89:3001';
+const BACKEND_URL = 'http://136.109.124.154:3001';
 const AUTH_KEY = 'breviai-secret-password';
 
 /**

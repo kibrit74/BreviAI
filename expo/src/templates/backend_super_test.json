@@ -52,7 +52,7 @@
                 "phoneNumber": "{{hedefNumara}}",
                 "message": "💰 Güncel Dolar Kuru: {{dolarKuru}}\n\n📅 Tarih: {{_date}}\n⏰ Saat: {{_time}}\n\n🤖 BreviAI Otomatik Bildirim (İlk Test)",
                 "mode": "backend",
-                "backendUrl": "http://136.117.34.89:3001/whatsapp",
+                "backendUrl": "http://136.109.124.154:3001/whatsapp",
                 "backendAuthKey": "breviai-secret-password"
             },
             "position": {

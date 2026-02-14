@@ -251,7 +251,7 @@ export async function executeWhatsAppSend(
     // ═══════════════════════════════════════════════════════════
     if (mode === 'backend') {
         try {
-            const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.117.34.89:3001/whatsapp');
+            const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.109.124.154:3001/whatsapp');
             const authKey = variableManager.resolveString(config.backendAuthKey || 'breviai-secret-password');
 
             // Format phone number: remove ALL non-digit characters (handles ÷, +, spaces, etc.)
