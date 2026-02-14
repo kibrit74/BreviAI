@@ -117,22 +117,12 @@ export default function SettingsScreen({ navigation }: any) {
         const loadWaUrl = async () => {
             try {
                 const defaultCloudShell = 'http://136.109.124.154:3001';
-                // Priority 1: Check UserSettings variables (set via .env or custom vars)
-                const envUrl = userSettingsService.getCustomVariable('WHATSAPP_BACKEND_URL');
 
-                if (envUrl && (envUrl.startsWith('http') || envUrl.includes('.'))) {
-                    console.log('[Settings] Loaded WA URL from Variables:', envUrl);
-                    setWaBackendUrl(envUrl);
-                    return;
-                }
+                // NUCLEAR OPTION: Force reset to this URL every time for now
+                console.log('[Settings] FORCING URL:', defaultCloudShell);
+                setWaBackendUrl(defaultCloudShell);
+                await AsyncStorage.setItem('whatsapp_backend_url', defaultCloudShell);
 
-                // Priority 2: Check AsyncStorage (manual overrides)
-                const saved = await AsyncStorage.getItem('whatsapp_backend_url');
-                if (saved && (saved.startsWith('http') || saved.includes('.'))) {
-                    setWaBackendUrl(saved);
-                } else {
-                    setWaBackendUrl(defaultCloudShell);
-                }
             } catch (e) {
                 console.log('Failed to load WA URL');
             }
