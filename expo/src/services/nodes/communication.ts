@@ -268,6 +268,17 @@ export async function executeWhatsAppSend(
 
             console.log('[WHATSAPP Backend] Sending via:', backendUrl, 'to:', cleanPhone);
 
+            // Validate phone number is not empty
+            if (!cleanPhone || cleanPhone.length < 10) {
+                console.error('[WHATSAPP Backend] Invalid phone number:', phoneNumber, '→', cleanPhone);
+                return {
+                    success: false,
+                    mode: 'backend',
+                    error: 'Telefon numarası boş veya geçersiz',
+                    hint: `Orijinal: "${phoneNumber}" → Temizlenmiş: "${cleanPhone}"`
+                };
+            }
+
             const response = await fetch(`${backendUrl}/send`, {
                 method: 'POST',
                 headers: {

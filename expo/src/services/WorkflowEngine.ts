@@ -371,11 +371,21 @@ export class WorkflowEngine {
                 const { node, port } = currentNodes.shift()!;
                 debugLog('execution', `Processing node queue: ${node.label} (port: ${port})`, { nodeId: node.id, port });
 
-                // Prevent infinite loops (except for LOOP nodes and nodes in loop iteration)
-                // Nodes that came via 'loop' port need to re-execute for each iteration
+                // Prevent infinite loops (except for LOOP nodes and controlled re-execution)
+                // Allow re-execution for:
+                // 1. LOOP nodes (built-in loop support)
+                // 2. Nodes reached via 'loop' port
+                // 3. Nodes that are part of a user-controlled loop (IF_ELSE → back to earlier node)
                 if (executedNodes.has(node.id) && node.type !== 'LOOP' && port !== 'loop') {
-                    debugLog('warning', `Skipping already executed node (non-LOOP): ${node.label}`, { nodeId: node.id });
-                    continue;
+                    // Allow re-execution if coming from IF_ELSE true/false port (user-controlled loops)
+                    if (port === 'true' || port === 'false') {
+                        debugLog('execution', `Re-executing node in IF_ELSE loop: ${node.label}`, { nodeId: node.id, port });
+                        // Clear all downstream executed nodes to allow full loop re-execution
+                        executedNodes.clear();
+                    } else {
+                        debugLog('warning', `Skipping already executed node (non-LOOP): ${node.label}`, { nodeId: node.id });
+                        continue;
+                    }
                 }
 
                 // Notify UI

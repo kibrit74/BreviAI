@@ -101,6 +101,10 @@ export default function SettingsScreen({ navigation }: any) {
     const [isWaLoading, setIsWaLoading] = React.useState(false);
     const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.109.124.154:3001');
 
+    // Cron Job Management State
+    const [cronJobs, setCronJobs] = React.useState<any[]>([]);
+    const [isCronLoading, setIsCronLoading] = React.useState(false);
+
     // Collapsible Sections State
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
         'preferences': false,       // General settings
@@ -490,6 +494,78 @@ export default function SettingsScreen({ navigation }: any) {
             ]
         );
     };
+
+    // === Cron Job Management ===
+    const fetchCronJobs = async () => {
+        setIsCronLoading(true);
+        try {
+            const url = waBackendUrl.trim().replace(/\/$/, '');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            const response = await fetch(`${url}/cron/list`, {
+                headers: { 'x-auth-key': 'breviai-secret-password' },
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const data = await response.json();
+            setCronJobs(data.jobs || []);
+        } catch (error) {
+            console.warn('[CronUI] Fetch error:', error);
+            setCronJobs([]);
+        } finally {
+            setIsCronLoading(false);
+        }
+    };
+
+    const deleteCronJob = async (jobId: string) => {
+        Alert.alert('Görevi Sil', `Bu görevi silmek istediğinize emin misiniz?`, [
+            { text: 'İptal', style: 'cancel' },
+            {
+                text: 'Sil', style: 'destructive', onPress: async () => {
+                    try {
+                        const url = waBackendUrl.trim().replace(/\/$/, '');
+                        await fetch(`${url}/cron/delete/${encodeURIComponent(jobId)}`, {
+                            method: 'DELETE',
+                            headers: { 'x-auth-key': 'breviai-secret-password' },
+                        });
+                        fetchCronJobs();
+                    } catch (error) {
+                        Alert.alert('Hata', 'Görev silinemedi');
+                    }
+                }
+            }
+        ]);
+    };
+
+    const deleteAllCronJobs = async () => {
+        Alert.alert('Tümünü Sil', `${cronJobs.length} görev silinecek. Emin misiniz?`, [
+            { text: 'İptal', style: 'cancel' },
+            {
+                text: 'Hepsini Sil', style: 'destructive', onPress: async () => {
+                    try {
+                        const url = waBackendUrl.trim().replace(/\/$/, '');
+                        for (const job of cronJobs) {
+                            await fetch(`${url}/cron/delete/${encodeURIComponent(job.id)}`, {
+                                method: 'DELETE',
+                                headers: { 'x-auth-key': 'breviai-secret-password' },
+                            });
+                        }
+                        fetchCronJobs();
+                        Alert.alert('✅', 'Tüm görevler silindi');
+                    } catch (error) {
+                        Alert.alert('Hata', 'Bazı görevler silinemedi');
+                    }
+                }
+            }
+        ]);
+    };
+
+    // Auto-fetch cron jobs when section opens
+    React.useEffect(() => {
+        if (expandedSections['automation']) {
+            fetchCronJobs();
+        }
+    }, [expandedSections['automation']]);
 
     const styles = createStyles(activeColors);
 
@@ -938,14 +1014,66 @@ export default function SettingsScreen({ navigation }: any) {
                     </>
                 ))}
 
-                {/* ... Rethinking. Replacing the whole ScrollView content is too big and risky for one go.
-                     I should do it section by section.
-                     1. Replace "Genel Ayarlar" section with "Preferences" collapsible start.
-                     2. Replace "Data Management" section (move it to bottom).
-                     3. Replace "Automation" section with "Automation" collapsible.
-                     4. Replace "Variables" section with "Accounts" collapsible start.
-                     5. Replace "AI Keys" section.
-                 */}
+                {/* Otomasyon / Zamanlanmış Görevler */}
+                {renderCollapsibleSection('automation', '⏱️ Zamanlanmış Görevler', 'time-outline', (
+                    <>
+                        {isCronLoading ? (
+                            <View style={{ padding: 20, alignItems: 'center' }}>
+                                <ActivityIndicator size="small" color={colors.primary} />
+                                <Text style={{ color: colors.textSecondary, marginTop: 8, fontSize: 13 }}>Görevler yükleniyor...</Text>
+                            </View>
+                        ) : cronJobs.length === 0 ? (
+                            <View style={{ padding: 20, alignItems: 'center' }}>
+                                <Ionicons name="checkmark-circle-outline" size={40} color={colors.textSecondary} />
+                                <Text style={{ color: colors.textSecondary, marginTop: 8, fontSize: 14 }}>Aktif zamanlanmış görev yok</Text>
+                            </View>
+                        ) : (
+                            <>
+                                {cronJobs.map((job: any, index: number) => (
+                                    <View key={job.id || index} style={[styles.item, { backgroundColor: colors.surface, marginBottom: 6, borderRadius: 10 }]}>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                                                {job.name || job.id?.substring(0, 30)}
+                                            </Text>
+                                            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                                                ⏰ {job.schedule} • {job.action?.type || 'bilinmiyor'}
+                                            </Text>
+                                            {job.action?.phone && (
+                                                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 1 }}>
+                                                    📱 {job.action.phone}
+                                                </Text>
+                                            )}
+                                        </View>
+                                        <TouchableOpacity
+                                            onPress={() => deleteCronJob(job.id)}
+                                            style={{ padding: 8, borderRadius: 8, backgroundColor: '#FF444420' }}
+                                        >
+                                            <Ionicons name="trash-outline" size={18} color="#FF4444" />
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
+
+                                {cronJobs.length > 1 && (
+                                    <TouchableOpacity
+                                        onPress={deleteAllCronJobs}
+                                        style={[styles.item, { backgroundColor: '#FF444415', justifyContent: 'center', borderRadius: 10, marginTop: 4 }]}
+                                    >
+                                        <Ionicons name="trash-outline" size={18} color="#FF4444" style={{ marginRight: 8 }} />
+                                        <Text style={{ color: '#FF4444', fontSize: 14, fontWeight: '600' }}>Tümünü Sil ({cronJobs.length})</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </>
+                        )}
+
+                        <TouchableOpacity
+                            onPress={fetchCronJobs}
+                            style={[styles.item, { backgroundColor: colors.primary + '15', justifyContent: 'center', borderRadius: 10, marginTop: 8 }]}
+                        >
+                            <Ionicons name="refresh-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+                            <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>Yenile</Text>
+                        </TouchableOpacity>
+                    </>
+                ))}
 
 
 
