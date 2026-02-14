@@ -146,23 +146,35 @@ router.get('/status', (req, res) => {
 router.get('/qr', (req, res) => {
     // 1. WhatsApp Bağlıysa
     if (clientReady) {
+        const userName = client.info?.pushname || 'Kullanıcı';
+        const userPhone = client.info?.wid?.user || 'Bilinmiyor';
+
         return res.send(`
             <html>
                 <head>
                     <title>WhatsApp Bağlandı</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <style>
-                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #dcf8c6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                        .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
-                        h1 { color: #075e54; margin-bottom: 0.5rem; }
-                        .icon { font-size: 4rem; display: block; margin-bottom: 1rem; }
+                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #e5ddd5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                        .card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
+                        h1 { color: #075e54; margin-bottom: 0.5rem; font-size: 1.8rem; }
+                        .icon { font-size: 5rem; display: block; margin-bottom: 1.5rem; color: #25D366; }
+                        .user-info { background: #f0f2f5; padding: 1rem; border-radius: 8px; margin: 1.5rem 0; text-align: left; }
+                        .user-info p { margin: 0.5rem 0; color: #333; font-size: 1.1rem; }
+                        .label { font-weight: bold; color: #555; display: inline-block; width: 80px; }
+                        .status { display: inline-block; padding: 0.25rem 0.75rem; background: #dcf8c6; color: #075e54; border-radius: 15px; font-weight: bold; font-size: 0.9rem; }
                     </style>
                 </head>
                 <body>
                     <div class="card">
                         <span class="icon">✅</span>
-                        <h1>WhatsApp Bağlandı!</h1>
-                        <p>Servis aktif ve mesaj gönderimine hazır.</p>
+                        <h1>Bağlantı Başarılı!</h1>
+                        <div class="user-info">
+                            <p><span class="label">İsim:</span> ${userName}</p>
+                            <p><span class="label">Numara:</span> +${userPhone}</p>
+                            <p><span class="label">Durum:</span> <span class="status">Aktif</span></p>
+                        </div>
+                        <p style="color: #666;">BreviAI servisi şu anda bu hesaba bağlı ve mesaj göndermeye hazırdır.</p>
                     </div>
                 </body>
             </html>
@@ -179,55 +191,52 @@ router.get('/qr', (req, res) => {
                     <meta http-equiv="refresh" content="15"> <!-- Auto refresh every 15s -->
                     <style>
                         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-                        .container { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 90%; max-width: 800px; display: flex; flex-wrap: wrap; gap: 2rem; }
-                        .qr-section { flex: 1; text-align: center; min-width: 300px; border-right: 1px solid #eee; padding-right: 2rem; display: flex; flex-direction: column; justify-content: center; }
-                        .info-section { flex: 1; min-width: 300px; display: flex; flex-direction: column; justify-content: center; }
-                        h1 { color: #128c7e; margin: 0 0 1rem 0; font-size: 1.5rem; }
+                        .container { background: white; padding: 0; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 850px; display: flex; flex-wrap: wrap; overflow: hidden; }
+                        .info-section { flex: 1; padding: 3rem; min-width: 300px; display: flex; flex-direction: column; justify-content: center; background: #fff; }
+                        .qr-section { flex: 0 0 350px; background: #fff; padding: 3rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1px solid #f0f0f0; }
+                        
+                        h1 { color: #41525d; margin: 0 0 1.5rem 0; font-size: 1.8rem; font-weight: 300; }
                         .steps { list-style: none; padding: 0; margin: 0; }
-                        .steps li { margin-bottom: 1.5rem; display: flex; align-items: center; }
-                        .step-num { background: #128c7e; color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 1rem; flex-shrink: 0; }
-                        .step-text { font-size: 1rem; color: #333; }
-                        .qr-img { width: 264px; height: 264px; border: 1px solid #ddd; border-radius: 8px; }
-                        .refresh-hint { color: #666; font-size: 0.8rem; margin-top: 1rem; }
-                        @media (max-width: 700px) {
-                            .qr-section { border-right: none; padding-right: 0; border-bottom: 1px solid #eee; padding-bottom: 2rem; }
+                        .steps li { margin-bottom: 20px; display: flex; align-items: center; font-size: 1.1rem; color: #3b4a54; line-height: 1.5; }
+                        .step-num { font-weight: bold; color: #00a884; margin-right: 12px; font-size: 1.1rem; }
+                        
+                        .qr-wrapper { position: relative; padding: 10px; border: 1px solid #e9edef; border-radius: 8px; }
+                        .qr-img { width: 264px; height: 264px; display: block; }
+                        .logo-area { text-align: left; margin-bottom: 2rem; }
+                        .logo-img { height: 40px; width: auto; }
+                        
+                        .refresh-hint { color: #8696a0; font-size: 0.9rem; margin-top: 1.5rem; display: flex; align-items: center; gap: 6px; }
+                        
+                        @media (max-width: 750px) {
+                            .container { flex-direction: column-reverse; max-width: 400px; }
+                            .qr-section { border-left: none; border-bottom: 1px solid #f0f0f0; padding: 2rem; flex: 0 0 auto; }
+                            .info-section { padding: 2rem; }
                         }
                     </style>
                 </head>
                 <body>
                     <div class="container">
                         <div class="info-section">
-                            <div style="text-align: center; margin-bottom: 2rem;">
-                                <img src="/public/logo.png" alt="BreviAI Logo" style="height: 60px; width: auto;" />
+                            <div class="logo-area">
+                                <img src="/public/logo.png" alt="BreviAI" class="logo-img" />
                             </div>
-                            <h1>Nasıl Bağlanır?</h1>
-                            <ul class="steps">
-                                <li>
-                                    <span class="step-num">1</span>
-                                    <span class="step-text">Telefonunuzda <strong>WhatsApp</strong> uygulamasını açın</span>
-                                </li>
-                                <li>
-                                    <span class="step-num">2</span>
-                                    <span class="step-text"><strong>Ayarlar</strong> veya <strong>Menü</strong>'ye dokunun</span>
-                                </li>
-                                <li>
-                                    <span class="step-num">3</span>
-                                    <span class="step-text"><strong>Bağlı Cihazlar</strong> seçeneğini seçin</span>
-                                </li>
-                                <li>
-                                    <span class="step-num">4</span>
-                                    <span class="step-text"><strong>Cihaz Bağla</strong> butonuna basın</span>
-                                </li>
-                                <li>
-                                    <span class="step-num">5</span>
-                                    <span class="step-text">Yandaki QR kodu kameraya okutun</span>
-                                </li>
-                            </ul>
+                            <h1>WhatsApp'ı Bağlayın</h1>
+                            <ol class="steps">
+                                <li><span class="step-num">1.</span> Telefonunuzda WhatsApp'ı açın</li>
+                                <li><span class="step-num">2.</span> <strong>Ayarlar</strong> (iPhone) veya <strong>Menü</strong> (Android) simgesine dokunun</li>
+                                <li><span class="step-num">3.</span> <strong>Bağlı Cihazlar</strong> seçeneğine girin</li>
+                                <li><span class="step-num">4.</span> <strong>Cihaz Bağla</strong> butonuna dokunun</li>
+                                <li><span class="step-num">5.</span> Telefonunuzun kamerasını yandaki ekrana doğrultarak QR kodu tarayın</li>
+                            </ol>
                         </div>
                         <div class="qr-section">
-                            <h1>QR Kodu Taratın</h1>
-                            <img src="${currentQR}" class="qr-img" alt="WhatsApp QR Code" />
-                            <p class="refresh-hint">Kod otomatik yenilenir (Her 15sn)</p>
+                            <div class="qr-wrapper">
+                                <img src="${currentQR}" class="qr-img" alt="WhatsApp QR Code" />
+                            </div>
+                            <div class="refresh-hint">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                                Kod otomatik güncelleniyor
+                            </div>
                         </div>
                     </div>
                 </body>
@@ -242,17 +251,19 @@ router.get('/qr', (req, res) => {
                 <title>Yükleniyor...</title>
                 <meta http-equiv="refresh" content="2">
                 <style>
-                    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
-                    .loader { text-align: center; color: #555; }
-                    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #128c7e; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem auto; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #e5ddd5; margin: 0; }
+                    .loader { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #00a884; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 1.5rem auto; }
+                    h2 { color: #41525d; font-weight: 300; margin: 0 0 0.5rem 0; }
+                    p { color: #8696a0; margin: 0; }
                     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 </style>
             </head>
             <body>
                 <div class="loader">
                     <div class="spinner"></div>
-                    <h2>QR Kod Hazırlanıyor...</h2>
-                    <p>Lütfen bekleyin</p>
+                    <h2>Hazırlanıyor...</h2>
+                    <p>Bağlantı kontrol ediliyor</p>
                 </div>
             </body>
         </html>
