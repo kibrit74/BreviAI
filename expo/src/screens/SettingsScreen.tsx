@@ -99,7 +99,7 @@ export default function SettingsScreen({ navigation }: any) {
     // WhatsApp State
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
-    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.117.34.89:3001');
+    const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.109.124.154:3001');
 
     // Collapsible Sections State
     const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
@@ -116,7 +116,7 @@ export default function SettingsScreen({ navigation }: any) {
     React.useEffect(() => {
         const loadWaUrl = async () => {
             try {
-                const defaultCloudShell = 'http://136.117.34.89:3001';
+                const defaultCloudShell = 'http://136.109.124.154:3001';
                 // Priority 1: Check UserSettings variables (set via .env or custom vars)
                 const envUrl = userSettingsService.getCustomVariable('WHATSAPP_BACKEND_URL');
 
