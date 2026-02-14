@@ -1,7 +1,6 @@
 FROM node:18-slim
 
 # Install Google Chrome Stable and fonts
-# Note: this installs the necessary libs to make the bundled version of Chromium that Puppeteer installs, work.
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -16,18 +15,18 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /usr/src/app
 
-
 # Environment variables
 ENV PORT=3001
-# Skip downloading Chromium since we installed Google Chrome
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV CHROME_PATH=/usr/bin/google-chrome-stable
+ENV WA_AUTH_KEY=breviai-secret-password
 
 # Install app dependencies
 COPY package*.json ./
-# We only need dependencies for the script
-RUN npm install qrcode express cors node-cron --no-audit --no-fund --loglevel=verbose
-RUN npm install whatsapp-web.js --no-audit --no-fund --loglevel=verbose
+RUN npm install --no-audit --no-fund
+
+# Copy application code
+COPY scripts/ ./scripts/
 
 # Create volume directory for session persistence
 RUN mkdir -p .wwebjs_auth && chmod 777 .wwebjs_auth
@@ -36,4 +35,5 @@ RUN mkdir -p .wwebjs_auth && chmod 777 .wwebjs_auth
 EXPOSE 3001
 
 # Start the service
-CMD [ "node", "scripts/breviai-hub.js" ]
+CMD ["/bin/sh", "-c", "rm -rf /usr/src/app/.wwebjs_auth/session-*/Singleton* && node scripts/breviai-hub.js"]
+
