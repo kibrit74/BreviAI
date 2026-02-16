@@ -1,4 +1,4 @@
-/* V4/V5/V6 Styles */
+/* V4/V5/V6/V7 Styles */
 .container {
     max-width: 1600px;
     margin: 0 auto;
@@ -34,7 +34,7 @@
 /* Search Box */
 .searchBox {
     margin-top: 2rem;
-    max-width: 800px;
+    max-width: 900px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -67,25 +67,24 @@
     background-color: #1E1E2E;
     color: #94A3B8;
     border: 1px solid #313142;
-    padding: 0.5rem 1.2rem;
+    padding: 0.4rem 1rem;
     border-radius: 20px;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
 .filterBtn:hover {
     background-color: #2D2D44;
-    color: #fff;
 }
 
 .filterBtn.active {
-    background-color: #6366F1;
+    background-color: #2D2D44;
     border-color: #6366F1;
-    color: #fff;
 }
 
-/* V6: Layout (Sidebar) */
+/* Sidebar */
 .contentGrid {
     display: flex;
     gap: 3rem;
@@ -95,11 +94,10 @@
 .nodeGrid {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 2rem;
 }
 
-/* Sidebar for Guides */
 .sidebar {
     width: 300px;
     background-color: #13131A;
@@ -145,14 +143,15 @@
     border: 1px solid #313142;
 }
 
-
-/* Node Cards */
+/* V7: MOCKUP Node Card */
 .nodeDetailCard {
     background-color: #13131A;
     border: 1px solid #2D2D44;
     border-radius: 16px;
     overflow: hidden;
     transition: transform 0.2s;
+    display: flex;
+    flex-direction: column;
 }
 
 .nodeDetailCard:hover {
@@ -160,194 +159,120 @@
     transform: translateY(-2px);
 }
 
-.cardHeader {
-    padding: 1.5rem;
-    border-bottom: 1px solid #2D2D44;
+/* The Visual Mockup Header */
+.mockupHeader {
+    padding: 1rem 1.5rem;
     display: flex;
     align-items: center;
     gap: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.cardHeader h3 {
-    margin: 0;
-    font-size: 1.25rem;
-    color: #F8FAFC;
+.mockupIcon {
+    width: 32px;
+    height: 32px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #fff;
 }
 
-.cardTypeBadge {
-    font-size: 0.7rem;
+.mockupTitle {
     font-weight: 700;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    color: #000;
+    font-size: 1.1rem;
+    color: #fff;
+    flex: 1;
 }
 
-.trigger .cardTypeBadge {
-    background-color: #10B981;
-}
-
-.action .cardTypeBadge {
-    background-color: #3B82F6;
-}
-
-.logic .cardTypeBadge {
-    background-color: #8B5CF6;
-}
-
-.ai .cardTypeBadge {
-    background-color: #EC4899;
-}
-
-.integration .cardTypeBadge {
-    background-color: #F59E0B;
-}
-
-.core .cardTypeBadge {
-    background-color: #f43f5e;
-    color: white;
+.mockupDots {
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 900;
+    letter-spacing: 2px;
 }
 
 .cardBody {
     padding: 1.5rem;
+    flex: 1;
+}
+
+.descriptionRow {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.cardTypeBadge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .cardDesc {
-    color: #F8FAFC;
-    margin-bottom: 1rem;
-    font-weight: 500;
-    font-size: 1.05rem;
+    color: #94A3B8;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    margin: 0;
 }
 
-/* V5: Long Description */
 .longDescription {
     color: #CBD5E1;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     line-height: 1.6;
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid #2D2D44;
-}
-
-.longDescription p {
-    margin-bottom: 0.8rem;
-}
-
-.longDescription ul,
-.longDescription ol {
-    margin: 0.5rem 0 1rem 1.2rem;
-    padding: 0;
-}
-
-.longDescription li {
-    margin-bottom: 0.4rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #2D2D44;
 }
 
 .subHeader {
-    color: #94A3B8;
+    color: #64748B;
     text-transform: uppercase;
+    font-size: 0.75rem;
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
     letter-spacing: 0.05em;
-    font-size: 0.85rem;
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid #2D2D44;
-    padding-bottom: 0.25rem;
 }
 
-/* Mini Tables */
 .miniTable {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.miniTable th {
-    text-align: left;
-    color: #64748B;
-    padding: 0.5rem;
-    font-weight: 600;
+    font-size: 0.85rem;
 }
 
 .miniTable td {
-    padding: 0.5rem;
-    border-top: 1px solid #2D2D44;
-    color: #E2E8F0;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid #1E1E2E;
+    color: #CBD5E1;
+}
+
+.miniTable td:last-child {
+    border-bottom: none;
 }
 
 .fontMono {
     font-family: 'Fira Code', monospace;
     color: #A5B4FC;
+    width: 30%;
 }
 
 .typeTag {
     background-color: #1E1E2E;
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #94A3B8;
 }
 
-.typeTagSmall {
-    background-color: #1E1E2E;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    font-size: 0.7rem;
+.descCell {
     color: #64748B;
-    margin-left: 0.5rem;
-}
-
-/* JSON Preview */
-.jsonPreview {
-    background-color: #0F0F13;
-    padding: 1rem;
-    border-radius: 8px;
-    font-family: 'Fira Code', monospace;
-    font-size: 0.85rem;
-    color: #A5B4FC;
-    overflow-x: auto;
-    border: 1px solid #2D2D44;
-}
-
-.outputList {
-    list-style: none;
-    padding: 0;
-    margin-top: 0.5rem;
-}
-
-.outputList li {
-    margin-bottom: 0.25rem;
-    font-size: 0.9rem;
-    color: #CBD5E1;
-}
-
-.tipsBox {
-    margin-top: 1.5rem;
-    background-color: rgba(99, 102, 241, 0.1);
-    border: 1px solid rgba(99, 102, 241, 0.2);
-    padding: 1rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    color: #E0E7FF;
-}
-
-.tipsBox ul {
-    margin: 0.5rem 0 0 1.2rem;
-    padding: 0;
-}
-
-/* V5: Troubleshooting Box */
-.troubleBox {
-    margin-top: 1.5rem;
-    background-color: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    padding: 1rem;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    color: #FEF3C7;
-}
-
-.troubleBox ul {
-    margin: 0.5rem 0 0 1.2rem;
-    padding: 0;
+    padding-left: 0.5rem;
 }
 
 .noResult {
@@ -355,7 +280,6 @@
     text-align: center;
     padding: 3rem;
     color: #94A3B8;
-    font-size: 1.2rem;
 }
 
 @media (max-width: 1024px) {
