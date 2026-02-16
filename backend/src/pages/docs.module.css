@@ -1,4 +1,4 @@
-/* V4 Styles */
+/* V4 Styles & V5 Updates */
 .container {
     max-width: 1400px;
     margin: 0 auto;
@@ -152,9 +152,34 @@
 }
 
 .cardDesc {
+    color: #F8FAFC;
+    margin-bottom: 1rem;
+    font-weight: 500;
+    font-size: 1.05rem;
+}
+
+/* V5: Long Description */
+.longDescription {
     color: #CBD5E1;
-    margin-bottom: 1.5rem;
+    font-size: 0.95rem;
     line-height: 1.6;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #2D2D44;
+}
+
+.longDescription p {
+    margin-bottom: 0.8rem;
+}
+
+.longDescription ul,
+.longDescription ol {
+    margin: 0.5rem 0 1rem 1.2rem;
+    padding: 0;
+}
+
+.longDescription li {
+    margin-bottom: 0.4rem;
 }
 
 .subHeader {
@@ -245,6 +270,22 @@
 }
 
 .tipsBox ul {
+    margin: 0.5rem 0 0 1.2rem;
+    padding: 0;
+}
+
+/* V5: Troubleshooting Box */
+.troubleBox {
+    margin-top: 1.5rem;
+    background-color: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #FEF3C7;
+}
+
+.troubleBox ul {
     margin: 0.5rem 0 0 1.2rem;
     padding: 0;
 }
