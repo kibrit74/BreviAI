@@ -19,8 +19,8 @@ const CATEGORY_STYLES: Record<string, { color: string; icon: string; label: stri
     calendar: { color: '#8B5CF6', icon: '📅', label: 'Takvim' },
     communication: { color: '#F97316', icon: '💬', label: 'İletişim' },
     data: { color: '#6366F1', icon: '💾', label: 'Veri & Hafıza' },
-    smart_home: { color: '#FCD34D', icon: '🏠', label: 'Akıllı Ev' }, // Added
-    audio: { color: '#EF4444', icon: '🔊', label: 'Ses & Konuşma' }, // Added
+    smart_home: { color: '#FCD34D', icon: '🏠', label: 'Akıllı Ev' },
+    audio: { color: '#EF4444', icon: '🔊', label: 'Ses & Konuşma' },
 };
 
 type NodeType = keyof typeof CATEGORY_STYLES;
@@ -51,250 +51,211 @@ interface NodeDoc {
     credentials?: string;
 }
 
-// --- V10: THE COMPLETE CATALOG (Based on workflow-types.ts) ---
+// --- V11: GRANDMASTER CONTENT (Detailed Guides, Tips, Troubleshooting) ---
 const NODES: NodeDoc[] = [
     // ═════════════════════════════════════════
-    // TRIGGERS (15+)
+    // TRIGGERS (Tetikleyiciler)
     // ═════════════════════════════════════════
     {
-        id: 'MANUAL', title: 'Manual Trigger', type: 'trigger', summary: 'Manuel başlatma.',
-        overviewHTML: '<p>Akışı test etmek veya butona tıklayarak başlatmak için kullanılır.</p>',
-        params: [{ name: 'Form Fields', type: 'Array', required: false, desc: 'Kullanıcı girdileri' }],
-        outputs: [{ field: 'formData', type: 'Object', desc: 'Girilen veriler' }],
-        examples: [{ title: 'Kullanıcı Girdisi', code: 'Form: [{name: "query", type: "text"}]', explanation: 'Akış başında kullanıcıdan metin ister.' }]
-    },
-    {
-        id: 'TIME_TRIGGER', title: 'Cron / Interval', type: 'trigger', summary: 'Zamanlanmış tetikleyici.',
-        overviewHTML: '<p>Belirli aralıklarla (Interval) veya belirli bir saatte (Cron) çalışır.</p>',
-        params: [{ name: 'Mode', type: 'Select', required: true, desc: 'Interval / Cron' }, { name: 'Value', type: 'String', required: true, desc: 'dk veya cron ifadesi' }],
-        outputs: [{ field: 'timestamp', type: 'Number', desc: 'Unix zamanı' }],
-        examples: [{ title: 'Her Sabah 09:00', code: '0 9 * * *', explanation: 'Her gün sabah 9\'da tetiklenir.' }]
-    },
-    {
-        id: 'WEBHOOK', title: 'Webhook', type: 'trigger', summary: 'HTTP isteği al.',
-        overviewHTML: '<p>Dış dünyadan gelen HTTP isteklerini karşılar.</p>',
-        params: [{ name: 'Path', type: 'String', required: true, desc: 'URL yolu' }, { name: 'Method', type: 'Select', required: true, desc: 'GET/POST' }],
-        outputs: [{ field: 'body', type: 'Object', desc: 'Payload' }],
-        examples: [{ title: 'Form Yanıtı', code: 'POST /submit-form', explanation: 'Bir web formundan gelen veriyi işler.' }]
-    },
-    {
-        id: 'NOTIFICATION_TRIGGER', title: 'Notification Trigger', type: 'trigger', summary: 'Bildirim gelince.',
-        overviewHTML: '<p>Telefonunuza belirli bir uygulamadan bildirim geldiğinde çalışır.</p>',
-        params: [{ name: 'App Name', type: 'String', required: true, desc: 'Örn: WhatsApp' }, { name: 'Filter', type: 'String', required: false, desc: 'İçerik filtresi' }],
-        outputs: [{ field: 'title', type: 'String', desc: 'Bildirim başlığı' }, { field: 'text', type: 'String', desc: 'İçerik' }],
-        examples: [{ title: 'Banka SMS Yakalama', code: 'App: Messages, Filter: "Banka"', explanation: 'Bankadan gelen SMS bildirimlerini yakalar.' }]
-    },
-    {
-        id: 'SMS_TRIGGER', title: 'SMS Trigger', type: 'trigger', summary: 'SMS gelince.',
-        overviewHTML: '<p>Gelen SMS mesajlarını dinler.</p>',
-        params: [{ name: 'Sender', type: 'String', required: false, desc: 'Gönderen numara/isim' }],
-        outputs: [{ field: 'message', type: 'String', desc: 'Mesaj içeriği' }],
-        examples: [{ title: 'OTP Yakalama', code: 'Sender: "Google"', explanation: 'Google doğrulama kodlarını yakalar.' }]
-    },
-    {
-        id: 'CALL_TRIGGER', title: 'Call Trigger', type: 'trigger', summary: 'Arama gelince/bitince.',
-        overviewHTML: '<p>Gelen veya giden aramaları takip eder.</p>',
-        params: [{ name: 'State', type: 'Select', required: true, desc: 'Incoming / Connected / Ended' }],
-        outputs: [{ field: 'number', type: 'String', desc: 'Telefon numarası' }],
-        examples: [{ title: 'Arama Kaydı', code: 'State: Ended', explanation: 'Görüşme bitince süresini kaydeder.' }]
-    },
-    {
-        id: 'WHATSAPP_TRIGGER', title: 'WhatsApp Trigger', type: 'trigger', summary: 'WhatsApp mesajı gelince.',
-        overviewHTML: '<p>WhatsApp\'tan mesaj geldiğinde tetiklenir (Erişilebilirlik izni gerektirir).</p>',
-        params: [{ name: 'Contact', type: 'String', required: false, desc: 'Kişi adı' }],
-        outputs: [{ field: 'text', type: 'String', desc: 'Mesaj' }],
-        examples: [{ title: 'Otomatik Cevap', code: 'Contact: "Müşteri"', explanation: 'Müşteriden gelen mesaja otomatik cevap verir.' }]
-    },
-    {
-        id: 'GESTURE_TRIGGER', title: 'Gesture Trigger', type: 'trigger', summary: 'Hareket algılayınca.',
-        overviewHTML: '<p>Telefonu salladığınızda veya çevirdiğinizde çalışır.</p>',
-        params: [{ name: 'Type', type: 'Select', required: true, desc: 'Shake / Flip / Pocket' }],
-        outputs: [],
-        examples: [{ title: 'Salla-Feneri Aç', code: 'Type: Shake', explanation: 'Telefonu sallayınca feneri açar.' }]
-    },
-    {
-        id: 'GEOFENCE_ENTER', title: 'Geofence Enter', type: 'trigger', summary: 'Bölgeye girince.',
-        overviewHTML: '<p>Belirlenen harita konumuna girdiğinizde çalışır.</p>',
-        params: [{ name: 'Lat/Long', type: 'Coordinates', required: true, desc: 'Merkez nokta' }, { name: 'Radius', type: 'Number', required: true, desc: 'Yarıçap (m)' }],
-        outputs: [],
-        examples: [{ title: 'Eve Varınca', code: 'Radius: 100m', explanation: 'Ev konumuna 100m yaklaşınca Wi-Fi açar.' }]
-    },
-    {
-        id: 'GEOFENCE_EXIT', title: 'Geofence Exit', type: 'trigger', summary: 'Bölgeden çıkınca.',
-        overviewHTML: '<p>Belirlenen harita konumundan ayrıldığınızda çalışır.</p>',
-        params: [{ name: 'Lat/Long', type: 'Coordinates', required: true, desc: 'Merkez nokta' }],
-        outputs: [],
-        examples: [{ title: 'İşten Çıkınca', code: 'Radius: 200m', explanation: 'İş yerinden çıkınca eşinize mesaj atar.' }]
-    },
-    {
-        id: 'CHAT_INPUT_TRIGGER', title: 'Chat / Voice Trigger', type: 'trigger', summary: 'Sohbetten başlat.',
-        overviewHTML: '<p>BreviAI asistanına yazarak veya konuşarak başlattığınız akışlar.</p>',
-        params: [{ name: 'Keywords', type: 'String', required: true, desc: 'Tetikleyici kelimeler' }],
-        outputs: [{ field: 'input', type: 'String', desc: 'Söylenen cümle' }],
-        examples: [{ title: 'Sesli Komut', code: 'Keywords: "Toplantı ayarla"', explanation: '"Toplantı ayarla" dediğinizde bu akış çalışır.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // CONTROL & LOGIC
-    // ═════════════════════════════════════════
-    {
-        id: 'IF_ELSE', title: 'IF / Else', type: 'control', summary: 'Koşul kontrolü.',
-        overviewHTML: '<p>Verilen koşula göre akışı <strong>True</strong> veya <strong>False</strong> yoluna saptırır.</p>',
-        params: [{ name: 'Condition', type: 'Expression', required: true, desc: 'Örn: {{price}} > 100' }],
-        outputs: [],
-        examples: [{ title: 'Fiyat Kontrolü', code: '{{$json.price}} > 1000', explanation: 'Fiyat 1000 TL üzerindeyse yöneticiye e-posta at.' }]
-    },
-    {
-        id: 'SWITCH', title: 'Switch', type: 'control', summary: 'Çoklu seçim.',
-        overviewHTML: '<p>Bir değerin içeriğine göre birden fazla (Case 1, Case 2...) yola ayrılır.</p>',
-        params: [{ name: 'Value', type: 'String', required: true, desc: 'Kontrol edilecek değişken' }],
-        outputs: [],
-        examples: [{ title: 'Dosya Tipi', code: 'Value: {{file.type}} -> Case "PDF", Case "IMG"', explanation: 'Dosya tipine göre farklı işlem yapar.' }]
-    },
-    {
-        id: 'LOOP', title: 'Loop', type: 'control', summary: 'Döngü.',
-        overviewHTML: '<p>Bir liste (Array) üzerindeki her eleman için akışı tekrar çalıştırır.</p>',
-        params: [{ name: 'Items', type: 'Array', required: true, desc: 'Dönülecek liste' }],
-        outputs: [{ field: 'item', type: 'Any', desc: 'O anki eleman' }],
-        examples: [{ title: 'E-posta Listesi', code: 'Items: {{$json.users}}', explanation: 'Listetedeki her kullanıcıya tek tek e-posta atar.' }]
-    },
-    {
-        id: 'DELAY', title: 'Delay', type: 'control', summary: 'Bekle.',
-        overviewHTML: '<p>Akışı belirli bir süre duraklatır.</p>',
-        params: [{ name: 'Duration', type: 'Number', required: true, desc: 'Saniye/Dakika' }],
-        outputs: [],
-        examples: [{ title: '5 Saniye Bekle', code: '5000ms', explanation: 'İşlemden önce 5 saniye bekler.' }]
-    },
-    {
-        id: 'CODE_EXECUTION', title: 'Code (JS)', type: 'control', summary: 'JavaScript çalıştır.',
-        overviewHTML: '<p>Özel JavaScript kodu yazarak karmaşık işlemler yapmanızı sağlar.</p>',
-        params: [{ name: 'Code', type: 'Javascript', required: true, desc: 'Fonksiyon gövdesi' }],
-        outputs: [{ field: 'result', type: 'Any', desc: 'Return değeri' }],
-        examples: [{ title: 'Veri Dönüştürme', code: 'return items.map(i => i.name.toUpperCase());', explanation: 'İsimleri büyük harfe çevirir.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // AI (YAPAY ZEKA)
-    // ═════════════════════════════════════════
-    {
-        id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'GPT/Gemini ile metin işleme.',
-        overviewHTML: '<p>Yapay zeka modellerini (GPT-4, Gemini) kullanarak metin üretir, özetler veya analiz eder.</p>',
-        params: [
-            { name: 'Model', type: 'Select', required: true, desc: 'GPT-4o, Gemini Pro' },
-            { name: 'Prompt', type: 'Text', required: true, desc: 'Talimat' }
-        ],
-        outputs: [{ field: 'content', type: 'String', desc: 'AI Yanıtı' }],
+        id: 'MANUAL', title: 'Manual Trigger', type: 'trigger', summary: 'Akışı elle veya butonla başlatır.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔍 Nasıl Çalışır?</h3>
+                <p>Bu düğüm, akışın başlangıç noktasıdır. Genellikle test amaçlı veya kullanıcının bir butona basarak başlattığı senaryolarda kullanılır.</p>
+                <div class="tip-box">💡 <strong>İpucu:</strong> Akışınızı test ederken her zaman bu düğümü kullanın. "Play" butonuna bastığınızda bu düğüm tetiklenir.</div>
+            </div>
+            <div class="guide-section">
+                <h3>📝 Form Alanları (Form Fields)</h3>
+                <p>Eğer akış başladığında kullanıcıdan bilgi istemek istiyorsanız (örn: "Hangi e-postayı özetleyeyim?"), <code>Form Fields</code> parametresini kullanın.</p>
+                <ul>
+                    <li><strong>Text:</strong> Metin girişi.</li>
+                    <li><strong>Number:</strong> Sayı girişi.</li>
+                    <li><strong>Select:</strong> Seçim listesi.</li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Form Fields', type: 'Array', required: false, desc: 'Kullanıcıdan istenecek verilerin listesi (JSON formatında).' }],
+        outputs: [{ field: 'formData', type: 'Object', desc: 'Kullanıcının girdiği veriler. Örn: {{formData.query}}' }],
         examples: [
-            { title: 'Özetleme', code: 'Prompt: "Şu metni özetle: {{$json.body}}"', explanation: 'Gelen e-postayı özetler.' },
-            { title: 'Kod Yazma', code: 'Prompt: "Node.js ile bir HTTP server yaz."', explanation: 'İstenen kodu üretir.' }
+            {
+                title: 'Basit Kullanıcı Girişi',
+                code: `// Form Fields Parametresi:
+[
+  { "name": "konu", "type": "text", "label": "Ne hakkında şiir yazayım?" },
+  { "name": "uzunluk", "type": "number", "label": "Kaç kıta olsun?" }
+]`,
+                explanation: 'Bu ayar ile akış başladığında kullanıcıya iki soru sorulur. Girilen cevaplar sonraki düğümlerde {{formData.konu}} olarak kullanılabilir.'
+            }
         ]
     },
     {
-        id: 'IMAGE_GENERATOR', title: 'Image Generator', type: 'ai', summary: 'Resim üret.',
-        overviewHTML: '<p>DALL-E veya Stable Diffusion kullanarak metinden görsel üretir.</p>',
-        params: [{ name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi' }],
-        outputs: [{ field: 'imageUrl', type: 'String', desc: 'Resim URL' }],
-        examples: [{ title: 'Logo Tasarımı', code: 'Prompt: "Minimalist coffee shop logo vector"', explanation: 'Kahve dükkanı logosu çizer.' }]
-    },
-    {
-        id: 'SPEECH_TO_TEXT', title: 'Speech to Text', type: 'audio', summary: 'Sesi yazıya çevir.',
-        overviewHTML: '<p>Ses dosyasını veya mikrofon kaydını metne dönüştürür (Whisper).</p>',
-        params: [{ name: 'File', type: 'File', required: false, desc: 'Ses dosyası' }],
-        outputs: [{ field: 'text', type: 'String', desc: 'Döküm' }],
-        examples: [{ title: 'Toplantı Notu', code: 'Input: Kayıt.mp3', explanation: 'Ses kaydını yazıya döker.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // WEB & API
-    // ═════════════════════════════════════════
-    {
-        id: 'HTTP_REQUEST', title: 'HTTP Request', type: 'web', summary: 'API isteği yap.',
-        overviewHTML: '<p>Herhangi bir sunucuya REST API (GET/POST/PUT) isteği gönderir.</p>',
+        id: 'TIME_TRIGGER', title: 'Cron / Interval', type: 'trigger', summary: 'Zamanlanmış görevler oluşturur.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>⏰ Zamanlayıcı Nedir?</h3>
+                <p>Bu düğüm, akışın sizin müdahaleniz olmadan, belirli zamanlarda otomatik çalışmasını sağlar. İki modu vardır:</p>
+                <ul>
+                    <li><strong>Interval (Aralık):</strong> "Her 15 dakikada bir çalış", "Her 2 saatte bir çalış" gibi tekrarlı işlemler.</li>
+                    <li><strong>Cron (Takvim):</strong> "Her Pazartesi sabah 09:00'da çalış" gibi hassas zamanlamalar.</li>
+                </ul>
+            </div>
+            <div class="guide-section">
+                <h3>⚠️ Önemli Uyarılar</h3>
+                <div class="alert-box">Android kısıtlamaları nedeniyle, zamanlayıcılar bazen "Doze Mode" (Pil Tasarrufu) yüzünden birkaç dakika gecikebilir. Kesin saniye hassasiyeti beklemeyin.</div>
+            </div>
+        `,
         params: [
-            { name: 'URL', type: 'String', required: true, desc: 'https://api.example.com' },
-            { name: 'Method', type: 'Select', required: true, desc: 'GET/POST' },
-            { name: 'Headers', type: 'JSON', required: false, desc: 'Auth headerları' }
+            { name: 'Mode', type: 'Select', required: true, desc: 'Interval (Basit) veya Cron (Gelişmiş).' },
+            { name: 'Value', type: 'String', required: true, desc: 'Dakika sayısı veya Cron ifadesi.' }
         ],
-        outputs: [{ field: 'data', type: 'Object', desc: 'Sunucu yanıtı' }],
-        examples: [{ title: 'Döviz Kuru Çekme', code: 'GET https://api.exchangerate.host/latest', explanation: 'Güncel kurları çeker.' }]
+        outputs: [{ field: 'timestamp', type: 'Number', desc: 'Tetiklenme zamanı (Unix Time).' }],
+        examples: [
+            { title: 'Her Sabah 08:30 (Cron)', code: '30 8 * * *', explanation: 'Cron formatı: Dakika(30) Saat(8) Gün(*) Ay(*) HaftanınGünü(*)' },
+            { title: 'Hafta İçi Her Gün (Cron)', code: '0 9 * * 1-5', explanation: 'Sadece Pazartesi(1) - Cuma(5) arası sabah 09:00.' }
+        ]
     },
     {
-        id: 'BROWSER_SCRAPE', title: 'Web Scraper', type: 'web', summary: 'Site verisi kazı.',
-        overviewHTML: '<p>Bir web sitesine girer ve belirtilen alanın (CSS Selector) metnini çeker.</p>',
-        params: [{ name: 'URL', type: 'String', required: true, desc: 'Site adresi' }, { name: 'Selector', type: 'String', required: true, desc: '.price-tag' }],
-        outputs: [{ field: 'text', type: 'String', desc: 'Bulunan metin' }],
-        examples: [{ title: 'Fiyat Takibi', code: 'Selector: ".product-price"', explanation: 'E-ticaret sitesinden ürün fiyatını okur.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // DEVICE & PHONE
-    // ═════════════════════════════════════════
-    {
-        id: 'NOTIFICATION', title: 'Show Notification', type: 'device', summary: 'Bildirim göster.',
-        overviewHTML: '<p>Telefonda yerel bir bildirim oluşturur.</p>',
-        params: [{ name: 'Title', type: 'String', required: false, desc: 'Başlık' }, { name: 'Message', type: 'String', required: true, desc: 'Mesaj' }],
-        outputs: [],
-        examples: [{ title: 'İşlem Tamamlandı', code: 'Message: "Dosya başarıyla yüklendi."', explanation: 'İşlem bitince kullanıcıya haber verir.' }]
-    },
-    {
-        id: 'APP_LAUNCH', title: 'Launch App', type: 'device', summary: 'Uygulama aç.',
-        overviewHTML: '<p>Yüklü bir uygulamayı paket adıyla başlatır.</p>',
-        params: [{ name: 'Package Name', type: 'String', required: true, desc: 'com.instagram.android' }],
-        outputs: [],
-        examples: [{ title: 'Instagram\'ı Aç', code: 'Package: com.instagram.android', explanation: 'Instagram uygulamasını açar.' }]
-    },
-    {
-        id: 'CLIPBOARD', title: 'Clipboard', type: 'device', summary: 'Pano yönetimi.',
-        overviewHTML: '<p>Panoya metin kopyalar veya panodaki metni okur.</p>',
-        params: [{ name: 'Action', type: 'Select', required: true, desc: 'Copy / Paste' }],
-        outputs: [{ field: 'content', type: 'String', desc: 'Okunan veri' }],
-        examples: [{ title: 'Link Kopyala', code: 'Action: Copy, Text: {{url}}', explanation: 'Üretilen linki panoya kopyalar.' }]
-    },
-    {
-        id: 'VOLUME_CONTROL', title: 'Volume', type: 'audio', summary: 'Ses seviyesi.',
-        overviewHTML: '<p>Medya, Zil Sesi veya Alarm seviyesini değiştirir.</p>',
-        params: [{ name: 'Level', type: 'Number', required: true, desc: '0 - 100' }],
-        outputs: [],
-        examples: [{ title: 'Sessize Al', code: 'Level: 0', explanation: 'Toplantı modunda sesi kapatır.' }]
-    },
-    {
-        id: 'BATTERY_CHECK', title: 'Battery Level', type: 'device', summary: 'Pil durumu.',
-        overviewHTML: '<p>Cihazın şarj seviyesini ve şarjda olup olmadığını kontrol eder.</p>',
-        params: [],
-        outputs: [{ field: 'level', type: 'Number', desc: '%' }, { field: 'isCharging', type: 'Boolean', desc: 'Şarj oluyor mu?' }],
-        examples: [{ title: 'Düşük Pil Uyarısı', code: 'If level < 20', explanation: 'Pil %20 altındaysa uyarı verir.' }]
+        id: 'WEBHOOK', title: 'Webhook', type: 'trigger', summary: 'Dış dünyadan gelen verileri yakalar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🌐 Webhook Nedir?</h3>
+                <p>Webhook, BreviAI'ye dışarıdan (IFTTT, Zapier, kendi sunucunuz veya bir web formu) veri göndermenin yoludur. Size özel bir URL üretilir.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🚀 Nasıl Kullanılır?</h3>
+                <ol>
+                    <li>Bu düğümü ekleyin ve bir <code>Path</code> (örn: <code>/form-submit</code>) belirleyin.</li>
+                    <li>Size verilen URL'i kopyalayın: <code>https://api.breviai.com/webhook/form-submit</code></li>
+                    <li>Bu URL'e POST isteği atıldığında akış çalışır.</li>
+                </ol>
+            </div>
+        `,
+        params: [
+            { name: 'Path', type: 'String', required: true, desc: 'URL\'in son kısmı. Benzersiz olmalı.' },
+            { name: 'Method', type: 'Select', required: true, desc: 'HTTP Metodu (Genellikle POST).' }
+        ],
+        outputs: [{ field: 'body', type: 'Object', desc: 'Gelen JSON verisi.' }, { field: 'query', type: 'Object', desc: 'URL parametreleri.' }],
+        examples: [
+            { title: 'Google Forms Entegrasyonu', code: 'Path: /basvuru-al', explanation: 'Google Forms\'tan bu adrese veri gönderildiğinde akış başlar ve gelen veriyi işler.' }
+        ]
     },
 
     // ═════════════════════════════════════════
-    // GOOGLE & MICROSOFT & SOCIAL
+    // LOGIC & CONTROL (Beyin)
     // ═════════════════════════════════════════
     {
-        id: 'GMAIL_SEND', title: 'Gmail Send', type: 'google', summary: 'E-posta at.',
-        overviewHTML: '<p>Gmail hesabınızdan e-posta gönderir.</p>',
-        params: [{ name: 'To', type: 'String', required: true, desc: 'Alıcı' }, { name: 'Subject', type: 'String', required: true, desc: 'Konu' }],
+        id: 'IF_ELSE', title: 'IF / Else', type: 'control', summary: 'Karar verme mekanizması.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🤔 Karar Ağacı</h3>
+                <p>Akışın gidişatını bir koşula göre değiştirir. Eğer koşul <strong>Doğru (True)</strong> ise üst yoldan, <strong>Yanlış (False)</strong> ise alt yoldan devam eder.</p>
+            </div>
+            <div class="guide-section">
+                <h3>Eşittir, Büyüktür, Küçüktür...</h3>
+                <p>Koşullarınızı yazarken JavaScript benzeri ifadeler veya basit karşılaştırmalar kullanabilirsiniz.</p>
+                <ul>
+                    <li><code>==</code> : Eşittir</li>
+                    <li><code>!=</code> : Eşit Değildir</li>
+                    <li><code>></code> : Büyüktür</li>
+                    <li><code>includes()</code> : İçerir</li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Condition', type: 'Expression', required: true, desc: 'Mantıksal ifade. Örn: {{fiyat}} > 100' }],
         outputs: [],
-        examples: [{ title: 'Rapor Gönder', code: 'Subject: "Günlük Rapor"', explanation: 'Hazırlanan raporu patrona e-postalar.' }]
+        examples: [
+            { title: 'Gelen Mail Spam mi?', code: '{{$json.subject}}.includes("Kazandınız")', explanation: 'Eğer e-posta başlığı "Kazandınız" içeriyorsa True (Spam) yoluna git.' },
+            { title: 'Bakiye Yeterli mi?', code: '{{wallet.balance}} >= {{product.price}}', explanation: 'Bakiye ürün fiyatından büyük veya eşitse satın al.' }
+        ]
     },
     {
-        id: 'SHEETS_WRITE', title: 'Sheets Row', type: 'google', summary: 'Tabloya ekle.',
-        overviewHTML: '<p>Google Sheets tablosuna yeni bir satır ekler.</p>',
-        params: [{ name: 'Values', type: 'Array', required: true, desc: 'Sütun verileri' }],
-        outputs: [],
-        examples: [{ title: 'Harcama Kaydı', code: 'Values: ["Kahve", "50 TL", "Bugün"]', explanation: 'Harcamayı tabloya işler.' }]
+        id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'Akıllı metin işleme asistanı.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🧠 Yapay Zeka Nasıl Kullanılır?</h3>
+                <p>Bu düğüm, GPT-4 veya Gemini gibi büyük dil modellerini kullanarak metinleri anlar, özetler veya yeni içerik üretir.</p>
+            </div>
+            <div class="guide-section">
+                <h3>✨ Prompt Mühendisliği (İpucu)</h3>
+                <p>AI'dan iyi sonuç almak için talimatınızı (Prompt) net verin.</p>
+                <ul>
+                    <li>❌ Kötü: "Bunu düzelt."</li>
+                    <li>✅ İyi: "Aşağıdaki metindeki imla hatalarını düzelt ve resmi bir dille yeniden yaz: {{text}}"</li>
+                </ul>
+            </div>
+        `,
+        params: [
+            { name: 'Model', type: 'Select', required: true, desc: 'Hız için Gemini Flash, Kalite için GPT-4o seçin.' },
+            { name: 'Prompt', type: 'Text', required: true, desc: 'Yapay zekaya vereceğiniz görev.' }
+        ],
+        outputs: [{ field: 'content', type: 'String', desc: 'AI\'ın cevabı.' }],
+        examples: [
+            { title: 'Toplantı Özeti Çıkarma', code: 'Prompt: "Aşağıdaki toplantı dökümünü oku ve alınan 3 ana kararı maddeler halinde yaz:\n{{speech.text}}"', explanation: 'Ses kaydından metne dönüştürülen dökümü analiz eder.' },
+            { title: 'Duygu Analizi', code: 'Prompt: "Bu müşteri mesajı olumlu mu, olumsuz mu? Sadece tek kelime cevap ver:\n{{sms.message}}"', explanation: 'Gelen mesajın tonunu (Positive/Negative) analiz eder.' }
+        ]
     },
     {
-        id: 'WHATSAPP_SEND', title: 'WhatsApp Send', type: 'communication', summary: 'Mesaj gönder.',
-        overviewHTML: '<p>WhatsApp üzerinden mesaj gönderir (Otomatik veya Onaylı).</p>',
-        params: [{ name: 'Phone', type: 'String', required: true, desc: '+90...' }, { name: 'Message', type: 'Text', required: true, desc: 'Mesaj' }],
+        id: 'HTTP_REQUEST', title: 'HTTP Request', type: 'web', summary: 'İnternet dünyasına açılan kapı.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🌍 API Bağlantısı</h3>
+                <p>Bu düğüm ile BreviAI'yi dünyadaki neredeyse tüm servislere (Hava durumu, Döviz, Haberler, Spotify, Notion...) bağlayabilirsiniz.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🛠️ Ayarlar Rehberi</h3>
+                <ul>
+                    <li><strong>Method:</strong> Veri çekecekseniz <code>GET</code>, veri gönderecekseniz <code>POST</code> kullanın.</li>
+                    <li><strong>Headers:</strong> Genellikle API Anahtarı (Authorization) buraya yazılır.</li>
+                    <li><strong>Body:</strong> POST işlemlerinde gönderilecek veriyi JSON formatında buraya yazarsınız.</li>
+                </ul>
+            </div>
+        `,
+        params: [
+            { name: 'URL', type: 'String', required: true, desc: 'İstek yapılacak adres.' },
+            { name: 'Headers', type: 'JSON', required: false, desc: 'Örn: {"Authorization": "Bearer KEY"}' }
+        ],
+        outputs: [{ field: 'data', type: 'Object', desc: 'Sunucudan dönen yanıt.' }, { field: 'status', type: 'Number', desc: 'HTTP kodu (200, 404 vb).' }],
+        examples: [
+            { title: 'Bitcoin Fiyatı Çekme', code: 'GET https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd', explanation: 'Bitcoin\'in güncel dolar kurunu çeker.' },
+            { title: 'Slack Mesajı Atma', code: 'POST https://hooks.slack.com/services/...\nBody: { "text": "Mehaba Dünya!" }', explanation: 'Webhook URL\'ine JSON verisi gönderir.' }
+        ]
+    },
+
+    // ═════════════════════════════════════════
+    // DEVICE & TOOLS
+    // ═════════════════════════════════════════
+    {
+        id: 'NOTIFICATION', title: 'Show Notification', type: 'device', summary: 'Kullanıcıya bildirim gösterir.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📱 Yerel Bildirimler</h3>
+                <p>Akış tamamlandığında veya bir hata olduğunda size haber vermek için telefon bildirimlerini kullanır.</p>
+            </div>
+        `,
+        params: [{ name: 'Message', type: 'String', required: true, desc: 'Bildirim metni.' }],
         outputs: [],
-        examples: [{ title: 'Konum Paylaş', code: 'Message: "Evdeyim: {{location}}"', explanation: 'Konumunuzu WhatsApp\'tan atar.' }]
+        examples: [{ title: 'İşlem Başarılı', code: 'Message: "Rapor oluşturuldu ve mail atıldı! ✅"', explanation: 'Kullanıcıya işlemin bittiğini haber verir.' }]
     },
     {
-        id: 'INSTAGRAM_POST', title: 'Instagram Post', type: 'social', summary: 'Fotoğraf paylaş.',
-        overviewHTML: '<p>Instagram akışında fotoğraf veya video paylaşır.</p>',
-        params: [{ name: 'Media', type: 'String', required: true, desc: 'Dosya yolu' }, { name: 'Caption', type: 'Text', required: false, desc: 'Açıklama' }],
+        id: 'APP_LAUNCH', title: 'Launch App', type: 'device', summary: 'Başka bir uygulamayı açar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🚀 Uygulama Başlatma</h3>
+                <p>Akışın sonunda kullanıcıyı başka bir uygulamaya yönlendirmek için kullanılır.</p>
+            </div>
+            <div class="guide-section">
+                <h3>Paket Adı (Package Name) Nedir?</h3>
+                <p>Her uygulamanın benzersiz bir kimliği vardır. Play Store URL'sinde <code>id=</code> kısmından bulabilirsiniz.</p>
+                <ul>
+                    <li>Instagram: <code>com.instagram.android</code></li>
+                    <li>Twitter: <code>com.twitter.android</code></li>
+                    <li>Spotify: <code>com.spotify.music</code></li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Package Name', type: 'String', required: true, desc: 'Uygulamanın teknik adı.' }],
         outputs: [],
-        examples: [{ title: 'Günlük Paylaşım', code: 'Media: {{image.path}}', explanation: 'Üretilen görseli Instagram\'a yükler.' }]
+        examples: [{ title: 'Spotify Aç', code: 'Package: com.spotify.music', explanation: 'Spor modu akışının sonunda müziği açar.' }]
     }
 ];
 
@@ -311,14 +272,11 @@ export default function DocsPage() {
 
     const nodesByCategory = useMemo(() => {
         const groups: Record<string, NodeDoc[]> = {};
-        // Initialize all categories
         Object.keys(CATEGORY_STYLES).forEach(k => groups[k] = []);
-
         filteredNodes.forEach(node => {
             if (groups[node.type]) {
                 groups[node.type].push(node);
             } else {
-                // Fallback for types not in style map
                 if (!groups['device']) groups['device'] = [];
                 groups['device'].push(node);
             }
@@ -328,43 +286,36 @@ export default function DocsPage() {
 
     return (
         <div className={styles.pageContainer}>
-            {/* --- SIDEBAR --- */}
+            {/* SIDEBAR */}
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
-                    <div className={styles.logo}>BreviAI Docs</div>
-                    <div className={styles.version}>v10.0</div>
+                    <div className={styles.logo}>BreviAI Guide</div>
+                    <div className={styles.version}>v11.0</div>
                 </div>
-
                 <div className={styles.searchContainer}>
                     <input
                         type="text"
-                        placeholder="Filter nodes..."
+                        placeholder="Düğüm ara..."
                         className={styles.searchInput}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-
                 <div className={styles.nodeTree}>
                     {Object.entries(CATEGORY_STYLES).map(([type, style]) => {
                         const nodes = nodesByCategory[type];
                         if (!nodes || nodes.length === 0) return null;
-
                         return (
                             <div key={type} className={styles.categoryGroup}>
                                 <div className={styles.categoryTitle} style={{ color: style.color }}>
-                                    <span className={styles.catIcon}>{style.icon}</span>
-                                    {style.label}
+                                    <span className={styles.catIcon}>{style.icon}</span> {style.label}
                                 </div>
                                 <div className={styles.nodeList}>
                                     {nodes.map(node => (
                                         <button
                                             key={node.id}
                                             className={`${styles.nodeItem} ${selectedNodeId === node.id ? styles.activeNode : ''}`}
-                                            onClick={() => {
-                                                setSelectedNodeId(node.id);
-                                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                                            }}
+                                            onClick={() => { setSelectedNodeId(node.id); setActiveTab('overview'); }}
                                         >
                                             {node.title}
                                         </button>
@@ -376,9 +327,8 @@ export default function DocsPage() {
                 </div>
             </aside>
 
-            {/* --- MAIN CONTENT --- */}
+            {/* MAIN CONTENT */}
             <main className={styles.mainContent}>
-                {/* HERO */}
                 <div className={styles.heroSection}>
                     <div className={styles.heroIcon} style={{
                         backgroundColor: CATEGORY_STYLES[selectedNode.type]?.color + '20' || '#333',
@@ -390,21 +340,8 @@ export default function DocsPage() {
                         <h1 className={styles.nodeTitle}>{selectedNode.title}</h1>
                         <p className={styles.nodeSummary}>{selectedNode.summary}</p>
                     </div>
-                    <div className={styles.mockupContainer}>
-                        <div className={styles.nodeMockup} style={{ borderColor: CATEGORY_STYLES[selectedNode.type]?.color || '#555' }}>
-                            <div className={styles.mockupHeader} style={{ background: `linear-gradient(135deg, ${CATEGORY_STYLES[selectedNode.type]?.color || '#555'}, ${CATEGORY_STYLES[selectedNode.type]?.color || '#555'}80)` }}>
-                                <span className={styles.mockupIcon}>{CATEGORY_STYLES[selectedNode.type]?.icon || '📦'}</span>
-                                <span className={styles.mockupTitle}>{selectedNode.title}</span>
-                            </div>
-                            <div className={styles.mockupBody}>
-                                <div className={styles.mockupLine}></div>
-                                <div className={styles.mockupLine} style={{ width: '60%' }}></div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
-                {/* TABS */}
                 <div className={styles.tabsContainer}>
                     {(['overview', 'params', 'examples', 'credentials'] as const).map(tab => (
                         <button
@@ -412,12 +349,13 @@ export default function DocsPage() {
                             className={`${styles.tabBtn} ${activeTab === tab ? styles.activeTab : ''}`}
                             onClick={() => setActiveTab(tab)}
                         >
-                            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                            {tab === 'overview' ? 'Nasıl Kullanılır?' :
+                                tab === 'params' ? 'Parametreler' :
+                                    tab === 'examples' ? 'Örnek Senaryolar' : 'Kimlik & Yetki'}
                         </button>
                     ))}
                 </div>
 
-                {/* CONTENT AREA */}
                 <div className={styles.contentArea}>
                     {activeTab === 'overview' && (
                         <div className={styles.prose} dangerouslySetInnerHTML={{ __html: selectedNode.overviewHTML }} />
@@ -427,30 +365,23 @@ export default function DocsPage() {
                         <div className={styles.paramsTableWrapper}>
                             <table className={styles.paramsTable}>
                                 <thead>
-                                    <tr>
-                                        <th>Parameter</th>
-                                        <th>Type</th>
-                                        <th>Required</th>
-                                        <th>Description</th>
-                                    </tr>
+                                    <tr><th>Parametre</th><th>Tip</th><th>Zorunlu</th><th>Açıklama</th></tr>
                                 </thead>
                                 <tbody>
                                     {selectedNode.params.map((p, i) => (
                                         <tr key={i}>
                                             <td className={styles.fontMono}>{p.name}</td>
                                             <td><span className={styles.tag}>{p.type}</span></td>
-                                            <td>{p.required ? '✅' : 'Optional'}</td>
+                                            <td>{p.required ? '✅' : '-'}</td>
                                             <td>{p.desc}</td>
                                         </tr>
                                     ))}
-                                    {selectedNode.params.length === 0 && (
-                                        <tr><td colSpan={4} className={styles.emptyState}>Bu düğüm için parametre gerekmez.</td></tr>
-                                    )}
                                 </tbody>
                             </table>
                             {selectedNode.outputs.length > 0 && (
                                 <div className={styles.outputSection}>
-                                    <h3 className={styles.sectionHeader}>Ouptuts (Çıktılar)</h3>
+                                    <h3 className={styles.sectionHeader}>Çıktılar (Outputs)</h3>
+                                    <p className={styles.textMuted}>Bu düğüm çalıştıktan sonra elinizde şu veriler olur:</p>
                                     <ul className={styles.outputList}>
                                         {selectedNode.outputs.map((o, i) => (
                                             <li key={i}><code className={styles.outputField}>{o.field}</code> ({o.type}): {o.desc}</li>
@@ -465,24 +396,23 @@ export default function DocsPage() {
                         <div className={styles.examplesList}>
                             {selectedNode.examples.map((ex, i) => (
                                 <div key={i} className={styles.exampleCard}>
-                                    <h4>{ex.title}</h4>
-                                    <p>{ex.explanation}</p>
+                                    <h4 className={styles.exampleTitle}>{ex.title}</h4>
+                                    <p className={styles.exampleDesc}>{ex.explanation}</p>
                                     <div className={styles.codeBlock}>
+                                        <div className={styles.codeHeader}>Örnek Ayarlar</div>
                                         <pre>{ex.code}</pre>
                                     </div>
                                 </div>
                             ))}
-                            {selectedNode.examples.length === 0 && (
-                                <div className={styles.emptyState}>Bu düğüm için henüz örnek senaryo eklenmedi.</div>
-                            )}
                         </div>
                     )}
 
                     {activeTab === 'credentials' && (
                         <div className={styles.credentialsBox}>
+                            <h3 className={styles.sectionHeader}>🔑 Yetkilendirme</h3>
                             {selectedNode.credentials
                                 ? <p>{selectedNode.credentials}</p>
-                                : <p>Bu düğüm için özel kimlik doğrulama gerekmez.</p>
+                                : <p>Bu işlem için özel bir API anahtarı veya giriş yapmanız gerekmez. Açık sistemleri kullanır.</p>
                             }
                         </div>
                     )}
