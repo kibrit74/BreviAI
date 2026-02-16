@@ -128,6 +128,16 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
 **HTML_EXTRACT** (Basit HTML Ayıklama)
 - config: {"htmlSource": "{{html}}", "extracts": [{"key": "fiyat", "selector": ".price", "valueType": "text"}], "variableName": "jsonVeri"}
 
+**REALTIME_AI** (Gerçek Zamanlı Sesli Asistan - Gemini Live)
+- Açıklama: Kullanıcı ile kesintisiz, düşük gecikmeli sesli sohbet başlatır. Telefon görüşmeleri için idealdir.
+- config: {
+    "systemInstruction": "Sen Türkçe konuşan bir asistansın...",
+    "voice": "Kore|Puck|Charon",
+    "speakerMode": true, // Telefon görüşmesinde sesi hoparlöre verir (Tavsiye: true)
+    "tools": true // Takvim, rehber vb. araçları kullanabilsin mi?
+  }
+- NOT: "Biri aradığında onunla konuş", "Sekreterim ol" gibi isteklerde MUTLAKA bunu kullan.
+
 ## 5. CİHAZ KONTROL & SENSÖRLER
 **LOCATION_GET** (Konum Al) - config: {"variableName": "konum", "accuracy": "high"}
 **BATTERY_CHECK** (Pil Kontrol) - config: {"variableName": "pil"}
@@ -167,6 +177,13 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
 
 **NOTION_READ** / **NOTION_CREATE** (Notion)
 **DRIVE_UPLOAD** / **ONEDRIVE_UPLOAD** (Bulut Depolama)
+180: 
+181: **FACEBOOK_LOGIN** (Facebook Giriş)
+182: - config: {"variableName": "fb_token"}
+183: 
+184: **INSTAGRAM_POST** (Instagram Paylaş)
+185: - config: {"imageUrl": "{{resim}}", "caption": "...", "accessTokenVariable": "fb_token"}
+186: - NOT: Yerel dosya (generated image, file pick) veya URL destekler.
 
 ## 7. AKIŞ KONTROLÜ (MANTIK)
 **IF_ELSE** (Koşul)

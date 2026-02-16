@@ -138,45 +138,51 @@ export async function executeImageGenerator(
         const height = config.height || 1024;
         imageUrl += `?width=${width}&height=${height}&nologo=true`;
 
-        // For Instagram/social media posting, return the direct URL
-        // For local use (display in app), download to cache
-        const shouldDownload = (config as any).downloadLocally !== undefined
-            ? (config as any).downloadLocally
-            : false; // Default: don't download (return URL for Instagram API)
+        try {
+            // Always download to local cache — Pollinations URLs are redirect/dynamic
+            // and can't be consumed directly by APIs like Instagram Graph API
+            console.log('[ImageGenerator] Downloading Pollinations image:', imageUrl);
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+            const blob = await response.blob();
+            console.log('[ImageGenerator] Downloaded blob, size:', blob.size, 'type:', blob.type);
 
-        if (shouldDownload) {
-            // Download to cache
-            const filename = `gen_${Date.now()}.jpg`;
-            // @ts-ignore
+            // Convert blob to base64
+            const base64: string = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const result = reader.result as string;
+                    const base64Data = result.split(',')[1] || result;
+                    resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+
+            // Save base64 to local file
+            const filename = `gen_poll_${Date.now()}.jpg`;
             const localPath = `${FileSystem.cacheDirectory}${filename}`;
+            await FileSystem.writeAsStringAsync(localPath, base64, { encoding: 'base64' });
+            console.log('[ImageGenerator] Saved to:', localPath);
 
-            try {
-                const downloadResult = await FileSystem.downloadAsync(imageUrl, localPath);
-
-                // Save to variable
-                if (config.variableName) {
-                    variableManager.set(config.variableName, downloadResult.uri);
-                }
-
-                return {
-                    success: true,
-                    provider: 'pollinations',
-                    prompt,
-                    imageUrl: downloadResult.uri,
-                    publicUrl: imageUrl // Also include the original URL
-                };
-            } catch (error) {
-                return {
-                    success: false,
-                    error: error instanceof Error ? error.message : 'Image generation failed'
-                };
+            // Save to variable
+            if (config.variableName) {
+                variableManager.set(config.variableName, localPath);
             }
-        } else {
-            // Return direct URL (for Instagram API, webhooks, etc.)
+
+            return {
+                success: true,
+                provider: 'pollinations',
+                prompt,
+                imageUrl: localPath,
+                publicUrl: imageUrl // Original URL for reference
+            };
+        } catch (error) {
+            console.warn('[ImageGenerator] Download failed, falling back to URL:', error);
+            // Fallback: return the URL directly (might not work with Instagram but OK for display)
             if (config.variableName) {
                 variableManager.set(config.variableName, imageUrl);
             }
-
             return {
                 success: true,
                 provider: 'pollinations',

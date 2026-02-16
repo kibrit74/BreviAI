@@ -815,7 +815,7 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'post_instagram',
-        description: 'Posts a photo to Instagram Business account. Requires Facebook Login first.',
+        description: 'Posts a photo or video to Instagram Business account. Supports local file paths (from FILE_PICK or IMAGE_GENERATOR) and remote URLs. Requires Facebook Login first.',
         parameters: {
             type: 'OBJECT',
             properties: {

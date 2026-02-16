@@ -1019,20 +1019,26 @@ export class WorkflowEngine {
     }
 
     private executeVariable(config: VariableConfig): any {
+        // Resolve value if it's a string (e.g. "{{pickedImage}}")
+        let value = config.value;
+        if (typeof value === 'string') {
+            value = this.variableManager.resolveString(value);
+        }
+
         switch (config.operation) {
             case 'set':
-                this.variableManager.set(config.name, config.value);
-                return { name: config.name, value: config.value };
+                this.variableManager.set(config.name, value);
+                return { name: config.name, value: value };
             case 'get':
                 return { name: config.name, value: this.variableManager.get(config.name) };
             case 'increment':
-                const incValue = this.variableManager.increment(config.name, Number(config.value) || 1);
+                const incValue = this.variableManager.increment(config.name, Number(value) || 1);
                 return { name: config.name, value: incValue };
             case 'decrement':
-                const decValue = this.variableManager.decrement(config.name, Number(config.value) || 1);
+                const decValue = this.variableManager.decrement(config.name, Number(value) || 1);
                 return { name: config.name, value: decValue };
             case 'append':
-                const appendValue = this.variableManager.append(config.name, String(config.value));
+                const appendValue = this.variableManager.append(config.name, String(value));
                 return { name: config.name, value: appendValue };
             case 'clear':
                 this.variableManager.delete(config.name);

@@ -646,7 +646,7 @@ export async function executeFacebookLogin(
  * Uses freeimage.host (no API key required for basic uploads).
  */
 async function uploadImageToPublicHost(localUri: string): Promise<string> {
-    const FileSystem = require('expo-file-system');
+    const FileSystem = require('expo-file-system/legacy');
 
     console.log('[Instagram] Uploading local image to public host...');
 
@@ -709,14 +709,92 @@ export async function executeInstagramPost(
         // Trim whitespace and ensure clean token
         const token = typeof rawToken === 'string' ? rawToken.trim() : String(rawToken).trim();
         console.log('[Instagram] Token length:', token.length, '| First 10 chars:', token.substring(0, 10));
-        console.log('[Instagram] Image URL (raw):', imageUrl);
+        // Check if imageUrl is a JSON string (from FILE_PICK or similar)
+        if (imageUrl.trim().startsWith('{')) {
+            try {
+                const parsed = JSON.parse(imageUrl);
+                if (parsed.uri) {
+                    imageUrl = parsed.uri;
+                    console.log('[Instagram] Parsed URI from JSON:', imageUrl);
+                } else if (parsed.assets && parsed.assets[0] && parsed.assets[0].uri) {
+                    imageUrl = parsed.assets[0].uri;
+                    console.log('[Instagram] Parsed URI from Assets JSON:', imageUrl);
+                }
+            } catch (e) {
+                console.warn('[Instagram] Failed to parse JSON image URL:', e);
+            }
+        }
+
+        console.log('[Instagram] Image URL (processed):', imageUrl);
 
         // If image is a local file, upload it to a public host first
-        // Instagram Graph API requires a publicly accessible HTTP(S) URL
+        // Instagram Graph API requires a publicly accessible HTTP(S) URL with direct image content
         if (imageUrl.startsWith('file://') || imageUrl.startsWith('/') || imageUrl.startsWith('content://')) {
             console.log('[Instagram] Local file detected, uploading to public host...');
             imageUrl = await uploadImageToPublicHost(imageUrl);
             console.log('[Instagram] Public URL obtained:', imageUrl);
+        } else if (imageUrl.match(/pollinations\.ai|image\.pollinations/i) || !imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)) {
+            // Dynamic image generator URLs (e.g. Pollinations) or URLs without image extensions
+            // need to be downloaded and re-uploaded as Instagram can't resolve them
+            console.log('[Instagram] Dynamic/non-direct image URL detected, downloading via fetch and re-uploading...');
+            try {
+                // Download image using plain fetch (no expo-file-system dependency)
+                const imgResponse = await fetch(imageUrl);
+                if (!imgResponse.ok) throw new Error(`Download failed: ${imgResponse.status}`);
+                const blob = await imgResponse.blob();
+                console.log('[Instagram] Downloaded blob, size:', blob.size, 'type:', blob.type);
+
+                // Convert blob to base64
+                const base64: string = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const result = reader.result as string;
+                        // Remove data:image/...;base64, prefix
+                        const base64Data = result.split(',')[1] || result;
+                        resolve(base64Data);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+
+                console.log('[Instagram] Base64 length:', base64.length);
+
+                // Upload base64 to freeimage.host
+                const formData = new FormData();
+                formData.append('source', base64);
+                formData.append('type', 'base64');
+                formData.append('action', 'upload');
+                formData.append('format', 'json');
+
+                const uploadRes = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadData = await uploadRes.json();
+
+                if (uploadData.status_code === 200 && uploadData.image?.url) {
+                    imageUrl = uploadData.image.url;
+                    console.log('[Instagram] Re-uploaded to freeimage.host:', imageUrl);
+                } else {
+                    // Fallback to imgbb
+                    console.log('[Instagram] freeimage.host failed, trying imgbb...');
+                    const imgbbForm = new FormData();
+                    imgbbForm.append('image', base64);
+                    const imgbbRes = await fetch('https://api.imgbb.com/1/upload?key=3e45e975b8bf0b0e9ee12c28dae0f7e8', {
+                        method: 'POST',
+                        body: imgbbForm
+                    });
+                    const imgbbData = await imgbbRes.json();
+                    if (imgbbData.success && imgbbData.data?.url) {
+                        imageUrl = imgbbData.data.url;
+                        console.log('[Instagram] Re-uploaded to imgbb:', imageUrl);
+                    } else {
+                        console.warn('[Instagram] Both upload services failed, using original URL');
+                    }
+                }
+            } catch (downloadErr) {
+                console.warn('[Instagram] Could not download/reupload dynamic URL, trying original:', downloadErr);
+            }
         }
 
         console.log('[Instagram] Final Image URL:', imageUrl);
@@ -749,18 +827,23 @@ export async function executeInstagramPost(
 
         console.log('[Instagram] IG User ID:', igUserId);
 
-        // 2. Create Media Container
-        const containerUrl = `https://graph.facebook.com/v18.0/${igUserId}/media`;
+        // 2. Create Media Container (use URL params, not JSON body — Facebook Graph API standard)
+        const containerParams = new URLSearchParams({
+            image_url: imageUrl,
+            caption: caption || '',
+            media_type: 'IMAGE',
+            access_token: token
+        });
+        const containerUrl = `https://graph.facebook.com/v21.0/${igUserId}/media`;
+        console.log('[Instagram] Creating container with image_url:', imageUrl);
+
         const containerRes = await fetch(containerUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                image_url: imageUrl,
-                caption: caption,
-                access_token: token
-            })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: containerParams.toString()
         });
         const containerData = await containerRes.json();
+        console.log('[Instagram] Container response:', JSON.stringify(containerData));
 
         if (containerData.error) throw new Error(containerData.error.message);
 
@@ -768,16 +851,18 @@ export async function executeInstagramPost(
         console.log('[Instagram] Container Created:', creationId);
 
         // 3. Publish Container
-        const publishUrl = `https://graph.facebook.com/v18.0/${igUserId}/media_publish`;
+        const publishParams = new URLSearchParams({
+            creation_id: creationId,
+            access_token: token
+        });
+        const publishUrl = `https://graph.facebook.com/v21.0/${igUserId}/media_publish`;
         const publishRes = await fetch(publishUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                creation_id: creationId,
-                access_token: token
-            })
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: publishParams.toString()
         });
         const publishData = await publishRes.json();
+        console.log('[Instagram] Publish response:', JSON.stringify(publishData));
 
         if (publishData.error) throw new Error(publishData.error.message);
 
