@@ -1,6 +1,5 @@
+import '../app/globals.css';
 import styles from './docs.module.css';
-
-// export const dynamic = 'force-static'; // Removed for Vercel 404 fix
 
 export default function DocsPage() {
     return (
