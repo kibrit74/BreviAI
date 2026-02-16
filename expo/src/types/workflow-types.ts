@@ -180,11 +180,20 @@ export type NodeType =
     | 'OVERLAY_INPUT'
     | 'OVERLAY_CLEAR'
     // Real-time AI
-    | 'REALTIME_AI';
+    | 'REALTIME_AI'
+    // Execution
+    | 'EXECUTE_WORKFLOW';
 
 // ═══════════════════════════════════════════════════════════════
 // NODE CONFIGURATIONS
 // ═══════════════════════════════════════════════════════════════
+
+export interface ExecuteWorkflowConfig {
+    workflowId: string; // ID or Name of target workflow
+    waitForCompletion?: boolean; // Wait for it to finish?
+    passVariables?: boolean; // Pass current scope variables?
+    variableName?: string; // Store result
+}
 
 export interface ManualTriggerConfig {
     label?: string;
@@ -2288,12 +2297,29 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         type: 'SEARCH_MEMORY',
         category: 'memory',
         name: 'Hafızadan Ara',
-        description: 'Vektör veritabanında semantik arama yapar',
+        description: 'Vektör hafızasında arama yapar',
         icon: 'search-circle',
         color: '#9C27B0',
         hasInputPort: true,
         outputPorts: ['default']
     },
+    // Execution
+    EXECUTE_WORKFLOW: {
+        type: 'EXECUTE_WORKFLOW',
+        category: 'control',
+        name: 'Otomasyon Çalıştır',
+        description: 'Başka bir otomasyonu tetikler',
+        icon: 'play-circle',
+        color: '#6366F1',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
+    description: 'Vektör veritabanında semantik arama yapar',
+    icon: 'search-circle',
+    color: '#9C27B0',
+    hasInputPort: true,
+    outputPorts: ['default']
+},
     ADD_TO_MEMORY: {
         type: 'ADD_TO_MEMORY',
         category: 'memory',

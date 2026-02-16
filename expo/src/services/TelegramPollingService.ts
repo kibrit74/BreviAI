@@ -231,7 +231,12 @@ class TelegramPollingService {
             // Save offsets
             await this.saveOffsets();
 
-        } catch (e) {
+        } catch (e: any) {
+            // Check for AbortError
+            if (e?.name === 'AbortError' || e?.message === 'Aborted') {
+                // console.log('[TelegramPolling] Poll aborted (valid context switch).');
+                return;
+            }
             console.error(`[TelegramPolling] Error polling bot:`, e);
         }
     }

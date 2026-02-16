@@ -139,6 +139,7 @@ import {
     executePhilipsHue,
     executeRememberInfo,
     executeSwitch,
+    executeWorkflowNode,
     executeFacebookLogin,
     executeInstagramPost,
     executeOutlookSend,
@@ -300,6 +301,7 @@ const executorRegistry: Partial<Record<NodeType, ExecutorEntry>> = {
     'CLEAR_MEMORY': { executor: executeClearMemory },
 
     // Control
+    'EXECUTE_WORKFLOW': { executor: executeWorkflowNode },
     'SWITCH': { executor: executeSwitch },
     'CODE_EXECUTION': { executor: executeCodeExecution },
     'SET_VALUES': { executor: executeSetValues },

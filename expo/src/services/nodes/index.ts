@@ -4,7 +4,7 @@
  */
 
 export { executeTriggerNode } from './triggers';
-export { executeControlNode } from './controls';
+export { executeControlNode, executeWorkflowNode } from './controls';
 export { executeInputNode, executeClipboardReader, executeShowText, executeTextInput, executeShowMenu, executeShowImage } from './inputs';
 export { executeOutputNode, executeNotification } from './outputs';
 export { executeDeviceNode } from './devices';

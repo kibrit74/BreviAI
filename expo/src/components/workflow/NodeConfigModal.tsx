@@ -222,6 +222,59 @@ const ExpandableTextInput: React.FC<ExpandableTextInputProps> = ({
     );
 };
 
+const ExecuteWorkflowFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Hedef Otomasyon (ID veya İsim)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.workflowId || ''}
+                onChangeText={(v) => updateConfig('workflowId', v)}
+                placeholder="Örn: Trafik Analiz, 67b...",
+            placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>Tam ID veya otomasyon ismini giriniz.</Text>
+        </View>
+
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Bitmesini Bekle</Text>
+            <Switch
+                value={config.waitForCompletion !== false} // Default true
+                onValueChange={(v) => updateConfig('waitForCompletion', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+            <Text style={styles.fieldHint}>
+                Açık: Diğer otomasyon bitene kadar bekler. Kapalı: Arka planda çalıştırır ve devam eder.
+            </Text>
+        </View>
+
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Değişkenleri Aktar</Text>
+            <Switch
+                value={config.passVariables !== false} // Default true
+                onValueChange={(v) => updateConfig('passVariables', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+            <Text style={styles.fieldHint}>
+                Mevcut değişkenleri (örneğin trafik verisi) alt otomasyona kopyalar.
+            </Text>
+        </View>
+
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="childResult"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
+
 // API Dokümantasyon Linki
 interface ApiDocLinkProps {
     title: string;
@@ -5442,6 +5495,8 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <PdfCreateFields config={config} updateConfig={updateConfig} />;
             case 'ALARM_SET':
                 return <AlarmSetFields config={config} updateConfig={updateConfig} />;
+            case 'EXECUTE_WORKFLOW':
+                return <ExecuteWorkflowFields config={config} updateConfig={updateConfig} />;
             case 'SPEECH_TO_TEXT':
                 return <SpeechToTextFields config={config} updateConfig={updateConfig} />;
             case 'AGENT_AI':

@@ -1,0 +1,79 @@
+{
+    "name": "İstanbul Trafik Kontrolü",
+    "description": "İBB verileriyle anlık trafik yoğunluğunu kontrol eder ve yapay zeka ile analiz sunar.",
+    "nodes": [
+        {
+            "id": "1",
+            "type": "TIME_TRIGGER",
+            "label": "Hafta İçi 07:30",
+            "position": {
+                "x": 100,
+                "y": 100
+            },
+            "data": {
+                "cron": "30 7 * * 1-5"
+            }
+        },
+        {
+            "id": "2",
+            "type": "HTTP_REQUEST",
+            "label": "İBB Trafik Verisi",
+            "position": {
+                "x": 100,
+                "y": 250
+            },
+            "data": {
+                "url": "https://tkmservices.ibb.gov.tr/web/api/TrafficData/v1/TrafficIndex_Sc1_Cont",
+                "method": "GET",
+                "variableName": "trafficData",
+                "headers": "{\"User-Agent\": \"Mozilla/5.0\"}"
+            }
+        },
+        {
+            "id": "3",
+            "type": "AGENT_AI",
+            "label": "Trafik Analizi (AI)",
+            "position": {
+                "x": 100,
+                "y": 400
+            },
+            "data": {
+                "model": "gemini-pro",
+                "provider": "gemini",
+                "variableName": "advice",
+                "prompt": "İstanbul trafik verileri (JSON): {{trafficData}}\n\nAnahtarlar:\n- TI: Genel Trafik Yoğunluğu\n- TI_An: Anadolu Yakası\n- TI_Av: Avrupa Yakası\n\nGörev: Bu verilere dayanarak kısa bir trafik raporu hazırla. Yoğunluk %50'nin üzerindeyse uyarı ver, altındaysa yolun açık olduğunu belirt. Samimi ve yardımsever bir asistan gibi konuş."
+            }
+        },
+        {
+            "id": "4",
+            "type": "NOTIFICATION",
+            "label": "Bildirim Gönder",
+            "position": {
+                "x": 100,
+                "y": 550
+            },
+            "data": {
+                "title": "🚗 İstanbul Trafik Durumu",
+                "message": "{{advice}}",
+                "type": "push"
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "1",
+            "targetNodeId": "2"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "2",
+            "targetNodeId": "3"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "3",
+            "targetNodeId": "4"
+        }
+    ]
+}
