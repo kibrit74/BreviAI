@@ -1,8 +1,20 @@
 import { CronCreateConfig, BrowserScrapeConfig, CronDeleteConfig, CronListConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
+import { secureStorage } from '../SecureStorage';
 
-const BACKEND_URL = 'http://136.109.124.154:3001';
-const AUTH_KEY = 'breviai-secret-password';
+// Fallback defaults (used when SecureStore has no saved values)
+const DEFAULT_BACKEND_URL = 'http://136.109.124.154:3001';
+const DEFAULT_AUTH_KEY = 'breviai-secret-password';
+
+/**
+ * Backend yapılandırmasını güvenli depolamadan çeker.
+ * SecureStore'da değer yoksa fallback kullanır.
+ */
+async function getBackendConfig() {
+    const url = await secureStorage.getSecure('backendUrl') || DEFAULT_BACKEND_URL;
+    const key = await secureStorage.getSecure('backendAuthKey') || DEFAULT_AUTH_KEY;
+    return { url, key };
+}
 
 /**
  * Execute CRON_CREATE node
@@ -37,6 +49,7 @@ export async function executeCronCreate(
     console.log('[CronCreate] Creating job:', { name, schedule, actionType });
 
     try {
+        const { url: BACKEND_URL, key: AUTH_KEY } = await getBackendConfig();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
@@ -91,6 +104,7 @@ export async function executeCronDelete(
     console.log('[CronDelete] Deleting job:', jobId);
 
     try {
+        const { url: BACKEND_URL, key: AUTH_KEY } = await getBackendConfig();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -135,6 +149,7 @@ export async function executeCronList(
     console.log('[CronList] Fetching active jobs...');
 
     try {
+        const { url: BACKEND_URL, key: AUTH_KEY } = await getBackendConfig();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -184,6 +199,7 @@ export async function executeBrowserScrape(
     console.log('[BrowserScrape] Scraping URL:', url);
 
     try {
+        const { url: BACKEND_URL, key: AUTH_KEY } = await getBackendConfig();
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for scraping
 

@@ -262,7 +262,17 @@ export async function executeOutlookRead(
         return { success: true, count: emails.length, emails: emails };
 
     } catch (error) {
-        return { success: false, error: "IMAP Error: " + (error instanceof Error ? error.message : String(error)) };
+        const errMsg = error instanceof Error ? error.message : String(error);
+        let userMessage = 'E-posta okuma hatası (IMAP)';
+        if (errMsg.includes('auth') || errMsg.includes('login') || errMsg.includes('credentials') || errMsg.includes('LOGIN')) {
+            userMessage = 'Outlook giriş bilgileri hatalı. Lütfen e-posta ve uygulama şifresini kontrol edin.';
+        } else if (errMsg.includes('connect') || errMsg.includes('ECONNREFUSED') || errMsg.includes('timeout') || errMsg.includes('ETIMEDOUT')) {
+            userMessage = 'E-posta sunucusuna bağlanılamadı. İnternet bağlantınızı kontrol edin.';
+        } else if (errMsg.includes('certificate') || errMsg.includes('SSL') || errMsg.includes('TLS')) {
+            userMessage = 'E-posta sunucusu güvenlik sertifikası hatası.';
+        }
+        console.error('[OutlookRead/IMAP]', errMsg);
+        return { success: false, error: userMessage, details: errMsg };
     }
 }
 

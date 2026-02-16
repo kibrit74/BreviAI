@@ -9,6 +9,11 @@ import App from './App';
 AppRegistry.registerHeadlessTask('ExecuteWorkflow', () => WidgetHeadlessTask);
 
 // Register Notification Listener Headless Task -> Now handled by Native Service automatically
+import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
+import NotificationHeadlessTask from './src/services/NotificationHeadlessTask';
+
+// Register headless task to handle notifications in background
+AppRegistry.registerHeadlessTask(RNAndroidNotificationListenerHeadlessJsName, () => NotificationHeadlessTask);
 
 // Register the main app component
 registerRootComponent(App);

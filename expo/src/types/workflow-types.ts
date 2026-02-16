@@ -470,7 +470,7 @@ export interface NetworkCheckConfig {
 // Audio Configs
 export interface VolumeControlConfig {
     level: number; // 0-100
-    type: 'media' | 'ring' | 'alarm';
+    type: 'media' | 'ring' | 'alarm' | 'call';
 }
 
 export interface SpeakTextConfig {

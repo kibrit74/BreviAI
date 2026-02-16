@@ -17,16 +17,33 @@ import {
     InstagramPostConfig
 } from '../../types/workflow-types';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
 import { AgentMemoryService } from '../AgentMemoryService';
+import { VariableManager } from '../VariableManager';
+import { workflowEngine } from '../WorkflowEngine';
+import { secureStorage } from '../SecureStorage';
 
-const FB_APP_ID = '1395089878474790'; // Business App with Instagram API
+// Fallback defaults (used when SecureStore has no saved values)
+const DEFAULT_FB_APP_ID = '1395089878474790';
 const FB_DISCOVERY = {
     authorizationEndpoint: 'https://www.facebook.com/v12.0/dialog/oauth',
     tokenEndpoint: 'https://graph.facebook.com/v12.0/oauth/access_token',
 };
-import { VariableManager } from '../VariableManager';
-import { workflowEngine } from '../WorkflowEngine';
+
+/** Facebook App ID'yi güvenli depolamadan çeker */
+async function getFacebookAppId(): Promise<string> {
+    return await secureStorage.getSecure('facebookAppId') || DEFAULT_FB_APP_ID;
+}
+
+// Fallback defaults for image hosting services
+const DEFAULT_IMAGE_HOST_KEY = '6d207e02198a847aa98d0a2a901485a5';
+const DEFAULT_IMGBB_KEY = '3e45e975b8bf0b0e9ee12c28dae0f7e8';
+
+/** Image hosting API key'lerini güvenli depolamadan çeker */
+async function getImageHostKeys(): Promise<{ imageHostKey: string; imgbbKey: string }> {
+    const imageHostKey = await secureStorage.getSecure('imageHostApiKey') || DEFAULT_IMAGE_HOST_KEY;
+    const imgbbKey = await secureStorage.getSecure('imgbbApiKey') || DEFAULT_IMGBB_KEY;
+    return { imageHostKey, imgbbKey };
+}
 
 // --- Google Translate ---
 export async function executeGoogleTranslate(
@@ -566,6 +583,7 @@ export async function executeFacebookLogin(
             'instagram_content_publish'
         ].join(',');
 
+        const FB_APP_ID = await getFacebookAppId();
         const authUrl = `https://www.facebook.com/v12.0/dialog/oauth?` +
             `client_id=${FB_APP_ID}` +
             `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -646,6 +664,7 @@ export async function executeFacebookLogin(
  * Uses freeimage.host (no API key required for basic uploads).
  */
 async function uploadImageToPublicHost(localUri: string): Promise<string> {
+    const { imageHostKey, imgbbKey } = await getImageHostKeys();
     const FileSystem = require('expo-file-system/legacy');
 
     console.log('[Instagram] Uploading local image to public host...');
@@ -662,7 +681,7 @@ async function uploadImageToPublicHost(localUri: string): Promise<string> {
     formData.append('action', 'upload');
     formData.append('format', 'json');
 
-    const uploadRes = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+    const uploadRes = await fetch(`https://freeimage.host/api/1/upload?key=${imageHostKey}`, {
         method: 'POST',
         body: formData
     });
@@ -675,7 +694,7 @@ async function uploadImageToPublicHost(localUri: string): Promise<string> {
         const imgbbForm = new FormData();
         imgbbForm.append('image', base64);
 
-        const imgbbRes = await fetch('https://api.imgbb.com/1/upload?key=3e45e975b8bf0b0e9ee12c28dae0f7e8', {
+        const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
             method: 'POST',
             body: imgbbForm
         });
@@ -766,7 +785,8 @@ export async function executeInstagramPost(
                 formData.append('action', 'upload');
                 formData.append('format', 'json');
 
-                const uploadRes = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+                const { imageHostKey: ihKey, imgbbKey: ibKey } = await getImageHostKeys();
+                const uploadRes = await fetch(`https://freeimage.host/api/1/upload?key=${ihKey}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -780,7 +800,7 @@ export async function executeInstagramPost(
                     console.log('[Instagram] freeimage.host failed, trying imgbb...');
                     const imgbbForm = new FormData();
                     imgbbForm.append('image', base64);
-                    const imgbbRes = await fetch('https://api.imgbb.com/1/upload?key=3e45e975b8bf0b0e9ee12c28dae0f7e8', {
+                    const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${ibKey}`, {
                         method: 'POST',
                         body: imgbbForm
                     });

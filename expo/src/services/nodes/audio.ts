@@ -242,6 +242,14 @@ export async function executeAudioRecord(
     variableManager: VariableManager
 ): Promise<any> {
     try {
+        // Platform check
+        if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
+            return {
+                success: false,
+                error: 'Ses kaydı sadece Android ve iOS\'ta destekleniyor',
+            };
+        }
+
         const permission = await Audio.requestPermissionsAsync();
         if (permission.status !== 'granted') {
             return {

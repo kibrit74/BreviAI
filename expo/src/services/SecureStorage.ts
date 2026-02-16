@@ -16,6 +16,11 @@ const SECURE_KEYS = {
     smtpPassword: 'secure_smtp_password',
     googleAccessToken: 'secure_google_access_token',
     googleRefreshToken: 'secure_google_refresh_token',
+    backendUrl: 'secure_backend_url',
+    backendAuthKey: 'secure_backend_auth_key',
+    facebookAppId: 'secure_facebook_app_id',
+    imageHostApiKey: 'secure_image_host_api_key',
+    imgbbApiKey: 'secure_imgbb_api_key',
 } as const;
 
 export type SecureKeyName = keyof typeof SECURE_KEYS;

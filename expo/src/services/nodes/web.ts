@@ -33,9 +33,10 @@ export async function executeHttpRequest(
         }
 
         // --- RUNTIME PATCH: Redirect Placeholder APIs to Local DB ---
+        // @deprecated Bu yama, eski workflow'lar için geçici bir çözümdür. Eski workflow'lar migrate edilince kaldırılmalıdır.
         // Fixes legacy workflows where AI generated 'myapi.com' instead of DB_WRITE
         if (url.includes('myapi.com') || url.includes('api.example.com') || url.includes('your-api.com')) {
-            console.warn('[HTTP_REQUEST] ⚠️ Placeholder API detected! Redirecting to Local Database...');
+            console.warn(`[HTTP_REQUEST] ⚠️ DEPRECATION WARNING: Placeholder API detected (${url}). Bu özellik gelecek sürümde kaldırılacak. Lütfen iş akışını DB_WRITE düğümü kullanacak şekilde güncelleyin.`);
 
             try {
                 // Dynamic import to avoid circular dependencies

@@ -29,18 +29,34 @@ export const executeCodeExecution = async (
             log: (msg: any) => console.log('[Code Node]', msg),
         };
 
-        // Wrap code in an async function
-        // The user code can return a value or an object of variables to update
+        // Wrap code in an async function with sandbox guards
+        // Block dangerous globals to prevent data exfiltration
         const userFunction = new Function(
             'variables',
             'setVariable',
             'context',
-            `return (async () => { 
+            `
+            // Sandbox: Block dangerous globals
+            const fetch = undefined;
+            const XMLHttpRequest = undefined;
+            const eval = undefined;
+            const require = undefined;
+            const importScripts = undefined;
+            const process = undefined;
+            const globalThis = undefined;
+            return (async () => { 
                 ${code} 
             })();`
         );
 
-        const result = await userFunction(variables, setVariable, context);
+        // Execute with timeout (5 seconds max)
+        const timeoutMs = 5000;
+        const result = await Promise.race([
+            userFunction(variables, setVariable, context),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Kod çalıştırma zaman aşımına uğradı (5s)')), timeoutMs)
+            )
+        ]);
 
         // If variableName is provided, store the result there
         if (variableName) {
