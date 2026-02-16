@@ -230,8 +230,8 @@ const ExecuteWorkflowFields: React.FC<ConfigFieldsProps> = ({ config, updateConf
                 style={styles.input}
                 value={config.workflowId || ''}
                 onChangeText={(v) => updateConfig('workflowId', v)}
-                placeholder="Örn: Trafik Analiz, 67b...",
-            placeholderTextColor="#666"
+                placeholder="Örn: Trafik Analiz, 67b..."
+                placeholderTextColor="#666"
             />
             <Text style={styles.fieldHint}>Tam ID veya otomasyon ismini giriniz.</Text>
         </View>

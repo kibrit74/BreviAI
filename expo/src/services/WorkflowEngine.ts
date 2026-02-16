@@ -115,6 +115,7 @@ import {
     executeAppLaunch,
     executeCodeExecution,
     executeSetValues,
+    executeWorkflowNode,
     // Vector Memory (RAG) tools
     executeSearchMemory,
     executeAddToMemory,
@@ -600,6 +601,9 @@ export class WorkflowEngine {
                     break;
                 case 'SET_VALUES':
                     output = await executeSetValues(node.config as any, this.variableManager);
+                    break;
+                case 'EXECUTE_WORKFLOW':
+                    output = await executeWorkflowNode(node.config as any, this.variableManager);
                     break;
                 case 'SPLIT_BATCHES':
                     const batchResult = await this.executeSplitBatches(node);

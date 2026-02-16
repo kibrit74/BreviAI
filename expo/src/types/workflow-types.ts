@@ -2314,12 +2314,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         hasInputPort: true,
         outputPorts: ['default'],
     },
-    description: 'Vektör veritabanında semantik arama yapar',
-    icon: 'search-circle',
-    color: '#9C27B0',
-    hasInputPort: true,
-    outputPorts: ['default']
-},
+
     ADD_TO_MEMORY: {
         type: 'ADD_TO_MEMORY',
         category: 'memory',

@@ -42,13 +42,15 @@ export async function executeWorkflowNode(
 
     // 1. Find the target workflow
     // Try distinct ID first
-    let targetWorkflow = await WorkflowStorage.get(workflowId);
+    let targetWorkflow = await WorkflowStorage.getById(workflowId);
 
     // If not found, try searching by name or ID in all workflows
     if (!targetWorkflow) {
         const allWorkflows = await WorkflowStorage.getAll();
+        console.log(`[EXECUTE_WORKFLOW] Searching for '${workflowId}' in:`, allWorkflows.map((w: any) => w.name));
         targetWorkflow = allWorkflows.find((w: any) =>
-            w.id === workflowId || w.name.trim() === workflowId.trim()
+            w.id === workflowId ||
+            w.name.trim().toLowerCase() === workflowId.trim().toLowerCase()
         );
     }
 
