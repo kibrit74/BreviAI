@@ -50,428 +50,380 @@ interface NodeDoc {
 
 const NODES: NodeDoc[] = [
     // ═════════════════════════════════════════
-    // 1. TRIGGERS (TETİKLEYİCİLER) - COMPLETE
+    // 1. TRIGGERS (TETİKLEYİCİLER)
     // ═════════════════════════════════════════
     {
-        id: 'MANUAL_TRIGGER', title: 'Manual Trigger', type: 'trigger', summary: 'Butona basınca çalışır.',
-        overviewHTML: `<p>Otomasyonu test etmek veya manuel başlatmak için kullanılır. "Play" ikonuna bastığınızda bu tetiklenir.</p>`,
+        id: 'MANUAL_TRIGGER', title: 'Manual Trigger', type: 'trigger', summary: 'Tek dokunuşla otomasyon başlatma.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🚀 Sahneye Giriş</h3>
+                <p>Manual Trigger, otomasyonun "Play" butonudur. Genellikle test aşamasında veya bir görevi o an hemen yapmak istediğinizde kullanılır.</p>
+            </div>
+            <div class="tip-box">
+                <strong>Pro Tip:</strong> Dashboard üzerinden bu düğmeye bir isim vererek widget oalrak ana ekranınıza ekleyebilirsiniz.
+            </div>
+            <div class="guide-section">
+                <h3>🛠️ Form Parametreleri</h3>
+                <p>Akış başladığında kullanıcıdan bilgi almak istiyorsanız, düğüm ayarlarına tıklayıp "Input Schema" ekleyebilirsiniz. Örn: "Hedef Fiyat", "Mesaj Metni" gibi.</p>
+            </div>
+        `,
         params: [],
-        examples: [{ title: 'Test', code: 'Play butonuna bas.', explanation: 'Manuel başlatma.' }]
+        examples: [{ title: 'Hızlı Test', code: 'Play butonu -> Başlat', explanation: 'Ekranın sağ altındaki play butonu bu düğümü tetikler.' }]
     },
     {
-        id: 'TIME_TRIGGER', title: 'Cron / Interval', type: 'trigger', summary: 'Zamanlanmış görevler.',
-        overviewHTML: `<p>Belirli saatlerde veya aralıklarla (örn: her 5 dakikada bir) çalışır.</p>`,
-        params: [{ name: 'Mode', type: 'Select', required: true, desc: 'Interval / Cron' }, { name: 'Value', type: 'String', required: true, desc: 'Dakika veya Cron ifadesi (* * * * *)' }],
-        examples: [{ title: 'Sabah Alarmı', code: 'Cron: 0 8 * * *', explanation: 'Her sabah 08:00.' }]
+        id: 'TIME_TRIGGER', title: 'Time / Cron Trigger', type: 'trigger', summary: 'Zamanlanmış, periyodik görevler.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>⏰ Zamanlama Sihirbazı</h3>
+                <p>BreviAI, zamanı atomik hassasiyette yönetir. Üç farklı mod sunar:</p>
+                <ul>
+                    <li><strong>Interval:</strong> Her X dakika/saatte bir (Örn: Her 15 dakikada kur kontrolü).</li>
+                    <li><strong>Specific Date:</strong> Tek seferlik, ileri bir tarih (Örn: Doğum günü kutlaması).</li>
+                    <li><strong>Cron:</strong> Karmaşık takvim planları (Örn: Hafta içi her gün 09:00 - 18:00 arası).</li>
+                </ul>
+            </div>
+            <div class="warning-box">
+                <strong>Dikkat:</strong> Cron modunu kullanabilmek için Cihaz Ayarları > Pil > Kısıtlama Yok seçeneğinin aktif olması önerilir.
+            </div>
+        `,
+        params: [
+            { name: 'Mode', type: 'Select', required: true, desc: 'Interval, Date, Cron' },
+            { name: 'Value', type: 'String', required: true, desc: 'Zaman değeri veya cron ifadesi.' }
+        ],
+        examples: [{ title: 'Sabah Raporu', code: '0 8 * * 1-5', explanation: 'Hafta içi her sabah 08:00\'de çalışır.' }]
     },
     {
-        id: 'NOTIFICATION_TRIGGER', title: 'Notification Received', type: 'trigger', summary: 'Bildirim gelince çalışır.',
-        overviewHTML: `<p>WhatsApp, Instagram veya Banka uygulamasından bildirim geldiğinde tetiklenir.</p>`,
-        params: [{ name: 'App Name', type: 'String', required: true, desc: 'Uygulama adı (örn: WhatsApp)' }, { name: 'Filter', type: 'String', required: false, desc: 'İçerik filtresi.' }],
-        examples: [{ title: 'SMS Okuma', code: 'App: Mesajlar\nFilter: "Şifreniz"', explanation: 'SMS şifrelerini yakalar.' }]
+        id: 'NOTIFICATION_TRIGGER', title: 'Notification received', type: 'trigger', summary: 'Diğer uygulamaların bildirimlerini yakalar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📥 Pasif Dinleme</h3>
+                <p>WhatsApp, Instagram, Banka vb. uygulamalardan gelen bildirimleri okuyarak akışı başlatır. Bu sayede "API desteği olmayan" uygulamalarla bile entegrasyon sağlayabilirsiniz.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🔍 Regex Filtreleme</h3>
+                <p>Sadece belirli anahtar kelimeler içeren bildirimleri ayıklayabilirsiniz.</p>
+                <ul>
+                    <li><code>(?i).*harcama.*</code>: Harcama bildirimlerini yakalar.</li>
+                    <li><code>\d{4,6}</code>: Gelen SMS şifrelerini yakalar.</li>
+                </ul>
+            </div>
+        `,
+        params: [
+            { name: 'App Name', type: 'String', required: true, desc: 'Uygulama adı (örn: WhatsApp)' },
+            { name: 'Filter', type: 'String', required: false, desc: 'Regex veya anahtar kelime.' }
+        ],
+        examples: [{ title: 'Banka Takip', code: 'App: Garanti, Filter: "Harcama"', explanation: 'Banka harcama bildirimini Sheet\'e yazar.' }]
     },
     {
-        id: 'GEOFENCE_TRIGGER', title: 'Geofence Trigger', type: 'trigger', summary: 'Konum bazlı tetikleme.',
-        overviewHTML: `<p>Belirlenen bir alana girince (Enter) veya çıkınca (Exit) çalışır.</p>`,
-        params: [{ name: 'Latitude', type: 'Number', required: true, desc: 'Enlem' }, { name: 'Longitude', type: 'Number', required: true, desc: 'Boylam' }, { name: 'Radius', type: 'Number', required: true, desc: 'Metre (Örn: 100)' }],
-        examples: [{ title: 'Eve Dönüş', code: 'Lat: 41.00, Lon: 29.00, Radius: 200m', explanation: 'Eve yaklaşınca Wi-Fi aç.' }]
-    },
-    {
-        id: 'CHAT_INPUT_TRIGGER', title: 'Chat Input', type: 'trigger', summary: 'Sohbetten yazınca çalışır.',
-        overviewHTML: `<p>AI Asistan ile sohbet ederken yazdığınız mesaja göre tetiklenir.</p>`,
-        params: [{ name: 'Keyword', type: 'String', required: false, desc: 'Özel komut (örn: "/hava")' }],
-        examples: [{ title: 'Hava Durumu Sor', code: 'User: "Hava nasıl?"', explanation: 'Chat penceresinden tetiklenir.' }]
-    },
-    {
-        id: 'DEEP_LINK_TRIGGER', title: 'Deep Link / Webhook', type: 'trigger', summary: 'URL veya Kısayol ile.',
-        overviewHTML: `<p>Dışarıdan bir linke tıklayarak (brevi://run/...) otomasyonu başlatır. iPhone Kestirmeler ile uyumludur.</p>`,
-        params: [{ name: 'Path', type: 'String', required: true, desc: 'Link yolu.' }],
-        examples: [{ title: 'NFC Etiketi', code: 'Path: "kapiyi-ac"', explanation: 'NFC etiketine bu linki yazın.' }]
-    },
-    {
-        id: 'EMAIL_TRIGGER', title: 'Email Received', type: 'trigger', summary: 'E-posta gelince çalışır.',
-        overviewHTML: `<p>Gmail veya Outlook hesabınıza yeni e-posta düştüğünde tetiklenir.</p>`,
-        params: [{ name: 'Sender', type: 'String', required: false, desc: 'Kimden (örn: banka.com)' }, { name: 'Subject', type: 'String', required: false, desc: 'Konu filtresi.' }],
-        examples: [{ title: 'Fatura Takibi', code: 'Subject: "Fatura"', explanation: 'Faturaları otomatik kaydeder.' }]
-    },
-    {
-        id: 'TELEGRAM_TRIGGER', title: 'Telegram Message', type: 'trigger', summary: 'Telegram botuna mesaj gelince.',
-        overviewHTML: `<p>Telegram botunuza birisi yazdığında veya gruba mesaj atıldığında çalışır.</p>`,
-        params: [{ name: 'Bot Token', type: 'String', required: true, desc: 'BotFather token.' }],
-        examples: [{ title: 'Bot Komutu', code: 'Msg: "/start"', explanation: 'Botu başlatır.' }]
+        id: 'GEOFENCE_TRIGGER', title: 'Geofence Trigger', type: 'trigger', summary: 'Harita üzerinde alan koruması.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📍 Konumsal Tetikleme</h3>
+                <p>Cihazınız belirlenen bir koordinata girdiğinde veya oradan ayrıldığında çalışır.</p>
+            </div>
+            <div class="tip-box">
+                <strong>Hassasiyet:</strong> Radius (Yarıçap) değerini en az 200m tutmanız GPS sapmalarını önlemek için idealdir.
+            </div>
+        `,
+        params: [
+            { name: 'Latitude', type: 'Number', required: true, desc: 'Enlem' },
+            { name: 'Longitude', type: 'Number', required: true, desc: 'Boylam' },
+            { name: 'Type', type: 'Select', required: true, desc: 'Enter / Exit' }
+        ],
+        examples: [{ title: 'Eve Varınca', code: 'Enter (Ev Konumu)', explanation: 'Eve varınca ışıkları açar.' }]
     },
 
     // ═════════════════════════════════════════
-    // 2. AI & INTELLIGENCE
+    // 2. YAPAY ZEKA (AI) - DEFINITIONS RESTORED
     // ═════════════════════════════════════════
     {
-        id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'GPT-5, Gemini 3, Claude 4.5.',
-        overviewHTML: `<div class="guide-section"><h3>🧠 2026 Model Desteği</h3><p>En son teknoloji yapay zeka modelleri.</p><ul><li><strong>GPT-5:</strong> Akıl yürütme.</li><li><strong>Gemini 3:</strong> Sonsuz hafıza.</li><li><strong>Claude 4.5:</strong> Kodlama uzmanı.</li></ul></div>`,
+        id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'Süper zeka entegrasyonu (2026).',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🧠 Agent AI: BreviAI'nin Beyni</h3>
+                <p>En güçlü dil modellerini (LLM) kullanarak kararlar verir, metin analiz eder ve içerik üretir.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🤖 2026 Model Listesi (Bleeding Edge)</h3>
+                <ul>
+                    <li><strong>GPT-5 (OpenAI):</strong> Akıl yürütme ve çoklu görevde rakipsiz.</li>
+                    <li><strong>Gemini 3 (Google):</strong> "Deep Think" modu ve sonsuz hafıza desteği.</li>
+                    <li><strong>Claude 4.5 Opus:</strong> Kodlama ve otonom görev lideri.</li>
+                </ul>
+            </div>
+            <div class="tip-box">
+                <strong>Prompt Hint:</strong> "Sadece JSON formatında cevap ver" derseniz, çıktıyı sonraki düğümlerde kolayca işleyebilirsiniz.
+            </div>
+        `,
         params: [
             { name: 'Model', type: 'Select', required: true, desc: 'GPT-5, Gemini 3, etc.' },
-            { name: 'Prompt', type: 'Text', required: true, desc: 'Talimat.' }
+            { name: 'Prompt', type: 'Text', required: true, desc: 'Modele gidecek talimat.' },
+            { name: 'Temperature', type: 'Slider', required: false, desc: '0: Mantıksal, 1: Yaratıcı' }
         ],
-        examples: [{ title: 'Makale Yaz', code: 'Prompt: "Yapay zeka hakkında blog yazısı yaz."', explanation: 'İçerik üretir.' }]
+        examples: [{ title: 'Review Summarizer', code: 'Prompt: "Şu yorumu özetle: {{input}}"', explanation: 'Müşteri yorumlarını analiz eder.' }]
     },
     {
-        id: 'REALTIME_AI', title: 'Realtime AI (Live)', type: 'ai', summary: 'Sesli ve Görüntülü Canlı Sohbet.',
-        overviewHTML: `<p>Gemini Live altyapısı ile anlık, kesintisiz sesli sohbet.</p>`,
-        params: [{ name: 'Persona', type: 'Text', required: false, desc: 'Sistem rolü (Örn: Öğretmen).' }],
-        examples: [{ title: 'İngilizce Pratik', code: 'Persona: "I am your English tutor."', explanation: 'Sesli pratik yapın.' }]
+        id: 'REALTIME_AI', title: 'Realtime AI (Live Voice)', type: 'ai', summary: 'Gecikmesiz, canlı sesli asistan.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🎙️ Canlı Sohbet (Millisecond Latency)</h3>
+                <p>Gemini 3 Multimodal altyapısı ile asistanınızla sanki bir insanla konuşuyormuş gibi canlı sohbet edebilirsiniz. Yazmak yerine konuşarak komut verin.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🌟 Kullanım Alanları</h3>
+                <ul>
+                    <li>Yabancı dil pratiği.</li>
+                    <li>Eller serbest mutfakta asistanlık.</li>
+                    <li>Duyguları anlayan empati modu.</li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Persona', type: 'Text', required: true, desc: 'Asistanın kişiliği.' }],
+        examples: [{ title: 'İngilizce Pratik', code: 'Persona: "Zorlayıcı bir İngilizce öğretmeni ol."', explanation: 'Sesli konuşarak pratik yapın.' }]
     },
     {
-        id: 'IMAGE_GENERATOR', title: 'Image Gen 2026', type: 'ai', summary: 'Nanobana Pro / Flux.1.',
-        overviewHTML: `<p>4K çözünürlükte görsel üretimi.</p>`,
-        params: [{ name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi.' }, { name: 'Model', type: 'Select', required: true, desc: 'Flux.1, Nanobana Pro' }],
-        examples: [{ title: 'Logo Tasarımı', code: 'Prompt: "Minimalist tech logo"', explanation: 'Logo üretir.' }]
-    },
-    {
-        id: 'IMAGE_EDIT', title: 'Image Edit', type: 'ai', summary: 'Resim düzenle (Crop, Resize).',
-        overviewHTML: `<p>Bir resmi yeniden boyutlandırır, kırpar veya filtre uygular.</p>`,
-        params: [{ name: 'Actions', type: 'List', required: true, desc: 'Resize, Crop, Rotate' }],
-        examples: [{ title: 'Thumbnail Yap', code: 'Resize: 1280x720', explanation: 'YouTube kapak resmi boyutu.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 3. WEB & AUTOMATION
-    // ═════════════════════════════════════════
-    {
-        id: 'HTTP_REQUEST', title: 'HTTP Request', type: 'web', summary: 'API İsteği at.',
-        overviewHTML: `<p>REST API çağrıları yapar (GET, POST, PUT, DELETE).</p>`,
-        params: [{ name: 'URL', type: 'String', required: true, desc: 'https://api.site.com' }, { name: 'Body', type: 'JSON', required: false, desc: 'Veri paketi.' }],
-        examples: [{ title: 'Webhook', code: 'POST https://webhook.site/...', explanation: 'Veri gönderir.' }]
-    },
-    {
-        id: 'WEB_AUTOMATION', title: 'Web Automation', type: 'web', summary: 'Siteyi gez (RPA).',
-        overviewHTML: `<p>Bir siteye girip, butonlara tıklayıp, form doldurup veri çeker.</p>`,
-        params: [{ name: 'Actions', type: 'List', required: true, desc: 'GoTo -> Click -> Type -> Scrape' }],
-        examples: [{ title: 'Fiyat Takibi', code: 'GoTo Amazon -> Scrape Price', explanation: 'Fiyatı çeker.' }]
-    },
-    {
-        id: 'RSS_READ', title: 'RSS Reader', type: 'web', summary: 'Haberleri çek.',
-        overviewHTML: `<p>Web sitelerinin RSS akışlarını okur.</p>`,
-        params: [{ name: 'URL', type: 'String', required: true, desc: 'rss.xml adresi.' }],
-        examples: [{ title: 'Son Dakika', code: 'URL: bbcturkce.com/rss', explanation: 'Haberleri getirir.' }]
-    },
-    {
-        id: 'GOOGLE_TRANSLATE', title: 'Translate', type: 'web', summary: 'Çeviri yap.',
-        overviewHTML: `<p>Metni bir dilden diğerine çevirir.</p>`,
-        params: [{ name: 'Text', type: 'String', required: true, desc: 'Metin.' }, { name: 'Target', type: 'Select', required: true, desc: 'Hedef Dil (TR).' }],
-        examples: [{ title: 'Çevir', code: 'Hello -> Merhaba', explanation: 'Otomatik çeviri.' }]
-    },
-    {
-        id: 'FACEBOOK_LOGIN', title: 'Facebook Login', type: 'web', summary: 'FB ile giriş yap.',
-        overviewHTML: `<p>Otomasyon içinde Facebook yetkilendirmesi alır (Token).</p>`,
-        params: [{ name: 'Permissions', type: 'List', required: false, desc: 'public_profile, email' }],
-        examples: [{ title: 'Token Al', code: 'Login', explanation: 'Access Token döner.' }]
+        id: 'IMAGE_GENERATOR', title: 'Image Gen (Nanobana Pro)', type: 'ai', summary: 'Sanatsal ve gerçekçi görseller üretir.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🎨 Görsel Sanatın Zirvesi</h3>
+                <p>2026 standartlarında 4K çözünürlükte görseller üretin. Nanobana Pro özellikle "Metin Yazma" (Text inside image) konusunda kusursuzdur.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🚀 Motorlar</h3>
+                <ul>
+                    <li><strong>Nanobana Pro:</strong> Fotorealizm ve metin renderlama.</li>
+                    <li><strong>Flux.1 Ultra:</strong> Sanatsal derinlik ve stil transferi.</li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi (İngilizce önerilir).' }],
+        examples: [{ title: 'Logo Design', code: 'Prompt: "Minimalist futuristic logo for a space agency"', explanation: 'Profesyonel logo üretir.' }]
     },
 
     // ═════════════════════════════════════════
-    // 4. MICROSOFT OFFICE
+    // 3. KONTROL & MANTIK (LOGIC)
     // ═════════════════════════════════════════
     {
-        id: 'OUTLOOK_SEND', title: 'Outlook Send', type: 'microsoft', summary: 'Mail gönder (Outlook).',
-        overviewHTML: `<p>Microsoft hesabınızdan e-posta atar.</p>`,
-        params: [{ name: 'To', type: 'String', required: true, desc: 'Alıcı' }, { name: 'Subject', type: 'String', required: true, desc: 'Konu' }],
-        examples: [{ title: 'Şirket Maili', code: 'To: mudur@sirket.com', explanation: 'Resmi mail atar.' }]
+        id: 'IF_ELSE', title: 'IF / Else (Decision)', type: 'control', summary: 'Mantıksal dallanma noktası.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔀 Karar Verme</h3>
+                <p>Düğüm, gelen veriyi kontrol eder. Koşul doğruysa (True) üst çıkıştan, yanlışsa (False) alt çıkıştan devam eder.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🔢 Operatör Rehberi</h3>
+                <ul>
+                    <li><code>Equal (==)</code>: Tam eşleşme.</li>
+                    <li><code>Contains</code>: Metin parçasını arama.</li>
+                    <li><code>Exists</code>: Değişken tanımlı mı kontrolü.</li>
+                </ul>
+            </div>
+        `,
+        params: [{ name: 'Condition', type: 'UI_Builder', required: true, desc: 'Mantık kurallarını oluşturun.' }],
+        examples: [{ title: 'Bakiye Kontrolü', code: 'IF {{balance}} < 0 THEN "Uyarı Bildirimi"', explanation: 'Bakiye eksiye düşerse uyarır.' }]
     },
     {
-        id: 'EXCEL_WRITE', title: 'Excel Write', type: 'microsoft', summary: 'Excel dosyasına yaz.',
-        overviewHTML: `<p>OneDrive üzerindeki Excel dosyasına satır ekler.</p>`,
-        params: [{ name: 'File', type: 'String', required: true, desc: 'Dosya adı.' }, { name: 'Data', type: 'Array', required: true, desc: 'Satır verisi.' }],
-        examples: [{ title: 'Rapor', code: 'Row: [Tarih, Gelir]', explanation: 'Excel\'e işler.' }]
+        id: 'LOOP', title: 'Loop / For Each', type: 'control', summary: 'Liste elemanlarını tek tek işleme.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔄 Tekrarlayan İşlemler</h3>
+                <p>Bir veri listesi (Array) aldığınız her durumda Loop kullanmalısınız. Örneğin: 10 kişiye mail atmak, 20 görseli yedeklemek.</p>
+            </div>
+            <div class="tip-box">
+                <strong>Batch Mode:</strong> Liste çok büyükse (1000+) Split Batches düğümü ile Loop'u yönetebilirsiniz.
+            </div>
+        `,
+        params: [{ name: 'Items', type: 'Array', required: true, desc: 'Dönülecek veri listesi.' }],
+        examples: [{ title: 'Toplu Mail', code: 'Loop {{users}} -> SendMail', explanation: 'Her kullanıcıya mail gönderir.' }]
     },
     {
-        id: 'ONEDRIVE_UPLOAD', title: 'OneDrive Upload', type: 'microsoft', summary: 'Dosya yükle.',
-        overviewHTML: `<p>Dosyaları OneDrive bulutuna yükler.</p>`,
-        params: [{ name: 'File', type: 'File', required: true, desc: 'Dosya.' }],
-        examples: [{ title: 'Yedekleme', code: 'Upload log.txt', explanation: 'Buluta yedekler.' }]
+        id: 'EXECUTE_WORKFLOW', title: 'Run Sub-Workflow', type: 'control', summary: 'Başka bir akışı fonksiyon olarak çalıştırır.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📦 Modüler Tasarım</h3>
+                <p>Devasa akışlar yerine, küçük ve özelleşmiş akışlar oluşturun. Bu düğümle o akışları birleştirin.</p>
+            </div>
+            <div class="guide-section">
+                <h3>↔️ Veri Aktarımı</h3>
+                <p>Alt akışa "Input" gönderebilir ve alt akışın bitmesini bekleyerek sonucunu (Output) ana akışta kullanabilirsiniz.</p>
+            </div>
+        `,
+        params: [{ name: 'Workflow', type: 'Select', required: true, desc: 'Hedef otomasyon.' }, { name: 'Wait', type: 'Boolean', required: true, desc: 'Bitmesini beklesin mi?' }],
+        examples: [{ title: 'Hizmet Çağrısı', code: 'Run "Currency Converter"', explanation: 'Kuru çevirip sonucu ana akışa getirir.' }]
     },
 
     // ═════════════════════════════════════════
-    // 5. GOOGLE SERVICES
+    // 4. MICROSOFT & OFFICE 365
     // ═════════════════════════════════════════
     {
-        id: 'GMAIL_SEND', title: 'Gmail Send', type: 'google', summary: 'Gmail API ile gönder.',
-        overviewHTML: `<p>Resmi Gmail entegrasyonu.</p>`,
-        params: [{ name: 'To', type: 'String', required: true, desc: 'Alıcı' }],
-        examples: [{ title: 'Resmi Yazışma', code: 'To: boss@corp.com', explanation: 'Gmail hesabınızdan atar.' }]
+        id: 'OUTLOOK_SEND', title: 'Outlook Email', type: 'microsoft', summary: 'Resmi Microsoft hesabınızla mail gönderin.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📧 Kurumsal E-Posta</h3>
+                <p>Office 365 veya Outlook hesabınızı kullanarak profesyonel e-postalar gönderir. SMTP yerine API kullandığı için "Spam" kutusuna düşme riski çok düşüktür.</p>
+            </div>
+            <div class="guide-section">
+                <h3>📎 Ekler (Attachments)</h3>
+                <p>İş akışında üretilen PDF, Excel veya resimleri maile ek olarak ekleyebilirsiniz.</p>
+            </div>
+        `,
+        params: [{ name: 'To', type: 'String', required: true, desc: 'Alıcı adresi.' }, { name: 'Subject', type: 'String', required: true, desc: 'Konu.' }],
+        examples: [{ title: 'Rapor Gönder', code: 'To: boss@corp.com, Body: {{ai_summary}}', explanation: 'AI özetini rapor olarak atar.' }]
     },
     {
-        id: 'SHEETS_WRITE', title: 'Sheets Add Row', type: 'google', summary: 'Tabloya satır ekle.',
-        overviewHTML: `<p>Google E-Tablolar'a veri kaydeder.</p>`,
-        params: [{ name: 'Spreadsheet ID', type: 'String', required: true, desc: 'ID' }, { name: 'Row Data', type: 'Array', required: true, desc: '["A", "B"]' }],
-        examples: [{ title: 'Harcama Takibi', code: 'Row: [Tarih, Tutar, Kategori]', explanation: 'Harcamayı kaydeder.' }]
-    },
-    {
-        id: 'DRIVE_UPLOAD', title: 'Drive Upload', type: 'google', summary: 'Dosya yükle.',
-        overviewHTML: `<p>Google Drive'a dosya yedekler.</p>`,
-        params: [{ name: 'File', type: 'File', required: true, desc: 'Dosya yolu.' }],
-        examples: [{ title: 'Fotoğraf Yedekle', code: 'File: {{lastPhoto}}', explanation: 'Son fotoğrafı yükler.' }]
+        id: 'EXCEL_WRITE', title: 'Excel Write (OneDrive)', type: 'microsoft', summary: 'Excel dosyalarına veri işler.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📊 Dinamik Tablo Yönetimi</h3>
+                <p>OneDrive üzerindeki .xlsx dosyalarını hedef alır. Satır ekleme, hücre güncelleme veya tablo formatlama yapabilir.</p>
+            </div>
+            <div class="warning-box">
+                <strong>Dosya Formatı:</strong> Sadece OneDrive üzerinde bulunan Cloud-Excel dosyalarıyla çalışır.
+            </div>
+        `,
+        params: [{ name: 'File ID', type: 'String', required: true, desc: 'Dosya seçici.' }, { name: 'Table', type: 'String', required: true, desc: 'Sayfa/Tablo adı.' }],
+        examples: [{ title: 'Log Kaydı', code: 'Row: [{{$now}}, "Success", {{data}}]', explanation: 'Her başarılı işlemi Excel\'e yazar.' }]
     },
 
     // ═════════════════════════════════════════
-    // 6. CONTROLS (MANTIK)
+    // 5. AUDIO & VOICE
     // ═════════════════════════════════════════
     {
-        id: 'IF_ELSE', title: 'IF / Else', type: 'control', summary: 'Karar verme.',
-        overviewHTML: `<p>Koşula göre akışı yönlendirir.</p>`,
-        params: [{ name: 'Condition', type: 'Expression', required: true, desc: 'x > 5' }],
-        examples: [{ title: 'Kontrol', code: 'IF saat > 18 THEN "İyi akşamlar"', explanation: 'Zamana göre mesaj.' }]
+        id: 'SPEAK_TEXT', title: 'Speak Text (TTS)', type: 'audio', summary: 'Metni doğal bir insan sesiyle okur.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔊 Sesli Geri Bildirim</h3>
+                <p>Otomasyonun sonucunu veya gelen bir bildirimi telefonunuzun hoparlöründen sesli olarak duyun.</p>
+            </div>
+            <div class="guide-section">
+                <h3>🎭 Ses Seçenekleri</h3>
+                <p>Erkek, Kadın, Çocuk ve farklı vurgu (Türkçe, İngilizce) seçenekleri mevcuttur.</p>
+            </div>
+        `,
+        params: [{ name: 'Text', type: 'String', required: true, desc: 'Okunacak metin.' }, { name: 'Voice', type: 'Select', required: false, desc: 'Ses tonu.' }],
+        examples: [{ title: 'Karşılama', code: 'Speak "Hoş geldin Ahmet."', explanation: 'Uygulama açılınca sesli karşılama.' }]
     },
     {
-        id: 'LOOP', title: 'Loop', type: 'control', summary: 'Döngü.',
-        overviewHTML: `<p>Liste elemanlarını tek tek işler.</p>`,
-        params: [{ name: 'Items', type: 'Array', required: true, desc: 'Liste.' }],
-        examples: [{ title: 'Toplu İşlem', code: 'Loop {{contacts}}', explanation: 'Her kişiye işlem yap.' }]
-    },
-    {
-        id: 'DELAY', title: 'Delay', type: 'control', summary: 'Bekle.',
-        overviewHTML: `<p>Belirli süre bekler.</p>`,
-        params: [{ name: 'Duration', type: 'Number', required: true, desc: 'Saniye.' }],
-        examples: [{ title: 'Bekle', code: '5 saniye', explanation: 'Duraklatır.' }]
-    },
-    {
-        id: 'SWITCH', title: 'Switch', type: 'control', summary: 'Seçenekli yol.',
-        overviewHTML: `<p>Değere göre (Case 1, Case 2) yönlendirir.</p>`,
-        params: [{ name: 'Variable', type: 'String', required: true, desc: 'Değişken.' }],
-        examples: [{ title: 'Menü', code: '1->Bakiye, 2->Destek', explanation: 'Seçime göre git.' }]
-    },
-    {
-        id: 'EXECUTE_WORKFLOW', title: 'Sub-Workflow', type: 'control', summary: 'Alt akış çalıştır.',
-        overviewHTML: `<p>Başka bir otomasyonu çağırır.</p>`,
-        params: [{ name: 'Workflow', type: 'Select', required: true, desc: 'Akış adı.' }],
-        examples: [{ title: 'Modül', code: 'Run "Hata Bildir"', explanation: 'Hazır akışı çalıştırır.' }]
-    },
-    {
-        id: 'VARIABLE', title: 'Set Variable', type: 'control', summary: 'Değişken ata.',
-        overviewHTML: `<p>Veri sakla veya güncelle.</p>`,
-        params: [{ name: 'Name', type: 'String', required: true, desc: 'İsim' }, { name: 'Value', type: 'Any', required: true, desc: 'Değer' }],
-        examples: [{ title: 'Sayaç', code: 'count = count + 1', explanation: 'Sayacı artır.' }]
+        id: 'SPEECH_TO_TEXT', title: 'Speech-to-Text (Listen)', type: 'audio', summary: 'Söylenenleri metne dönüştürür.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🎙️ Dinle ve Anla</h3>
+                <p>Asistanın dinleme modunu açar. Sizin söylediğiniz cümleleri dijital metne çevirerek AI Agent düğümüne girdi sağlar.</p>
+            </div>
+            <div class="tip-box">
+                <strong>Hassasiyet:</strong> Arka plan gürültü engelleme özelliği sayesinde gürültülü ortamlarda bile başarılı sonuç verir.
+            </div>
+        `,
+        params: [{ name: 'Language', type: 'String', required: true, desc: 'Örn: tr-TR' }],
+        examples: [{ title: 'Sesli Not', code: 'Speak -> Listen -> SaveNotion', explanation: 'Sesinizi Notion sayfasına çevirir.' }]
     },
 
     // ═════════════════════════════════════════
-    // 7. DEVICE & SENSORS
+    // 6. HAFIZA & RAG (MEMORY)
     // ═════════════════════════════════════════
     {
-        id: 'LIGHT_SENSOR', title: 'Light Sensor', type: 'device', summary: 'Işık seviyesi.',
-        overviewHTML: `<p>Ortam aydınlığını (Lux) ölçer.</p>`,
+        id: 'ADD_TO_MEMORY', title: 'Remember (Memory)', type: 'memory', summary: 'Veriyi uzun süreli hafızaya kaydeder.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🧠 Kalıcı Öğrenme</h3>
+                <p>Yapay zekanın sizi daha iyi tanıması için önemli bilgileri buraya kaydedin. (Örn: "En sevdiğim renk mavidir", "Önemli projelerim şunlar...")</p>
+            </div>
+            <div class="guide-section">
+                <h3>🛡️ Gizlilik</h3>
+                <p>Bu veriler sadece sizin cihazınızda (Edge Memory) şifreli olarak saklanır ve sadece sizin workflowlarınız erişebilir.</p>
+            </div>
+        `,
+        params: [{ name: 'Context', type: 'Text', required: true, desc: 'Unutulmaması gereken bilgi.' }],
+        examples: [{ title: 'Bilgi Depolama', code: 'Context: "Yarın saat 10:00\'da dişçi randevum var."', explanation: 'AI bu bilgiyi daha sonra cevaplarken kullanır.' }]
+    },
+    {
+        id: 'SEARCH_MEMORY', title: 'Recall (Search Context)', type: 'memory', summary: 'Hafızadan ilgili bilgiyi geri getirir.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔍 Hatırlama Süreci</h3>
+                <p>Hafızaya atılmış binlerce sayfalık veri içinden, o anki sorunuzla en alakalı olanları bulur ve AI Agent'ın önüne "bağlam" olarak koyar.</p>
+            </div>
+        `,
+        params: [{ name: 'Query', type: 'String', required: true, desc: 'Aranacak anahtar kelime veya soru.' }],
+        examples: [{ title: 'Bilgi Geri Çağır', code: 'Query: "Dişçi randevusu ne zaman?"', explanation: 'Hafızadan ilgili saat bilgisini getirir.' }]
+    },
+
+    // ═════════════════════════════════════════
+    // 7. SENSÖRLER & DONANIM (DEVICE)
+    // ═════════════════════════════════════════
+    {
+        id: 'LIGHT_SENSOR', title: 'Light Sensor', type: 'device', summary: 'Ortam ışığına (LUX) duyarlı işlemler.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>💡 Işık Duyarlılığı</h3>
+                <p>Cihazınızın üzerindeki ışık sensörünü kullanarak ortamın ne kadar aydınlık/karanlık olduğunu ölçer.</p>
+            </div>
+            <div class="guide-section">
+                <h3>📊 LUX Değerleri</h3>
+                <ul>
+                    <li><strong>0 - 10:</strong> Zifiri karanlık.</li>
+                    <li><strong>100 - 500:</strong> Normal iç mekan.</li>
+                    <li><strong>1000+:</strong> Güneş ışığı.</li>
+                </ul>
+            </div>
+        `,
         params: [],
-        examples: [{ title: 'Otomatik Işık', code: 'IF lux < 10', explanation: 'Karanlıkta çalışır.' }]
+        examples: [{ title: 'Gece Modu', code: 'IF lux < 10 THEN "Işıkları Aç"', explanation: 'Hava kararınca akıllı lambaları kontrol eder.' }]
     },
     {
-        id: 'PEDOMETER', title: 'Pedometer', type: 'device', summary: 'Adım sayar.',
-        overviewHTML: `<p>Günlük adım sayısını verir.</p>`,
+        id: 'PEDOMETER', title: 'Pedometer (Adım Sayar)', type: 'device', summary: 'Günlük aktivite ve adım takibi.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🏃 Hareket Takibi</h3>
+                <p>Telefonun akselerometresini kullanarak attığınız adımları sayar. Google Fit veya Apple Health gerektirmez, doğrudan donanımdan okur.</p>
+            </div>
+        `,
         params: [],
-        examples: [{ title: 'Spor Takibi', code: 'Get Steps', explanation: 'Adımları alır.' }]
+        examples: [{ title: 'Zayıflama Takibi', code: 'IF steps > 10000 THEN "Tebrik Mesajı"', explanation: 'Hedefe ulaşınca kutlar.' }]
     },
     {
-        id: 'MAGNETOMETER', title: 'Compass', type: 'device', summary: 'Pusula.',
-        overviewHTML: `<p>Yön bilgisi (Azimuth) verir.</p>`,
-        params: [],
-        examples: [{ title: 'Kıble', code: 'Get Direction', explanation: 'Yönü bulur.' }]
-    },
-    {
-        id: 'BATTERY_CHECK', title: 'Battery Check', type: 'device', summary: 'Pil durumu.',
-        overviewHTML: `<p>Pil yüzdesini kontrol eder.</p>`,
-        params: [],
-        examples: [{ title: 'Pil Az', code: 'IF level < 20', explanation: 'Uyarı verir.' }]
-    },
-    {
-        id: 'FLASHLIGHT_CONTROL', title: 'Flashlight', type: 'device', summary: 'Fener.',
-        overviewHTML: `<p>Kamera flaşını açıp kapatır.</p>`,
-        params: [{ name: 'Mode', type: 'Select', required: true, desc: 'On/Off' }],
-        examples: [{ title: 'Fener Aç', code: 'Turn On', explanation: 'Aydınlatır.' }]
-    },
-    {
-        id: 'BRIGHTNESS_CONTROL', title: 'Brightness', type: 'device', summary: 'Ekran parlaklığı.',
-        overviewHTML: `<p>Ekran parlaklığını ayarlar.</p>`,
-        params: [{ name: 'Level', type: 'Number', required: true, desc: '0-100' }],
-        examples: [{ title: 'Gece Modu', code: 'Set 10%', explanation: 'Ekranı kısar.' }]
-    },
-    {
-        id: 'DND_CONTROL', title: 'DND Mode', type: 'device', summary: 'Rahatsız Etmeyin.',
-        overviewHTML: `<p>DND modunu açar/kapatır.</p>`,
-        params: [{ name: 'Enabled', type: 'Boolean', required: true, desc: 'Aç/Kapa' }],
-        examples: [{ title: 'Toplantı', code: 'DND On', explanation: 'Sessize alır.' }]
-    },
-    {
-        id: 'BLUETOOTH_CONTROL', title: 'Bluetooth', type: 'device', summary: 'BT Aç/Kapa.',
-        overviewHTML: `<p>Bluetooth bağlantısını kontrol eder.</p>`,
-        params: [{ name: 'Mode', type: 'Select', required: true, desc: 'On/Off' }],
-        examples: [{ title: 'Araba Modu', code: 'BT On', explanation: 'Bağlantıyı açar.' }]
-    },
-    {
-        id: 'MEDIA_CONTROL', title: 'Media Control', type: 'device', summary: 'Müzik kontrolü.',
-        overviewHTML: `<p>Oynat, Durdur, Sonraki Parça.</p>`,
-        params: [{ name: 'Action', type: 'Select', required: true, desc: 'Play/Pause/Next' }],
-        examples: [{ title: 'Müzik Başlat', code: 'Play', explanation: 'Müziği başlatır.' }]
-    },
-    {
-        id: 'APP_LAUNCH', title: 'Launch App', type: 'device', summary: 'Uygulama aç.',
-        overviewHTML: `<p>Telefonda yüklü uygulamayı başlatır.</p>`,
-        params: [{ name: 'Package', type: 'String', required: true, desc: 'Paket adı.' }],
-        examples: [{ title: 'Instagram', code: 'Open Instagram', explanation: 'Uygulamayı açar.' }]
+        id: 'FLASHLIGHT_CONTROL', title: 'Flashlight Control', type: 'device', summary: 'Kamera flaşını yönetir.',
+        overviewHTML: `<p>Fflaşı "On", "Off" veya "Toggle" (Durum Değiştir) modunda çalıştırır. Karanlık ortamlarda görsel uyarıcı olarak kullanılabilir.</p>`,
+        params: [{ name: 'Mode', type: 'Select', required: true, desc: 'On / Off / Toggle' }],
+        examples: [{ title: 'Blink Alert', code: 'Loop 5x -> Toggle Flash -> Wait 0.5s', explanation: 'Flaş patlatarak uyarı verir.' }]
     },
 
     // ═════════════════════════════════════════
-    // 8. AUDIO & VOICE
+    // 8. İLETİŞİM & SOSYAL (COMMUNICATION)
     // ═════════════════════════════════════════
     {
-        id: 'SPEAK_TEXT', title: 'Speak Text (TTS)', type: 'audio', summary: 'Metni oku.',
-        overviewHTML: `<p>Yazıyı sesli olarak okur.</p>`,
-        params: [{ name: 'Text', type: 'String', required: true, desc: 'Okunacak metin.' }],
-        examples: [{ title: 'Hoşgeldin', code: 'Speak "Merhaba"', explanation: 'Sesli karşılama.' }]
+        id: 'WHATSAPP_SEND', title: 'WhatsApp Send', type: 'communication', summary: 'WhatsApp mesajı ve görsel gönderir.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>💬 Otomatik Mesajlaşma</h3>
+                <p>BreviAI backend servisini kullanarak rehberdeki birine veya doğrudan numaraya mesaj atar.</p>
+            </div>
+            <div class="warning-box">
+                <strong>Format:</strong> Telefon numarası ülke koduyla başlamalıdır (905...).
+            </div>
+        `,
+        params: [
+            { name: 'Phone', type: 'String', required: true, desc: 'Hedef numara.' },
+            { name: 'Message', type: 'Text', required: true, desc: 'Metin.' }
+        ],
+        examples: [{ title: 'Günaydın', code: 'To: 905..., Msg: "Günaydın sevgilim!"', explanation: 'Kişiye otomatik mesaj atar.' }]
     },
     {
-        id: 'SPEECH_TO_TEXT', title: 'Listen (STT)', type: 'audio', summary: 'Sesi yazıya dök.',
-        overviewHTML: `<p>Ortamı dinler ve söylenenleri yazıya çevirir.</p>`,
-        params: [{ name: 'Language', type: 'String', required: false, desc: 'TR/EN' }],
-        examples: [{ title: 'Not Al', code: 'Listen -> Save to Notes', explanation: 'Sesli not alır.' }]
+        id: 'INSTAGRAM_POST', title: 'Instagram Post', type: 'communication', summary: 'Otomatik gönderi paylaşımı.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>📸 Feed Paylaşımı</h3>
+                <p>Oluşturulan veya telefonda bulunan bir resmi, açıklama yazısıyla birlikte Instagram hesabınızda paylaşır. AI Image Generator ile birleştirerek otonom sanat hesapları kurabilirsiniz.</p>
+            </div>
+        `,
+        params: [{ name: 'Image', type: 'Image', required: true, desc: 'Paylaşılacak görsel.' }, { name: 'Caption', type: 'Text', required: true, desc: 'Görsel açıklaması.' }],
+        examples: [{ title: 'Auto Post', code: 'Image: {{gen_img}}, Caption: "Made by AI"', explanation: 'AI görselini direkt paylaşır.' }]
     },
     {
-        id: 'AUDIO_RECORD', title: 'Record Audio', type: 'audio', summary: 'Ses kaydet.',
-        overviewHTML: `<p>Ortam sesini dosyaya kaydeder.</p>`,
-        params: [{ name: 'Duration', type: 'Number', required: true, desc: 'Saniye.' }],
-        examples: [{ title: 'Gizlice Kaydet', code: 'Record 10s', explanation: 'Kısa kayıt alır.' }]
-    },
-    {
-        id: 'VOLUME_CONTROL', title: 'Set Volume', type: 'audio', summary: 'Ses seviyesi.',
-        overviewHTML: `<p>Medya veya Zil sesi seviyesini ayarlar.</p>`,
-        params: [{ name: 'Level', type: 'Number', required: true, desc: '0-100' }],
-        examples: [{ title: 'Sessiz', code: 'Set 0%', explanation: 'Sesi kapatır.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 9. COMMUNICATION
-    // ═════════════════════════════════════════
-    {
-        id: 'WHATSAPP_SEND', title: 'WhatsApp Send', type: 'communication', summary: 'Mesaj at.',
-        overviewHTML: `<p>WhatsApp üzerinden mesaj gönderir.</p>`,
-        params: [{ name: 'Phone', type: 'String', required: true, desc: 'Tel No' }, { name: 'Message', type: 'Text', required: true, desc: 'Mesaj' }],
-        examples: [{ title: 'Mesaj', code: 'Msg: "Geliyorum"', explanation: 'Haber verir.' }]
-    },
-    {
-        id: 'SMS_SEND', title: 'SMS Send', type: 'communication', summary: 'SMS at.',
-        overviewHTML: `<p>SMS gönderir.</p>`,
-        params: [{ name: 'Phone', type: 'String', required: true, desc: 'Tel No' }],
-        examples: [{ title: 'Bilgi', code: 'Msg: "Kod: 123"', explanation: 'SMS atar.' }]
-    },
-    {
-        id: 'TELEGRAM_SEND', title: 'Telegram Send', type: 'communication', summary: 'Telegram mesajı.',
-        overviewHTML: `<p>Telegram botu ile mesaj atar.</p>`,
-        params: [{ name: 'Chat ID', type: 'String', required: true, desc: 'ID' }],
-        examples: [{ title: 'Log', code: 'Msg: "Sistem Aktif"', explanation: 'Bildirim atar.' }]
-    },
-    {
-        id: 'DISCORD_SEND', title: 'Discord Webhook', type: 'communication', summary: 'Discord mesajı.',
-        overviewHTML: `<p>Discord kanalına yazar.</p>`,
-        params: [{ name: 'Webhook', type: 'String', required: true, desc: 'URL' }],
-        examples: [{ title: 'Duyuru', code: 'Msg: "Yayındayız!"', explanation: 'Kanalda paylaşır.' }]
-    },
-    {
-        id: 'SLACK_SEND', title: 'Slack Message', type: 'communication', summary: 'Slack mesajı.',
-        overviewHTML: `<p>Slack kanalına mesaj atar.</p>`,
-        params: [{ name: 'Webhook', type: 'String', required: true, desc: 'URL' }],
-        examples: [{ title: 'İş Bildirimi', code: 'Msg: "Rapor hazır"', explanation: 'Ekibe yazar.' }]
-    },
-    {
-        id: 'INSTAGRAM_POST', title: 'Instagram Post', type: 'communication', summary: 'Post paylaş.',
-        overviewHTML: `<p>Instagramda gönderi paylaşır.</p>`,
-        params: [{ name: 'Image', type: 'Image', required: true, desc: 'Resim' }, { name: 'Caption', type: 'Text', required: true, desc: 'Açıklama' }],
-        examples: [{ title: 'Otomatik Post', code: 'Share Image', explanation: 'Paylaşım yapar.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 10. CALENDAR & CONTACTS
-    // ═════════════════════════════════════════
-    {
-        id: 'CALENDAR_Read', title: 'Read Calendar', type: 'calendar', summary: 'Etkinlikleri oku.',
-        overviewHTML: `<p>Takvimdeki yaklaşan olayları listeler.</p>`,
-        params: [{ name: 'Span', type: 'Select', required: true, desc: 'Today / Week' }],
-        examples: [{ title: 'Bugünkü Plan', code: 'Get Today', explanation: 'Ajandayı okur.' }]
-    },
-    {
-        id: 'CALENDAR_CREATE', title: 'Create Event', type: 'calendar', summary: 'Etkinlik oluştur.',
-        overviewHTML: `<p>Takvime yeni etkinlik ekler.</p>`,
-        params: [{ name: 'Title', type: 'String', required: true, desc: 'Başlık' }],
-        examples: [{ title: 'Randevu', code: 'Add "Dişçi"', explanation: 'Takvime işler.' }]
-    },
-    {
-        id: 'CONTACTS_READ', title: 'Read Contacts', type: 'calendar', summary: 'Kişi ara.',
-        overviewHTML: `<p>Rehberden kişi bilgisi çeker.</p>`,
-        params: [{ name: 'Name', type: 'String', required: true, desc: 'İsim' }],
-        examples: [{ title: 'Numara Bul', code: 'Find "Ahmet"', explanation: 'Numarasını getirir.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 11. FILES & PRODUCTIVITY
-    // ═════════════════════════════════════════
-    {
-        id: 'FILE_WRITE', title: 'Write File', type: 'files', summary: 'Dosya kaydet.',
-        overviewHTML: `<p>Telefona dosya yazar.</p>`,
-        params: [{ name: 'Content', type: 'Text', required: true, desc: 'İçerik' }],
-        examples: [{ title: 'Log', code: 'Save "test.txt"', explanation: 'Kaydeder.' }]
-    },
-    {
-        id: 'FILE_READ', title: 'Read File', type: 'files', summary: 'Dosya oku.',
-        overviewHTML: `<p>Dosyadan metin okur.</p>`,
-        params: [{ name: 'Filename', type: 'String', required: true, desc: 'Adı' }],
-        examples: [{ title: 'Config Oku', code: 'Read "conf.json"', explanation: 'Ayarları yükler.' }]
-    },
-    {
-        id: 'PDF_CREATE', title: 'Create PDF', type: 'files', summary: 'PDF oluştur.',
-        overviewHTML: `<p>Metni veya resimleri PDF yapar.</p>`,
-        params: [{ name: 'Content', type: 'Text', required: true, desc: 'İçerik' }],
-        examples: [{ title: 'Raporla', code: 'To PDF', explanation: 'PDF çıktısı alır.' }]
-    },
-    {
-        id: 'NOTION_CREATE', title: 'Notion Page', type: 'files', summary: 'Notion sayfası.',
-        overviewHTML: `<p>Notion veritabanına ekler.</p>`,
-        params: [{ name: 'Properties', type: 'JSON', required: true, desc: 'Data' }],
-        examples: [{ title: 'Not', code: 'Add Page', explanation: 'Notion\'a atar.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 12. LOCATION & MAPS
-    // ═════════════════════════════════════════
-    {
-        id: 'LOCATION_GET', title: 'Get Location', type: 'location', summary: 'GPS Konumu.',
-        overviewHTML: `<p>Enlem, Boylam ve Adres bilgisini çeker.</p>`,
-        params: [{ name: 'Accuracy', type: 'Select', required: false, desc: 'High / Low' }],
-        examples: [{ title: 'Konum Paylaş', code: 'SMS: "Buradayım: {{mapsUrl}}"', explanation: 'Konum atar.' }]
-    },
-    {
-        id: 'NAVIGATE_TO', title: 'Navigate', type: 'location', summary: 'Yol tarifi.',
-        overviewHTML: `<p>Haritaları açıp adrese yol tarifi başlatır.</p>`,
-        params: [{ name: 'Address', type: 'String', required: true, desc: 'Varış Yeri' }],
-        examples: [{ title: 'Eve Git', code: 'Nav to "Home"', explanation: 'Haritayı açar.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 13. SMART HOME & IOT
-    // ═════════════════════════════════════════
-    {
-        id: 'PHILIPS_HUE', title: 'Philips Hue', type: 'smart_home', summary: 'Işıkları yönet.',
-        overviewHTML: `<p>Hue ışıklarını açar, kapatır veya renk değiştirir.</p>`,
-        params: [{ name: 'Action', type: 'Select', required: true, desc: 'On / Off' }],
-        examples: [{ title: 'Sinema Modu', code: 'Lights Off', explanation: 'Işıkları kapatır.' }]
-    },
-
-    // ═════════════════════════════════════════
-    // 14. MEMORY (RAG)
-    // ═════════════════════════════════════════
-    {
-        id: 'ADD_TO_MEMORY', title: 'Remember', type: 'memory', summary: 'Hafızaya at.',
-        overviewHTML: `<p>Bilgiyi kalıcı hafızaya (Vector DB) kaydeder.</p>`,
-        params: [{ name: 'Text', type: 'String', required: true, desc: 'Bilgi' }],
-        examples: [{ title: 'Öğren', code: 'Remember "Patronun adı Ali"', explanation: 'Unutmaz.' }]
-    },
-    {
-        id: 'SEARCH_MEMORY', title: 'Recall', type: 'memory', summary: 'Hatırla.',
-        overviewHTML: `<p>Hafızadan bilgi sorar.</p>`,
-        params: [{ name: 'Query', type: 'String', required: true, desc: 'Soru' }],
-        examples: [{ title: 'Soru', code: 'Recall "Patron kim?" -> "Ali"', explanation: 'Cevap verir.' }]
+        id: 'SLACK_SEND', title: 'Slack Message (Webhooks)', type: 'communication', summary: 'Slack kanalına profesyonel duyurular yapar.',
+        overviewHTML: `<p>Incoming Webhook URL kullanarak ekibinize bildirimler gönderir. Özel "Block Kit" formatıyla butonlu/resimli mailler oluşturabilir.</p>`,
+        params: [{ name: 'Webhook URL', type: 'String', required: true, desc: 'Slack bot URLsi.' }, { name: 'Message', type: 'Text', required: true, desc: 'Duyuru metni.' }],
+        examples: [{ title: 'Project Update', code: 'Msg: "V16 Deploy edildi! 🚀"', explanation: 'Ekibe canlı bildirim.' }]
     }
 ];
 
@@ -505,8 +457,8 @@ export default function DocsPage() {
             {/* SIDEBAR */}
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
-                    <div className={styles.logo}>BreviAI Encyclopedia</div>
-                    <div className={styles.version}>v15.0</div>
+                    <div className={styles.logo}>BreviAI Grand Encyclopedia</div>
+                    <div className={styles.version}>v16.0 MASTER</div>
                 </div>
                 <div className={styles.searchContainer}>
                     <input
@@ -547,7 +499,7 @@ export default function DocsPage() {
             <main className={styles.mainContent}>
                 <div className={styles.heroSection}>
                     <div className={styles.heroIcon} style={{
-                        backgroundColor: CATEGORY_STYLES[selectedNode.type]?.color + '20' || '#333',
+                        backgroundColor: (CATEGORY_STYLES[selectedNode.type]?.color || '#333') + '20',
                         color: CATEGORY_STYLES[selectedNode.type]?.color || '#fff'
                     }}>
                         {CATEGORY_STYLES[selectedNode.type]?.icon || '📦'}
@@ -565,9 +517,9 @@ export default function DocsPage() {
                             className={`${styles.tabBtn} ${activeTab === tab ? styles.activeTab : ''}`}
                             onClick={() => setActiveTab(tab)}
                         >
-                            {tab === 'overview' ? 'Rehber' :
-                                tab === 'params' ? 'Parametreler' :
-                                    'Örnekler'}
+                            {tab === 'overview' ? '📜 Ansiklopedi Rehberi' :
+                                tab === 'params' ? '⚙️ Teknik Parametreler' :
+                                    '💡 Örnek Senaryolar'}
                         </button>
                     ))}
                 </div>
@@ -592,6 +544,9 @@ export default function DocsPage() {
                                             <td>{p.desc}</td>
                                         </tr>
                                     ))}
+                                    {selectedNode.params.length === 0 && (
+                                        <tr><td colSpan={4} style={{ textAlign: 'center', padding: '20px', color: '#666' }}>Bu düğüm için özel parametre ayarı gerekmez.</td></tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -604,7 +559,7 @@ export default function DocsPage() {
                                     <h4 className={styles.exampleTitle}>{ex.title}</h4>
                                     <p className={styles.exampleDesc}>{ex.explanation}</p>
                                     <div className={styles.codeBlock}>
-                                        <div className={styles.codeHeader}>Örnek Ayarlar</div>
+                                        <div className={styles.codeHeader}>Master Configuration</div>
                                         <pre>{ex.code}</pre>
                                     </div>
                                 </div>
