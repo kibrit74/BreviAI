@@ -96,68 +96,71 @@ const NODES: NodeDoc[] = [
         id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'Akıllı metin işleme ve üretme asistanı.',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🧠 Agent AI: BreviAI'nin Beyni</h3>
-                <p>Bu düğüm, dünyanın en gelişmiş yapay zeka modellerine doğrudan erişim sağlar. Sadece "sohbet etmek" için değil, karmaşık verileri analiz etmek, karar vermek ve içerik üretmek için kullanılır.</p>
+                <h3>🧠 Agent AI: Geleceğin Beyni (2026)</h3>
+                <p>BreviAI, sektörün en yeni ve en güçlü modellerini (State-of-the-Art) anında entegre eder. Eski modellerle vakit kaybetmeyin.</p>
             </div>
             
             <div class="guide-section">
-                <h3>🤖 GÜNCEL Model Listesi (V13)</h3>
+                <h3>🤖 2026 Model Listesi (Bleeding Edge)</h3>
                 <ul>
-                    <li><strong>Gemini 1.5 Pro:</strong> 2 Milyon token hafızası (Kitap yükleyip soru sorabilirsiniz).</li>
-                    <li><strong>GPT-4o:</strong> Çok modlu (Resim, Ses, Metin) ve çok hızlı.</li>
-                    <li><strong>Claude 3.5 Sonnet:</strong> Kodlama ve yaratıcı yazarlıkta en iyisi.</li>
-                    <li><strong>GPT-4 Turbo:</strong> Klasik ve güvenilir.</li>
+                    <li><strong>GPT-5 (OpenAI):</strong> Ağustos 2025 çıkışlı en son model. Akıl yürütme ve çoklu görevde rakipsiz.</li>
+                    <li><strong>Gemini 3 (Google):</strong> "Deep Think" modu ile en karmaşık problemleri çözer. Sonsuz hafıza (Infinite Context) desteği.</li>
+                    <li><strong>Claude 4.5 Opus (Anthropic):</strong> Kodlama, yaratıcı yazarlık ve ajan (agentic) görevlerde dünya lideri.</li>
+                    <li><strong>o3-Pro (OpenAI):</strong> Matematik ve Bilimsel analizler için özel "Düşünen" model.</li>
                 </ul>
             </div>
 
             <div class="guide-section">
-                <h3>✨ Prompt Mühendisliği 101</h3>
-                <div class="tip-box">Yapay zeka bir stajyer gibidir. Ne kadar net olursanız o kadar iyi sonuç alırsınız.</div>
-                <p><strong>Mükemmel Prompt:</strong> "Aşağıdaki müşteri şikayet mailini oku. 1. Müşterinin ana sorunu ne? 2. Duygu durumu ne (Sinirli/Üzgün)? 3. Ona kibar bir cevap taslağı hazırla. Metin: {{mail_body}}"</p>
+                <h3>✨ Prompt Mühendisliği 2.0</h3>
+                <div class="tip-box">Yeni nesil modeller "niyet okuma" özelliğine sahiptir, ancak netlik her zaman kazandırır.</div>
+                <p><strong>Agentic Prompt:</strong> "Şu dosyayı analiz et, hataları bul, kendi kendine düzelt ve bana sadece bitmiş halini ver." (GPT-5 ve Claude 4.5 bunu yapabilir.)</p>
             </div>
         `,
         params: [
-            { name: 'Model', type: 'Select', required: true, desc: 'Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet' },
-            { name: 'Prompt', type: 'Text', required: true, desc: 'AI\'a verilecek detaylı talimat.' },
-            { name: 'System Prompt', type: 'Text', required: false, desc: 'AI\'ın rolü (Örn: "Sen uzman bir avukatsın").' }
+            { name: 'Model', type: 'Select', required: true, desc: 'GPT-5, Gemini 3, Claude 4.5 Opus, o3-Pro' },
+            { name: 'Prompt', type: 'Text', required: true, desc: 'Görev tanımı.' },
+            { name: 'System Prompt', type: 'Text', required: false, desc: 'Rol atama (Örn: Senior Software Engineer).' }
         ],
-        outputs: [{ field: 'content', type: 'String', desc: 'AI\'ın ürettiği cevap (Text veya JSON).' }],
+        outputs: [{ field: 'content', type: 'String', desc: 'AI yanıtı.' }],
         examples: [
             {
-                title: '📧 E-posta Sınıflandırma',
-                code: `Prompt: "Bu e-posta Fatura mı, Destek mi? Sadece kategoriyi yaz."`,
-                explanation: 'Gelen mailleri otomatik olarak okur ve sınıflandırır.'
+                title: 'Otonom Kod Düzeltme',
+                code: `Model: Claude 4.5 Opus
+Prompt: "Ekteki React projesini analiz et, performans sorunlarını bul ve optimize edilmiş kodları ver."`,
+                explanation: 'Claude 4.5, tüm projeyi hafızasında tutup mimari öneriler sunabilir.'
             },
             {
-                title: '💻 Kod / Script Yazma',
-                code: `Prompt: "Bana Python ile bir PDF birleştirme scripti yaz."`,
-                explanation: 'Teknik işleriniz için kod parçacıkları üretir.'
+                title: 'Derin Analiz (Deep Think)',
+                code: `Model: Gemini 3
+Prompt: "Şirketin son 5 yıllık finansal verilerini analiz et ve 2027 projeksiyonu çıkar."`,
+                explanation: 'Gemini 3, milyonlarca veriyi saniyeler içinde işleyip grafik çizdirebilir.'
             }
         ]
     },
     {
-        id: 'IMAGE_GENERATOR', title: 'Image Gen (Nanobana)', type: 'ai', summary: 'Gelişmiş görsel üretimi.',
+        id: 'IMAGE_GENERATOR', title: 'Image Gen (Nanobana)', type: 'ai', summary: 'Gelişmiş görsel üretimi (2026).',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🎨 Nanobana & Pollinations Desteği</h3>
-                <p>Sadece metin girerek profesyonel kalitede görseller üretin. Artık <strong>Nanobana</strong> altyapısı ile daha hızlı ve sansürsüz üretim.</p>
+                <h3>🎨 Nanobana Pro & Flux.1 (Next-Gen)</h3>
+                <p>2026 standartlarında, 4K çözünürlükte ve "Photorealism" odaklı görsel üretim motorları.</p>
             </div>
              <div class="guide-section">
-                <h3>📐 Ayarlar</h3>
+                <h3>🚀 Motor Seçenekleri</h3>
                 <ul>
-                    <li><strong>Provider:</strong> Nanobana (Hızlı), DALL-E 3 (Kaliteli), Pollinations (Ücretsiz).</li>
-                    <li><strong>Aspect Ratio:</strong> 1:1 (Kare), 16:9 (Yatay), 9:16 (Hikaye).</li>
+                    <li><strong>Nanobana Pro (Gemini 3 Image):</strong> 4K çözünürlük, metinleri (Text rendering) kusursuz yazar.</li>
+                    <li><strong>Flux.1 Ultra:</strong> İnsan yüzlerinde ve ellerde %99 başarı oranı. Fotogerçekçilikte lider.</li>
+                    <li><strong>Midjourney v7:</strong> Sanatsal ve kreatif işler için en iyisi.</li>
                 </ul>
             </div>
         `,
         params: [
-            { name: 'Provider', type: 'Select', required: true, desc: 'Nanobana / DALL-E / Pollinations' },
-            { name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi (İngilizce önerilir).' },
-            { name: 'Size', type: 'Select', required: false, desc: '1024x1024' }
+            { name: 'Provider', type: 'Select', required: true, desc: 'Nanobana Pro / Flux.1 Ultra / MJ v7' },
+            { name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi.' },
+            { name: 'Size', type: 'Select', required: false, desc: '4K / 1080p / Instagram Story' }
         ],
-        outputs: [{ field: 'imageUrl', type: 'String', desc: 'Resim URL\'i.' }],
+        outputs: [{ field: 'imageUrl', type: 'String', desc: 'Yüksek çözünürlüklü resim URL\'i.' }],
         examples: [
-            { title: 'Instagram Hikaye Arkaplanı', code: 'Prompt: "Cyberpunk city aesthetics, neon lights, 9:16 vertical"', explanation: 'Hikayeleriniz için dikey duvar kağıdı üretir.' }
+            { title: 'E-Ticaret Ürün Çekimi', code: 'Prompt: "Studio shot of a perfume bottle, 4k, Flux.1"', explanation: 'Stüdyo kalitesinde ürün fotoğrafı üretir.' }
         ]
     },
 
