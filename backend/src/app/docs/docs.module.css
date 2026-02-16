@@ -1,0 +1,283 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: #0A0A0B;
+    color: #E2E8F0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.header {
+    border-bottom: 1px solid #2D2D44;
+    padding-bottom: 2rem;
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(to right, #818CF8, #C4B5FD);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+}
+
+.subtitle {
+    color: #94A3B8;
+    font-size: 1.1rem;
+}
+
+.section {
+    margin-bottom: 4rem;
+}
+
+.sectionTitle {
+    font-size: 1.8rem;
+    color: #F8FAFC;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #6366F1;
+    padding-left: 1rem;
+}
+
+.content {
+    color: #CBD5E1;
+}
+
+/* Node Mockup Styles */
+.mockupContainer {
+    background-color: #13131A;
+    border: 1px solid #2D2D44;
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 2rem 0;
+    position: relative;
+    overflow: hidden;
+    background-image: radial-gradient(#2D2D44 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.workflowRow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3rem;
+    position: relative;
+}
+
+/* Connecting Lines */
+.connector {
+    position: absolute;
+    height: 2px;
+    background: linear-gradient(90deg, #6366F1, #818CF8);
+    top: 50%;
+    left: 0;
+    right: 0;
+    z-index: 0;
+    transform: translateY(-50%);
+}
+
+.nodeCard {
+    background-color: #1E1E2E;
+    border: 1px solid #313142;
+    border-radius: 12px;
+    width: 220px;
+    padding: 1rem;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s;
+}
+
+.nodeCard:hover {
+    transform: translateY(-2px);
+    border-color: #6366F1;
+}
+
+.nodeHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.nodeIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.iconTrigger {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+}
+
+.iconAction {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.iconLogic {
+    background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
+}
+
+.nodeTitle {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.95rem;
+}
+
+.nodeBody {
+    font-size: 0.8rem;
+    color: #94A3B8;
+    background-color: #13131A;
+    padding: 0.5rem;
+    border-radius: 6px;
+    margin-top: 0.5rem;
+}
+
+.nodeLabel {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748B;
+    margin-bottom: 0.25rem;
+}
+
+.nodeValue {
+    color: #E2E8F0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Panel Mockup */
+.panelMockup {
+    background-color: #1E1E2E;
+    border-radius: 16px;
+    border: 1px solid #313142;
+    max-width: 400px;
+    margin: 0 auto;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+.panelHeader {
+    padding: 1rem;
+    border-bottom: 1px solid #313142;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panelBody {
+    padding: 1.5rem;
+}
+
+.formGroup {
+    margin-bottom: 1.25rem;
+}
+
+.inputLabel {
+    display: block;
+    color: #94A3B8;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.textInput {
+    background-color: #13131A;
+    border: 1px solid #313142;
+    color: #E2E8F0;
+    padding: 0.75rem;
+    border-radius: 8px;
+    width: 100%;
+    font-family: inherit;
+}
+
+.radioGroup {
+    display: flex;
+    gap: 1rem;
+    background-color: #13131A;
+    padding: 0.5rem;
+    border-radius: 8px;
+}
+
+.radioButton {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #94A3B8;
+    font-size: 0.85rem;
+}
+
+.radioButton.active {
+    background-color: #313142;
+    color: #fff;
+    font-weight: 500;
+}
+
+.btnGroup {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn {
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.btnCancel {
+    background-color: #313142;
+    color: #E2E8F0;
+}
+
+.btnSave {
+    background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+    color: #fff;
+}
+
+/* Table of Contents */
+.toc {
+    background-color: #13131A;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 3rem;
+    border: 1px solid #2D2D44;
+}
+
+.tocTitle {
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #F8FAFC;
+}
+
+.tocList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.tocItem {
+    margin-bottom: 0.5rem;
+}
+
+.tocLink {
+    color: #94A3B8;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.tocLink:hover {
+    color: #818CF8;
+}
