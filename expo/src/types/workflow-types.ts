@@ -593,12 +593,14 @@ export interface SearchMemoryConfig {
     query: string;
     threshold?: number;
     variableName: string;
+    storageType?: 'auto' | 'local' | 'backend';
 }
 
 export interface AddToMemoryConfig {
     text: string;
     metadata?: string; // JSON string
     variableName?: string;
+    storageType?: 'auto' | 'local' | 'backend';
 }
 
 export interface BulkAddToMemoryConfig {
@@ -608,10 +610,12 @@ export interface BulkAddToMemoryConfig {
     debtColumn?: number;
     nameColumn?: number;
     variableName?: string;
+    storageType?: 'auto' | 'local' | 'backend';
 }
 
 export interface ClearMemoryConfig {
     confirm?: boolean;
+    storageType?: 'auto' | 'local' | 'backend';
 }
 
 export interface SwitchConfig {

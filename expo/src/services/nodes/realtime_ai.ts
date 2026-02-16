@@ -31,6 +31,14 @@ export async function executeRealtimeAI(
 ): Promise<any> {
     console.log(`${TAG} Starting real-time AI session`);
 
+    // Auto-detect call context: if triggered from a phone call, force speaker mode
+    const triggerType = variableManager.get('_triggerType');
+    const isCallContext = triggerType === 'call';
+    if (isCallContext && !config.speakerMode) {
+        console.log(`${TAG} Call context detected, forcing speakerMode=true`);
+        config.speakerMode = true;
+    }
+
     const liveService = new GeminiLiveService();
     const transcript: { role: string; text: string; timestamp: number }[] = [];
     const maxDuration = (config.maxDuration || 300) * 1000; // Convert to ms

@@ -1,5 +1,6 @@
 import { apiService } from './ApiService';
 import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface MemoryItem {
     id: string;
@@ -16,6 +17,22 @@ export interface SearchResult extends MemoryItem {
 class VectorMemoryServiceClass {
     private db: SQLite.SQLiteDatabase | null = null;
     private isInitialized: boolean = false;
+
+    // ─────────────────────────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────────────────────────
+
+    private async getBackendUrl(): Promise<string | null> {
+        try {
+            const url = await AsyncStorage.getItem('whatsapp_backend_url');
+            if (url && url.startsWith('http')) {
+                return url.trim().replace(/\/$/, '');
+            }
+        } catch (e) {
+            // Ignore
+        }
+        return null;
+    }
 
     // ─────────────────────────────────────────────────────────────
     // DATABASE INITIALIZATION
@@ -64,11 +81,65 @@ class VectorMemoryServiceClass {
     /**
      * Add a new memory item (automatically generates embedding)
      */
-    async addMemory(text: string, metadata: Record<string, any> = {}): Promise<void> {
+    async addMemory(text: string, metadata: Record<string, any> = {}, storageType: 'auto' | 'local' | 'backend' = 'auto'): Promise<void> {
+        // Determine target storage
+        let useBackend = false;
+
+        if (storageType === 'backend') {
+            useBackend = true;
+        } else if (storageType === 'auto') {
+            const backendUrl = await this.getBackendUrl();
+            useBackend = !!backendUrl;
+        }
+
+        // 1. Backend Storage
+        if (useBackend) {
+            const backendUrl = await this.getBackendUrl();
+            if (backendUrl) {
+                try {
+                    console.log(`[VectorMemory] Adding to Backend (${storageType}):`, backendUrl);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                    const response = await fetch(`${backendUrl}/memory/add`, {
+                        method: 'POST',
+                        signal: controller.signal,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-auth-key': 'breviai-secret-password'
+                        },
+                        body: JSON.stringify({ text, metadata })
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        console.log('[VectorMemory] Backend Add Success');
+                        return;
+                    } else {
+                        console.warn('[VectorMemory] Backend Add Failed, falling back to local if auto.', response.status);
+                        if (storageType === 'backend') throw new Error('Backend add failed');
+                    }
+                } catch (e) {
+                    console.warn('[VectorMemory] Backend Unreachable:', e);
+                    if (storageType === 'backend') throw e;
+                }
+            } else if (storageType === 'backend') {
+                throw new Error('Backend URL not configured');
+            }
+        }
+
+        // 2. Local Storage (Fallback or Explicit)
+        // If we successfully used backend and didn't fall back, we return here (unless we want dual storage? likely not)
+        if (useBackend && storageType !== 'auto') return; // If forced backend succeeded, done.
+
+        // If auto and backend succeeded, we might want to skip local to avoid duplication?
+        // Current logic: If backend succeeds, we return. If backend fails (and auto), we convert to local.
+        // Wait, I missed the return in success block above. Yes, it returns.
+
         await this.ensureInitialized();
 
         try {
-            // 1. Get Embedding from API
+            // Get Embedding from API (Client-side)
             const embedding = await apiService.getEmbedding(text);
 
             if (!embedding || embedding.length === 0) {
@@ -76,11 +147,9 @@ class VectorMemoryServiceClass {
                 return;
             }
 
-            // 2. Create Memory Item
             const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
             const timestamp = Date.now();
 
-            // 3. Insert into SQLite
             this.db!.runSync(
                 'INSERT OR REPLACE INTO memories (id, text, embedding, metadata, timestamp) VALUES (?, ?, ?, ?, ?)',
                 id,
@@ -90,22 +159,66 @@ class VectorMemoryServiceClass {
                 timestamp
             );
 
-            console.log('[VectorMemory] Added memory:', text.substring(0, 30) + '...');
+            console.log(`[VectorMemory] Added local memory (storage: ${storageType}):`, text.substring(0, 30) + '...');
         } catch (error) {
-            console.error('[VectorMemory] Failed to add memory:', error);
+            console.error('[VectorMemory] Failed to add local memory:', error);
+            throw error;
         }
     }
 
     /**
      * Search for similar memories - HYBRID: Exact match first, then semantic
      */
-    async search(query: string, limit: number = 3, threshold: number = 0.7): Promise<SearchResult[]> {
+    async search(query: string, limit: number = 3, threshold: number = 0.7, storageType: 'auto' | 'local' | 'backend' = 'auto'): Promise<SearchResult[]> {
+        // Determine target storage
+        let useBackend = false;
+
+        if (storageType === 'backend') {
+            useBackend = true;
+        } else if (storageType === 'auto') {
+            const backendUrl = await this.getBackendUrl();
+            useBackend = !!backendUrl;
+        }
+
+        // 1. Backend Search
+        if (useBackend) {
+            const backendUrl = await this.getBackendUrl();
+            if (backendUrl) {
+                try {
+                    console.log(`[VectorMemory] Searching Backend (${storageType}):`, backendUrl);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                    const response = await fetch(`${backendUrl}/memory/search`, {
+                        method: 'POST',
+                        signal: controller.signal,
+                        headers: { 'Content-Type': 'application/json', 'x-auth-key': 'breviai-secret-password' },
+                        body: JSON.stringify({ query, limit, threshold })
+                    });
+                    clearTimeout(timeoutId);
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && Array.isArray(data.results)) {
+                            console.log(`[VectorMemory] Backend returned ${data.results.length} results`);
+                            return data.results;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[VectorMemory] Backend Search Failed:', e);
+                    if (storageType === 'backend') return []; // Don't fallback if explicitly backend
+                }
+            } else if (storageType === 'backend') {
+                return [];
+            }
+        }
+
+        // 2. Local Search
         await this.ensureInitialized();
 
         try {
             const queryLower = query.toLowerCase().trim();
 
-            // 1. EXACT MATCH: Check text and metadata for exact substring match via SQL LIKE
             const likePattern = `%${queryLower}%`;
             const exactRows = this.db!.getAllSync<{
                 id: string; text: string; embedding: string; metadata: string; timestamp: number;
@@ -128,7 +241,6 @@ class VectorMemoryServiceClass {
                 }));
             }
 
-            // 2. SEMANTIC SEARCH: Fall back to embedding similarity
             console.log('[VectorMemory] No exact matches, falling back to semantic search...');
 
             const queryEmbedding = await apiService.getEmbedding(query);
@@ -137,12 +249,10 @@ class VectorMemoryServiceClass {
                 return [];
             }
 
-            // Fetch all embeddings for cosine similarity comparison
             const allRows = this.db!.getAllSync<{
                 id: string; text: string; embedding: string; metadata: string; timestamp: number;
             }>('SELECT * FROM memories');
 
-            // Calculate Cosine Similarities
             const results: SearchResult[] = allRows.map(row => {
                 const itemEmbedding = JSON.parse(row.embedding);
                 return {
@@ -155,7 +265,6 @@ class VectorMemoryServiceClass {
                 };
             });
 
-            // Filter and Sort
             return results
                 .filter(item => item.similarity >= threshold)
                 .sort((a, b) => b.similarity - a.similarity)
@@ -170,10 +279,30 @@ class VectorMemoryServiceClass {
     /**
      * Clear all memories (for debugging/reset)
      */
-    async clear(): Promise<void> {
-        await this.ensureInitialized();
-        this.db!.runSync('DELETE FROM memories');
-        console.log('[VectorMemory] Cleared all memories');
+    async clear(storageType: 'auto' | 'local' | 'backend' = 'auto'): Promise<void> {
+        let cleared = false;
+        const backendUrl = await this.getBackendUrl();
+
+        // Backend Clear
+        if (storageType !== 'local' && backendUrl) {
+            try {
+                await fetch(`${backendUrl}/memory/clear`, { method: 'DELETE', headers: { 'x-auth-key': 'breviai-secret-password' } });
+                console.log('[VectorMemory] Backend memory cleared');
+                cleared = true;
+            } catch (e) { console.error(e); }
+        }
+
+        // Local Clear
+        if (storageType !== 'backend') {
+            await this.ensureInitialized();
+            this.db!.runSync('DELETE FROM memories');
+            console.log('[VectorMemory] Local memories cleared');
+            cleared = true;
+        }
+
+        if (!cleared) {
+            console.warn('[VectorMemory] Clear called but nothing happened or failed (Storage: ' + storageType + ')');
+        }
     }
 
     /**

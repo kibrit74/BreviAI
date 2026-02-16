@@ -801,71 +801,28 @@ export async function executeInstagramPost(
  */
 export async function executePhilipsHue(
     config: PhilipsHueConfig,
-    variableManager: any
+    variableManager: VariableManager
 ): Promise<any> {
     try {
         const bridgeIp = variableManager.resolveString(config.bridgeIp);
         const apiKey = variableManager.resolveString(config.apiKey);
+        const lightId = config.lightId ? Number(variableManager.resolveString(String(config.lightId))) : 1;
+        const action = config.action; // 'on' | 'off' | 'toggle' | 'brightness' | 'color' | 'scene'
 
-        if (!bridgeIp || !apiKey) {
-            return { success: false, error: 'Bridge IP veya API Key eksik' };
+        if (!bridgeIp || !apiKey || isNaN(lightId)) {
+            return { success: false, error: 'Hue Ayarları eksik (Bridge IP, API Key, Light ID)' };
         }
 
-        const baseUrl = `http://${bridgeIp}/api/${apiKey}`;
-        let endpoint = '';
-        let body: any = {};
+        const url = `http://${bridgeIp}/api/${apiKey}/lights/${lightId}/state`;
+        const isOn = action === 'on' || action === 'brightness' || action === 'color';
+        const body = {
+            on: isOn,
+            ...(isOn && config.brightness ? { bri: Number(config.brightness) } : {}),
+            ...(isOn && config.hue ? { hue: Number(config.hue) } : {}),
+            ...(isOn && config.saturation ? { sat: Number(config.saturation) } : {})
+        };
 
-        // Determine endpoint and body based on action
-        if (config.lightId && config.lightId !== 'all') {
-            // Control specific light
-            endpoint = `/lights/${config.lightId}/state`;
-        } else if (config.groupId) {
-            // Control group (room)
-            endpoint = `/groups/${config.groupId}/action`;
-        } else {
-            // Control all lights (group 0)
-            endpoint = '/groups/0/action';
-        }
-
-        switch (config.action) {
-            case 'on':
-                body = { on: true };
-                break;
-            case 'off':
-                body = { on: false };
-                break;
-            case 'toggle':
-                // First get current state, then toggle
-                const stateUrl = config.lightId
-                    ? `${baseUrl}/lights/${config.lightId}`
-                    : `${baseUrl}/groups/${config.groupId || '0'}`;
-                const stateRes = await fetch(stateUrl);
-                const stateData = await stateRes.json();
-                const isOn = config.lightId
-                    ? stateData?.state?.on
-                    : stateData?.action?.on;
-                body = { on: !isOn };
-                break;
-            case 'brightness':
-                body = { on: true, bri: Math.min(254, Math.max(0, config.brightness || 127)) };
-                break;
-            case 'color':
-                body = {
-                    on: true,
-                    hue: config.hue || 0,
-                    sat: config.saturation || 254
-                };
-                break;
-            case 'scene':
-                if (!config.sceneId) {
-                    return { success: false, error: 'Scene ID gerekli' };
-                }
-                endpoint = `/groups/${config.groupId || '0'}/action`;
-                body = { scene: config.sceneId };
-                break;
-        }
-
-        const response = await fetch(`${baseUrl}${endpoint}`, {
+        const response = await fetch(url, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -873,70 +830,40 @@ export async function executePhilipsHue(
 
         const data = await response.json();
 
-        // Check for Hue API errors
-        if (Array.isArray(data) && data[0]?.error) {
+        if (Array.isArray(data) && data[0].error) {
             throw new Error(data[0].error.description);
         }
 
-        const result = {
+        return {
             success: true,
-            action: config.action,
-            response: data
+            lightId,
+            action,
+            details: data
         };
-
-        if (config.variableName) {
-            variableManager.set(config.variableName, result);
-        }
-
-        return result;
 
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Philips Hue control failed'
+            error: error instanceof Error ? error.message : 'Philips Hue failed'
         };
     }
 }
 
 /**
- * Update Agent Memory
+ * Remember Information (Deprecated - Use ADD_TO_MEMORY instead)
  */
 export async function executeRememberInfo(
     config: RememberInfoConfig,
-    variableManager: any
+    variableManager: VariableManager
 ): Promise<any> {
     try {
-        const key = variableManager.resolveString(config.key);
-        let valueStr = variableManager.resolveString(config.value);
+        const text = variableManager.resolveString(config.value || config.key);
+        if (!text) return { success: false, error: 'Kaydedilecek bilgi boş' };
 
-        if (!key || !valueStr) {
-            return { success: false, error: 'Key veya Value eksik' };
-        }
+        console.log('[RememberInfo] Adding to agent memory:', text);
+        await AgentMemoryService.saveSemanticMemory(text, { key: config.key });
 
-        // Try to parse value if it's JSON
-        let value = valueStr;
-        try {
-            value = JSON.parse(valueStr);
-        } catch (e) {
-            // Keep as string
-        }
-
-        await AgentMemoryService.ensureLoaded();
-
-        // Handle specific keys that map to typed preferences
-        const prefs = AgentMemoryService.getPreferences();
-        if (key in prefs) {
-            await AgentMemoryService.setPreference(key as any, value);
-        } else {
-            console.warn(`[RememberInfo] Unknown preference key: ${key}`);
-        }
-
-        return {
-            success: true,
-            updated: key,
-            newValue: value
-        };
-
+        return { success: true, stored: text };
     } catch (error) {
         return {
             success: false,
@@ -949,7 +876,7 @@ export async function executeRememberInfo(
  * Search Vector Memory (RAG)
  */
 export async function executeSearchMemory(
-    config: { query: string; limit?: number; threshold?: number; variableName?: string },
+    config: { query: string; limit?: number; threshold?: number; variableName?: string; storageType?: 'auto' | 'local' | 'backend' },
     variableManager: any
 ): Promise<any> {
     try {
@@ -958,14 +885,15 @@ export async function executeSearchMemory(
         const query = variableManager.resolveString(config.query);
         const limit = config.limit || 5;
         const threshold = config.threshold || 0.5;
+        const storageType = config.storageType || 'auto';
 
         if (!query) {
             return { success: false, error: 'Arama sorgusu boş olamaz' };
         }
 
-        console.log(`[SearchMemory] Searching for: "${query}" (limit: ${limit}, threshold: ${threshold})`);
+        console.log(`[SearchMemory] Searching for: "${query}" (limit: ${limit}, threshold: ${threshold}, storage: ${storageType})`);
 
-        const results = await vectorMemoryService.search(query, limit, threshold);
+        const results = await vectorMemoryService.search(query, limit, threshold, storageType);
 
         console.log(`[SearchMemory] Found ${results.length} results`);
 
@@ -1006,13 +934,14 @@ export async function executeSearchMemory(
  * Add to Vector Memory (RAG)
  */
 export async function executeAddToMemory(
-    config: { text: string; metadata?: string; variableName?: string },
+    config: { text: string; metadata?: string; variableName?: string; storageType?: 'auto' | 'local' | 'backend' },
     variableManager: any
 ): Promise<any> {
     try {
         const { vectorMemoryService } = require('../VectorMemoryService');
 
         const text = variableManager.resolveString(config.text);
+        const storageType = config.storageType || 'auto';
 
         if (!text) {
             return { success: false, error: 'Eklenecek metin boş olamaz' };
@@ -1029,9 +958,9 @@ export async function executeAddToMemory(
             }
         }
 
-        console.log(`[AddToMemory] Adding: "${text.substring(0, 50)}..." with metadata:`, metadata);
+        console.log(`[AddToMemory] Adding: "${text.substring(0, 50)}..." with metadata:`, metadata, `Storage: ${storageType}`);
 
-        await vectorMemoryService.addMemory(text, metadata);
+        await vectorMemoryService.addMemory(text, metadata, storageType);
 
         if (config.variableName) {
             variableManager.set(config.variableName, { added: true, text: text.substring(0, 100) });
@@ -1067,11 +996,13 @@ export async function executeBulkAddToMemory(
         muhatabColumn?: number;  // Column for muhatap tanımı (optional)
         durumColumn?: number;    // Column for durum tanıtıcısı (optional)
         variableName?: string;
+        storageType?: 'auto' | 'local' | 'backend';
     },
     variableManager: any
 ): Promise<any> {
     try {
         const { vectorMemoryService } = require('../VectorMemoryService');
+        const storageType = config.storageType || 'auto';
 
         // Get sheet data from variable
         const dataVar = variableManager.get(config.data);
@@ -1106,7 +1037,7 @@ export async function executeBulkAddToMemory(
             }
         }
 
-        console.log(`[BulkAddToMemory] Processing ${rows.length} rows`);
+        console.log(`[BulkAddToMemory] Processing ${rows.length} rows. Storage: ${storageType}`);
 
         let addedCount = 0;
         let skippedCount = 0;
@@ -1157,7 +1088,7 @@ export async function executeBulkAddToMemory(
             };
 
             try {
-                await vectorMemoryService.addMemory(text, metadata);
+                await vectorMemoryService.addMemory(text, metadata, storageType);
                 addedCount++;
 
                 if (addedCount % 10 === 0) {
@@ -1197,15 +1128,16 @@ export async function executeBulkAddToMemory(
  * Clear Vector Memory
  */
 export async function executeClearMemory(
-    config: { variableName?: string },
+    config: { variableName?: string; storageType?: 'auto' | 'local' | 'backend' },
     variableManager: any
 ): Promise<any> {
     try {
         const { vectorMemoryService } = require('../VectorMemoryService');
+        const storageType = config.storageType || 'auto';
 
-        await vectorMemoryService.clear();
+        await vectorMemoryService.clear(storageType);
 
-        console.log('[ClearMemory] All memories cleared');
+        console.log(`[ClearMemory] All memories cleared (Storage: ${storageType})`);
 
         const result = { success: true, message: 'Tüm hafıza temizlendi' };
 
