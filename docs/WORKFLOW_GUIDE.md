@@ -108,152 +108,229 @@ graph LR
 
 ### ⚡ Tetikleyiciler (Triggers)
 
-#### Manual Trigger
-*   **Özet:** İş akışını uygulama içinden manuel olarak (butona basarak) başlatır.
-*   **Girdi:** Yok.
-*   **Çıktı:** Boş JSON nesnesi veya tetikleme anındaki parametreler.
+#### 1. Manual Trigger (Elle Başlatma)
+*   **Amaç:** Kullanıcının butona basarak akışı başlatması. Test süreçleri ve on-demand (ihtiyaç anında) işler için idealdir.
+*   **Çıktı:** `{ "executionId": "12345", "timestamp": "...", "input": {} }`
 
-#### Time Trigger (Cron / Zamanlayıcı)
-*   **Özet:** İş akışını belirli zamanlarda, periyodik olarak veya belirli tarihlerde otomatik başlatır.
-*   **Parametreler:**
-    *   `Schedule`: Cron ifadesi. Bu ifade, zamanlamanın "matematiksel" formülüdür.
-    *   `Repeat`: Tekrarlı mı? (True: Her zaman, False: Sadece bir kere).
+**Gelişmiş Ayarlar - Giriş Parametreleri (Form):**
+Akış başlatılırken kullanıcıdan veri isteyebilirsiniz. "Add Parameter" butonu ile form oluşturun:
 
-##### ⏳ Sık Kullanılan Cron İfadeleri
-Kopyalayıp kullanabileceğiniz hazır zamanlama şablonları:
-
-| Açıklama | Cron İfadesi | Anlamı |
+| Parametre Tipi | Açıklama | Örnek Kullanım |
 | :--- | :--- | :--- |
-| **Her Dakika** | `* * * * *` | Durmaksızın her dakika çalışır. |
-| **Her Saat Başı** | `0 * * * *` | 13:00, 14:00, 15:00... |
-| **Her Gün Sabah 09:00** | `0 9 * * *` | Günde bir kez çalışır. |
-| **Hafta İçi Her Sabah** | `0 9 * * 1-5` | Pazartesi'den Cuma'ya sabah 9'da. |
-| **Her Cuma Akşamı** | `0 20 * * 5` | Sadece Cuma günleri saat 20:00'de. |
-| **Her Ayın 1'i** | `0 0 1 * *` | Maaş günü vb. işler için. |
-| **5 Dakikada Bir** | `*/5 * * * *` | :00, :05, :10 geçe... |
+| **String (Metin)** | Kısa yazı girişi. | "Müşteri Adı", "Aranacak Kelime" |
+| **Number (Sayı)** | Matematiksel işlemler için sayı. | "Tekrar Sayısı", "Fiyat Limiti" |
+| **Boolean (E/H)** | Aç/Kapa anahtarı. | "PDF İndirilsin mi?", "Sessiz Mod" |
+| **Select (Seçim)** | Açılır liste (Dropdown). | "Renk: [Kırmızı, Mavi]", "Mod: [Hızlı, Yavaş]" |
 
-> **İpucu:** Backend servisinin (Node-Cron) sunucuda aktif olduğundan emin olun.
+> **İpucu:** Bu parametrelere akış içinde `{{input.parametreAdi}}` şeklinde erişebilirsiniz.
 
-#### Notification Trigger (Bildirim Yakalayıcı)
-*   **Özet:** Telefonunuza gelen bildirimleri okur ve içeriğine göre akışı tetikler. Banka SMS'leri veya WhatsApp mesajlarını yakalamak için idealdir.
-*   **Detaylı Parametreler:**
-    *   `Package Name`: Hangi uygulamanın bildirimleri dinlenecek? (Örn: `com.whatsapp`, `com.garanti.cepsubesi`).
-    *   `Title Filter`: Bildirim başlığında (Gönderen Kişi) ne yazmalı?
-        *   Örn: `Ahmet` yazarsanız sadece Ahmet'ten gelenler tetikler.
-    *   `Text Filter`: Bildirim içeriğinde ne geçmeli?
+---
 
-##### 🔍 Regex (Düzenli İfadeler) ile Gelişmiş Filtreleme
-Filtre alanlarında Regex kullanarak çok daha akıllı kurallar yazabilirsiniz:
+#### 2. Time Trigger (Zamanlayıcı / Cron)
+*   **Amaç:** Akışı belirli bir saatte, günün belirli zamanlarında veya periyodik aralıklarla otomatik başlatmak.
+*   **Modlar:**
+    1.  **Interval (Aralık):** "Her 15 dakikada bir çalış".
+    2.  **Cron Expression:** Çok detaylı zamanlama (Backend servisi gerektirir).
+    3.  **Specific Date:** Tek seferlik ileri tarihli görev (Örn: "1 Ocak 2027 00:00").
 
-| Amaç | Regex Kodu | Neyi Yakalar? |
+**Cron İfadeleri Ansiklopedisi:**
+Cron formatı: `Dakika Saat Gün Ay HaftanınGünü`
+
+| İfade | Açıklama | Kullanım Senaryosu |
 | :--- | :--- | :--- |
-| **Tam Eşleşme** | `^Kod$` | Sadece "Kod" yazan mesajı yakalar. |
-| **İçeren (Büyük/Küçük Harf Duyarsız)** | `(?i).*banka.*` | "Banka", "BANKA", "bankamatik" geçerse yakalar. |
-| **Sayı Yakalama** | `\d{6}` | İçinde 6 haneli bir sayı (doğrulama kodu) varsa yakalar. |
-| **Belirli Kelimeler** | `(?i)(onay|şifre)` | İçinde "onay" VEYA "şifre" geçenleri yakalar. |
+| `* * * * *` | Her Dakika | Sistem takibi, çok sık kontrol. |
+| `*/5 * * * *` | 5 Dakikada Bir | Borsa/Döviz takibi. |
+| `0 * * * *` | Saat Başı (:00) | Raporlama, durum kontrolü. |
+| `30 * * * *` | Her Saat Buçukta (:30) | Ara kontroller. |
+| `0 9 * * *` | Her Gün 09:00 | "Günaydın" mesajı, günlük plan. |
+| `0 18 * * 1-5` | Hafta İçi 18:00 | "Mesai bitti" bildirimi. |
+| `0 20 * * 5` | Cuma 20:00 | Haftalık özet, eğlence modu. |
+| `0 0 1 * *` | Her Ayın 1'i | Fatura ödeme hatırlatması. |
+| `0 0 1 1 *` | Yılbaşı (1 Ocak) | Yıllık bakım. |
 
-*   **Çıktı (Output JSON):**
+> **⚠️ Önemli:** Cron tetikleyicilerin çalışması için sunucuda `node-cron` servisinin aktif olması gerekir. `Ayarlar > Servis Durumu` ekranından "Cron Service: Active" yazısını kontrol edin.
+
+---
+
+#### 3. Notification Trigger (Bildirim Yakalayıcı)
+*   **Amaç:** Telefonunuza gelen bildirimleri okuyup akışı başlatmak. Banka SMS'leri, WhatsApp mesajları veya uygulama bildirimleri ile otomasyon yapmanızı sağlar.
+*   **Çıktı (JSON):**
     ```json
     {
       "packageName": "com.whatsapp",
-      "title": "Ahmet Yılmaz",
-      "text": "Toplantı saat 14:00'te.",
-      "id": 16273849,
-      "postTime": 171542384992
+      "title": "Ahmet",
+      "text": "Yarın buluşuyor muyuz?",
+      "postTime": 1708934000000,
+      "appName": "WhatsApp"
     }
     ```
 
-#### Webhook / Deep Link
-*   **Özet:** Dış dünyadan (web sitesi, IFTTT, Zapier) gelen istekleri kabul eden kapıdır.
-*   **Parametreler:**
-    *   `Path`: Tetikleme yolu. Örn: `contact-form`.
-    *   `Method`: GET veya POST.
-*   **Kullanım Örneği:**
-    *   URLniz: `https://api.breviai.com/webhook/contact-form`
-    *   **Güvenlik İpucu:** Webhook URL'nizi gizli tutun.
-*   **Çıktı:** Gelen isteğin gövdesi (Body) ve URL parametreleri (Query Params) JSON olarak döner.
+**Parametre Detayları:**
+
+| Parametre | Zorunlu? | Açıklama |
+| :--- | :--- | :--- |
+| **Package Name** | Evet | Hangi uygulamanın dinleneceği. (Örn: `com.whatsapp`, `com.garanti.cepsubesi`) |
+| **Text Filter** | Hayır | Mesaj içeriğinde aranacak Regex kalıbı. Boş bırakılırsa hepsini yakalar. |
+| **Title Filter** | Hayır | Bildirim başlığında (Gönderen kişi) aranacak Regex. |
+
+**Regex Filtreleme Kütüphanesi:**
+`Text Filter` alanında kullanabileceğiniz hazır kalıplar:
+
+| Senaryo | Regex Kodu | Açıklama |
+| :--- | :--- | :--- |
+| **Banka Harcaması** | `(?i).*harcama.*` | İçinde "harcama" geçen tüm mesajlar (Büyük/küçük harf duyarsız). |
+| **OTP Kodları** | `\d{4,6}` | 4 ile 6 haneli herhangi bir sayı içeren mesajlar. |
+| **Belirli Kelime** | `^Onay$` | Mesaj SADECE "Onay" kelimesinden oluşuyorsa. |
+| **VEYA Mantığı** | `(sipariş|kargo|teslim)` | İçinde "sipariş", "kargo" VEYA "teslim" geçenler. |
+| **Yasaklı Kelime** | `^((?!reklam).)*$` | İçinde "reklam" geçmeyen mesajlar. |
+
+> **Sorun Giderme:** Bildirimler tetiklenmiyorsa:
+> 1. Telefonun "Bildirim Erişimi" izinlerinde BreviAI'ya yetki verdiğinizden emin olun.
+> 2. Pil tasarrufu modunun BreviAI uygulamasını kapatmadığını kontrol edin.
+
+---
+
+#### 4. Webhook Trigger (Dış Bağlantı)
+*   **Amaç:** Dış dünyadan (IFTTT, Zapier, Kendi Siteniz) gelen HTTP istekleriyle akışı başlatmak.
+*   **URL Formatı:** `https://breviai.vercel.app/webhook/{webhookId}`
+*   **Method:** `GET` veya `POST` destekler.
+
+**Çıktı (JSON):**
+```json
+{
+  "body": { "email": "ali@test.com", "mesaj": "Selam" },
+  "query": { "source": "twitter" },
+  "headers": { "content-type": "application/json" }
+}
+```
+
+*   `{{body.email}}` -> POST gövdesindeki veriyi okur.
+*   `{{query.source}}` -> URL parametresini (?source=twitter) okur.
+
+> **Güvenlik İpucu:** Webhook URL'nizi gizli tutun. URL'yi bilen herkes akışınızı tetikleyebilir.
 
 ### 🛠 Eylemler & Entegrasyonlar
 
-#### HTTP Request (Ağ İsteği)
-*   **Özet:** İnternetin bel kemiği. Herhangi bir API'ye istek gönderir, veri çeker veya veri yollar.
-*   **Gelişmiş Parametreler:**
-    *   `Method`: 
-        *   **GET**: Veri okumak için (Örn: Hava durumu çek).
-        *   **POST**: Veri göndermek için (Örn: Form kaydet).
-        *   **PUT/PATCH**: Güncelleme yapmak için.
-        *   **DELETE**: Silmek için.
-    *   `URL`: Tam adres (https://...).
-    *   `Headers`: Kimlik doğrulama bilgileri buraya girilir.
-        *   Örn: `{"Authorization": "Bearer SK-123...", "Content-Type": "application/json"}`
-    *   `Body`: POST isteklerinde gönderilecek veri paketi. JSON formatında olmalıdır.
-    
-##### 🚦 HTTP Durum Kodları Rehberi
-İsteğinizin sonucunu anlamak için bu kodları bilmek gerekir:
+#### 1. HTTP Request (Ağ İsteği)
+*   **Amaç:** İnternetin bel kemiği. Herhangi bir API'ye bağlanmanızı sağlar.
+*   **Kullanım Alanları:** Hava durumu çekmek, döviz kuru almak, başka bir sunucuya veri göndermek.
 
-| Kod | Durum | Anlamı | Ne Yapmalı? |
+**Parametre Ansiklopedisi:**
+
+| Parametre | Seçenekler | Açıklama |
+| :--- | :--- | :--- |
+| **Method** | `GET` | Veri okumak için. (Tarayıcıda link açmak gibidir). Body gönderilmez. |
+| | `POST` | Veri göndermek/oluşturmak için. (Form doldurmak gibidir). Body gerektirir. |
+| | `PUT` | Veri güncellemek için (Tüm kaynağı değiştirir). |
+| | `PATCH` | Veri güncellemek için (Sadece değişen kısmı günceller). |
+| | `DELETE` | Veri silmek için. |
+| **URL** | `https://...` | İsteğin gideceği tam adres. Query parametreleri de eklenebilir. |
+| **Headers** | JSON | Kimlik doğrulama ve veri tipi bilgileri. <br>Örn: `{"Authorization": "Bearer TOKEN", "Content-Type": "application/json"}` |
+| **Body** | JSON | `POST/PUT/PATCH` metodlarında gönderilecek veri paketi. <br>Örn: `{"name": "Ali", "age": 25}` |
+
+**🚦 HTTP Durum Kodları (Status Codes):**
+Sunucunun cevabını anlamak hayati önem taşır.
+
+| Kod | Durum | Anlamı | Aksiyon |
 | :--- | :--- | :--- | :--- |
-| **200** | OK | Başarılı. | Veriyi kullanabilirsiniz. |
-| **201** | Created | Oluşturuldu. | Kayıt işlemi başarılı. |
-| **400** | Bad Request | Hatalı İstek. | Gönderdiğiniz JSON'u veya parametreleri kontrol edin. |
-| **401** | Unauthorized | Yetkisiz. | API Anahtarınız (Token) yanlış veya eksik. |
-| **403** | Forbidden | Yasaklı. | Token doğru ama bu işlemi yapmaya yetkiniz yok. |
-| **404** | Not Found | Bulunamadı. | URL yanlış. |
-| **429** | Too Many Requests | Çok Fazla İstek. | Biraz yavaşlayın, API limitine takıldınız. |
-| **500** | Server Error | Sunucu Hatası. | Sorun sizde değil, karşı sunucuda. Daha sonra tekrar deneyin. |
+| **200** | OK | Başarılı. | Veriyi `{{http.data}}` ile kullanabilirsiniz. |
+| **201** | Created | Oluşturuldu. | Kayıt başarıyla açıldı. |
+| **204** | No Content | Başarılı (Boş). | İşlem tamam ama geri dönecek veri yok. |
+| **400** | Bad Request | Hatalı İstek. | Gönderdiğiniz JSON formatı bozuk veya eksik parametre var. |
+| **401** | Unauthorized | Yetkisiz. | API Key yanlış, eksik veya süresi dolmuş. |
+| **403** | Forbidden | Yasaklı. | Giriş yaptınız ama bu işlemi yapmaya yetkiniz yok. |
+| **404** | Not Found | Bulunamadı. | URL yanlış veya kaynak silinmiş. |
+| **429** | Too Many Req | Çok Hızlı. | API limitine takıldınız. Biraz bekleyin. |
+| **500** | Server Error | Sunucu Hatası. | Sorun karşı tarafta. Daha sonra tekrar deneyin. |
+| **502/503** | Gateway/Service | Servis Dışı. | Karşı sunucu şu an bakımda veya kapalı. |
 
-**Panel Görünümü:**
-```
-+--------------------------------------------------+
-|  ⚙️ HTTP Request                               X |
-+--------------------------------------------------+
-|                                                  |
-|  URL:                                            |
-|  [ https://api.exa...del               ]         |
-|                                                  |
-|  Method:                                         |
-|  ( ) GET   (•) POST   ( ) PUT                    |
-|                                                  |
-|  Headers (JSON):                                 |
-|  [ {"Authorization": "Bearer..."}      ]         |
-|                                                  |
-|  Body:                                           |
-|  [ {"data": "{{userInput}}"}           ]         |
-|                                                  |
-|                       [ İPTAL ]   [ KAYDET ]     |
-+--------------------------------------------------+
-```
-*(Yukarıdaki şema, düğüm ayarlarının nasıl yapılandırıldığını gösterir.)*
+---
 
+#### 2. Google Sheets (E-Tablolar)
+*   **Amaç:** Google E-Tablolarını bir veritabanı gibi kullanmak. Veri okuyabilir, satır ekleyebilir veya güncelleyebilirsiniz.
 
-#### Google Sheets Read / Write (E-Tablolar)
-*   **Özet:** Excel tablolarını bir veritabanı gibi kullanmanızı sağlar.
-*   **Kurulum (Çok Önemli):**
-    1.  Google Cloud Console'dan bir **Service Account** oluşturun.
-    2.  İndirdiğiniz JSON dosyasındaki `client_email` adresini kopyalayın.
-    3.  İşlem yapmak istediğiniz Google E-Tablosunu açın.
-    4.  "Paylaş" butonuna basıp, kopyaladığınız e-posta adresine **Editör** yetkisi verin.
+**🔧 Kurulum ve Yetkilendirme (Adım Adım):**
+Google Sheets'e erişmek için "Service Account" (Robot Hesap) kullanmalısınız.
+
+1.  **Google Cloud Console**'a gidin ve yeni bir proje oluşturun.
+2.  **APIs & Services** > **Enable APIs** menüsünden "Google Sheets API"yi etkinleştirin.
+3.  **Credentials** > **Create Credentials** > **Service Account** yolunu izleyin.
+4.  Oluşturulan hesaba bir isim verin ve **Done** diyerek bitirin.
+5.  Hesabın detayına girip **Keys** sekmesinden **Add Key > JSON** seçeneği ile anahtarı indirin.
+6.  İndirdiğiniz JSON dosyasındaki `client_email` adresini kopyalayın (Örn: `breviai-bot@...iam.gserviceaccount.com`).
+7.  İşlem yapmak istediğiniz Google E-Tablosunu açın ve **Paylaş** butonuna basarak bu e-posta adresine **Editör** yetkisi verin.
+
+**Parametre Detayları:**
+
+| Parametre | Açıklama | Örnek |
+| :--- | :--- | :--- |
+| **Action** | `Read` (Oku) veya `Write` (Yaz/Ekle). | - |
+| **Spreadsheet ID** | Tablo URL'sindeki uzun kod. | `https://docs.google.com/spreadsheets/d/`**1BxiMVs0XRA5nSLqo...**`/edit` |
+| **Range** | Hangi hücreler? | `Sayfa1!A1:C5` (Belirli alan) <br> `Sayfa1!A:A` (Tüm A sütunu) |
+| **Values (Write)** | Yazılacak veri (Dizi içinde dizi). | `[ ["Ad", "Soyad"], ["Ali", "Veli"] ]` |
+
+> **İpucu:** Yazarken `USER_ENTERED` modunu seçerseniz, gönderdiğiniz formüller (örn: `=TOBB(A1)`) excel tarafından işlenir. `RAW` seçerseniz metin olarak kalır.
+
+---
+
+#### 3. WhatsApp Send
+*   **Amaç:** İş akışınızdan belirlediğiniz numaralara otomatik WhatsApp mesajı göndermek.
+
+**Bağlantı Türleri:**
+1.  **Backend (WWebJS):** Kendi numaranızı kullanır. Ücretsizdir. QR kod ile bağlanır.
+2.  **Cloud API:** Meta'nın resmi API'sidir. İşletme hesabı ve şablon onayı gerektirir. (Daha stabil ama ücretli olabilir).
+
+**Parametreler:**
+
+| Parametre | Açıklama | Örnek |
+| :--- | :--- | :--- |
+| **To (Alıcı)** | Telefon numarası. Ülke kodu olmalı, `+` olmamalı. | `905321234567` (Doğru) <br> `0532...` (Yanlış) |
+| **Message** | Gönderilecek metin. | "Merging tamamlandı. ✅" |
+| **Media URL** | (Opsiyonel) Resim/PDF linki. | `https://example.com/fatura.pdf` |
+
+> **İpucu:** Mesaj içinde `\n` karakteri kullanarak alt satıra geçebilirsiniz. Örn: `Başlık\nDetaylar...`
+
+---
+
+#### 4. Code Execution (Javascript Çalıştır)
+*   **Amaç:** Standart düğümlerin yetersiz kaldığı yerde, kendi Javascript kodunuzu yazarak sınırsız işlem yapabilirsiniz.
+*   **Erişim:** `input` (önceki düğüm verisi) ve `variables` (global değişkenler) nesnelerine erişir.
+
+**Sık Kullanılan Snippet Kütüphanesi:**
+
+| Senaryo | Kod Örneği | Açıklama |
+| :--- | :--- | :--- |
+| **Bugünün Tarihi** | `return { date: new Date().toISOString().split('T')[0] };` | YYYY-MM-DD formatında tarih döner. |
+| **Metin İşleme** | `return { upper: input.text.toUpperCase() };` | Gelen metni BÜYÜK HARFE çevirir. |
+| **Matematik** | `return { kdvliFiyat: input.fiyat * 1.20 };` | Fiyata %20 KDV ekler. |
+| **Liste Filtreleme** | `return { aktifler: input.users.filter(u => u.active) };` | Sadece aktif kullanıcıları seçer. |
+| **Rastgele Sayı** | `return { zar: Math.floor(Math.random() * 6) + 1 };` | 1-6 arası sayı üretir. |
+
+> **⚠️ Önemli Kural:** Kodunuzun sonunda MUTLAKA `return { ... }` ile bir JSON nesnesi döndürmelisiniz. Sadece `return 5;` yazarsanız hata alırsınız.
+
+---
+
+### 🤖 Yapay Zeka (AI)
+
+#### 1. Agent AI (LLM)
+*   **Amaç:** Gemini veya OpenAI modellerini kullanarak metin üretme, özetleme veya karar verme.
 *   **Parametreler:**
-    *   `Action`: Read (Oku) veya Write (Yaz).
-    *   `Spreadsheet ID`: Tablo URL'sindeki uzun kod.
-        *   `docs.google.com/spreadsheets/d/`**BU_KISIM_ID_DIR**`/edit`
-    *   `Range`: Hangi hücreler okunacak/yazılacak? (Örn: `Sayfa1!A1:C10`).
-    *   `Value Input Option`:
-        *   `RAW`: Formülleri metin olarak yazar.
-        *   `USER_ENTERED`: Kullanıcı yazmış gibi davranır (Formülleri çalıştırır, sayıları tanır).
+    *   `Provider`: Google (Gemini) - *Önerilen, hızlı ve ücretsiz kota.*
+    *   `Model`: `gemini-1.5-flash` (Hızlı), `gemini-1.5-pro` (Akıllı).
+    *   `Prompt`: Yapay zekaya talimatınız. `{{variable}}` kullanabilirsiniz.
 
-#### WhatsApp Send
-*   **Özet:** İş akışından WhatsApp mesajı atar.
-*   **Bağlantı Türleri:**
-    1.  **Backend (Tavsiye Edilen):** QR kod ile bağladığınız kendi numaranızı kullanır. Ücretsizdir.
-    2.  **Cloud API:** Meta'nın resmi API'sidir. Ücretli olabilir ve onaylı işletme hesabı gerektirir.
-*   **Parametreler:**
-    *   `Phone Number`: Alıcı numarası.
-    *   `Message`: Mesaj içeriği.
-*   **Kullanım İpuçları:**
-    *   Numarayı uluslararası formatta yazın ama `+` koymayın (Örn: `905321234567`).
-    *   Mesaj içeriğinde `\n` kullanarak alt satıra geçebilirsiniz.
-*   **Çıktı:** Gönderim durumu (Success/Fail).
+**Prompt Mühendisliği İpuçları:**
+*   **Rol Yapma:** "Sen uzman bir finans asistanısın."
+*   **Format Belirleme:** "Cevabı sadece JSON formatında ver."
+*   **Örnekleme:** "Örnek çıktı: {'özet': '...'}"
+
+#### 2. Image Generator
+*   **Amaç:** Metinden görsel oluşturur (Text-to-Image).
+*   **Provider:**
+    *   `Nanobana`: Hızlı ve ücretsiz (SDXL).
+    *   `Pollinations`: Çeşitli modeller sunar.
+*   **Kullanım:** "Prompt" kısmına İngilizce betimleme yazın (Örn: "A futuristic city with flying cars, cyberpunk style").
+*   **Çıktı:** Oluşturulan resmin URL adresi. Bu adresi WhatsApp'a veya E-Tablolara gönderebilirsiniz.
 
 ### 🧠 Mantık & İşleme
 
@@ -308,55 +385,6 @@ Veri, koşulun sonucuna göre `True` veya `False` çıkışına yönlendirilir.
 #### Merge
 *   **Özet:** Birden fazla koldan gelen akışı tek bir noktada birleştirir.
 *   **Kullanım:** Genellikle IF veya Switch düğümlerinden ayrılan kolları tekrar birleştirmek veya parallel çalışan işlemlerin bitmesini beklemek için kullanılır.
-
-
-#### Code Execution (Javascript Çalıştır)
-*   **Özet:** Standart düğümlerin yetersiz kaldığı yerde, kendi Javascript kodunuzu yazarak sınırsız işlem yapabilirsiniz.
-*   **Parametreler:**
-    *   `Code`: Çalıştırılacak JS kodu. `input` ve `variables` nesnelerine erişebilir.
-*   **Erişilebilir Nesneler:**
-    *   `input`: Önceki düğümden gelen veri.
-    *   `variables`: Akış genelindeki değişkenler.
-*   **Sık Kullanılan Kod Parçacıkları (Snippet):**
-
-**1. Tarih Formatlama:**
-```javascript
-// Bugünü YYYY-MM-DD formatına çevir
-const today = new Date().toISOString().split('T')[0];
-return { todayDate: today };
-```
-
-**2. Matematiksel İşlem (KDV Hesapla):**
-```javascript
-const fiyat = input.price;
-const kdvli = fiyat * 1.20;
-return { net: fiyat, brut: kdvli };
-```
-
-**3. Metin Birleştirme:**
-```javascript
-const ad = input.user.firstName;
-const soyad = input.user.lastName;
-return { tamAd: `${ad} ${soyad}` };
-```
-
-### 🤖 Yapay Zeka (AI)
-
-#### Agent AI
-*   **Özet:** LLM (Large Language Model) kullanarak karmaşık görevleri yerine getirir.
-*   **Parametreler:**
-    *   `Provider`: Gemini, OpenAI, Claude.
-    *   `Model`: Kullanılacak model (Örn: `gemini-pro`).
-    *   `Prompt`: YZ'ye verilecek talimat.
-    *   `Tools`: Agent'ın kullanabileceği araçlar (Web Search, Calculator vb.).
-*   **Çıktı:** YZ'nin yanıtı ve (varsa) çalıştırdığı araçların sonuçları.
-
-#### Image Generator
-*   **Özet:** Metinden görüntü oluşturur.
-*   **Parametreler:**
-    *   `Provider`: Nanobana, Pollinations, Gemini.
-    *   `Prompt`: Görüntü açıklaması.
-    *   `Size`: Boyut (Örn: 1024x1024).
 
 
 ### 📱 Cihaz & Sensörler
@@ -546,6 +574,48 @@ Bankadan gelen harcama bildirimini yakalayıp, tutarı ve mağaza adını otomat
 4.  **(İsteğe Bağlı) AI Agent:** Prompt = "{{magaza}} mağazası hangi kategoriye ait? Seçenekler: Market, Restoran, Giyim, Ulaşım, Diğer. Sadece kategori adını yaz."
     *   AI çıktısını 4. sütuna (Kategori) yazın.
 
+### 🎨 Senaryo 4: Yapay Zeka ile Görsel Üretim ve Paylaşım
+Kullanılan kelimelerden profesyonel bir görsel oluşturup, bunu WhatsApp üzerinden paylaşan yaratıcı bir akış.
+
+**Akış Diyagramı:**
+`📝 Text Input` → `🤖 Image Generator` → `💬 WhatsApp Send`
+
+**Adım Adım Kurulum:**
+1.  **Text Input:** Prompt = "Ne çizmemi istersiniz?", Placeholder = "Örn: Gün batımında uçan arabalar..."
+2.  **Image Generator:**
+    *   Provider = `Nanobana` (veya `Pollinations`).
+    *   Prompt = `{{textInput}}`. (Kullanıcının girdiği metni kullan).
+3.  **WhatsApp Send:**
+    *   To = `905XXXXXXXXX` (Kendi numaranız).
+    *   Message = "İşte hayalinizdeki resim! 🎨"
+    *   Media URL = `{{imageGenerator.url}}`.
+
+### 🕵️ Senaryo 5: Web Scraper ve Rakip Analizi (Masterclass)
+Bir e-ticaret sitesinin ürün sayfasını (HTML) çekip, fiyatı ayıklayan ve rakibinizden ucuzsa size mail atan gelişmiş senaryo.
+
+**Akış Diyagramı:**
+`⏰ Cron` → `🌐 HTTP` → `⚙️ Code (Cheerio/Regex)` → `❓ IF` → `📧 Email`
+
+**Adım Adım Kurulum:**
+1.  **Cron Trigger:** Günde bir kez çalışması için `0 9 * * *`.
+2.  **HTTP Request:**
+    *   URL = `https://rakip-site.com/urun-sayfasi`
+    *   Method = `GET`.
+3.  **Code Execution (Fiyat Ayıklama):**
+    ```javascript
+    // Gelen HTML metni içinden fiyatı bul
+    const html = input.http.data;
+    // Regex ile (Örn: 1.250 TL) formatını yakala
+    const fiyatMatch = html.match(/class="price">([0-9.,]+)/);
+    const fiyat = fiyatMatch ? parseFloat(fiyatMatch[1].replace('.', '').replace(',', '.')) : 0;
+    return { rakipFiyat: fiyat };
+    ```
+4.  **IF Node:**
+    *   Condition: `{{rakipFiyat}} < 5000` (Rakip 5000 TL'den ucuza satıyorsa).
+5.  **True → Send Email:**
+    *   Subject: "🚨 Fiyat Alarmı!"
+    *   Message: "Rakip fiyatı düşürdü: {{rakipFiyat}} TL. Kontrol et!"
+
 ---
 
 ## 6. İpuçları, En İyi Uygulamalar ve Hata Ayıklama
@@ -613,4 +683,3 @@ Otomasyonlarınızı profesyonel, hatasız ve yönetilebilir hale getirmek için
 
 **4. Değişken Bulunamadı**
 *   **Çözüm:** Bir düğümün çıktısını (`{{nodeName.data}}`) kullanmadan önce, o düğümün akışta *daha önce* çalıştığından emin olun.
-

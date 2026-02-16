@@ -282,3 +282,85 @@
 .tocLink:hover {
     color: #818CF8;
 }
+
+/* Tables */
+.tableContainer {
+    overflow-x: auto;
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    border: 1px solid #2D2D44;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+.th {
+    background-color: #1E1E2E;
+    color: #F8FAFC;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border-bottom: 1px solid #2D2D44;
+}
+
+.td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #2D2D44;
+    color: #CBD5E1;
+}
+
+.tr:last-child .td {
+    border-bottom: none;
+}
+
+.tr:hover {
+    background-color: #13131A;
+}
+
+/* Code Blocks */
+.code {
+    background-color: #1E1E2E;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Fira Code', monospace;
+    color: #A5B4FC;
+    font-size: 0.85em;
+}
+
+.pre {
+    background-color: #0F0F13;
+    padding: 1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 1rem 0;
+    border: 1px solid #2D2D44;
+}
+
+.pre .code {
+    background-color: transparent;
+    padding: 0;
+    color: #E2E8F0;
+    font-size: 0.9em;
+    font-family: 'Fira Code', monospace;
+}
+
+.blockQuote {
+    border-left: 4px solid #6366F1;
+    background-color: rgba(99, 102, 241, 0.1);
+    padding: 1rem;
+    border-radius: 0 4px 4px 0;
+    margin: 1.5rem 0;
+    color: #E0E7FF;
+}
+
+.blockQuoteWarning {
+    border-left: 4px solid #F59E0B;
+    background-color: rgba(245, 158, 11, 0.1);
+    padding: 1rem;
+    border-radius: 0 4px 4px 0;
+    margin: 1.5rem 0;
+    color: #FEF3C7;
+}
