@@ -1,6 +1,6 @@
-/* V4 Styles & V5 Updates */
+/* V4/V5/V6 Styles */
 .container {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 2rem;
     background-color: #0A0A0B;
@@ -85,13 +85,68 @@
     color: #fff;
 }
 
-/* Grid */
+/* V6: Layout (Sidebar) */
+.contentGrid {
+    display: flex;
+    gap: 3rem;
+    align-items: flex-start;
+}
+
 .nodeGrid {
+    flex: 1;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 2rem;
 }
 
+/* Sidebar for Guides */
+.sidebar {
+    width: 300px;
+    background-color: #13131A;
+    border: 1px solid #2D2D44;
+    border-radius: 16px;
+    padding: 1.5rem;
+    position: sticky;
+    top: 2rem;
+    flex-shrink: 0;
+}
+
+.sidebarSection h3 {
+    margin-top: 0;
+    color: #F8FAFC;
+    border-bottom: 2px solid #6366F1;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.sidebarSection h4 {
+    color: #94A3B8;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+}
+
+.sidebarSection ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebarSection li {
+    background-color: #1E1E2E;
+    padding: 0.5rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    color: #A5B4FC;
+    border: 1px solid #313142;
+}
+
+
+/* Node Cards */
 .nodeDetailCard {
     background-color: #13131A;
     border: 1px solid #2D2D44;
@@ -145,6 +200,11 @@
 
 .integration .cardTypeBadge {
     background-color: #F59E0B;
+}
+
+.core .cardTypeBadge {
+    background-color: #f43f5e;
+    color: white;
 }
 
 .cardBody {
@@ -296,4 +356,15 @@
     padding: 3rem;
     color: #94A3B8;
     font-size: 1.2rem;
+}
+
+@media (max-width: 1024px) {
+    .contentGrid {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: static;
+    }
 }
