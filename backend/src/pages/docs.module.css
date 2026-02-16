@@ -1,5 +1,5 @@
 /* V8 Styles */
-:root {
+.pageContainer {
     --bg-page: #0F1115;
     --bg-sidebar: #16181D;
     --bg-card: #1E2128;
@@ -7,9 +7,7 @@
     --primary: #9D74FF;
     --text-main: #E6E8EC;
     --text-muted: #9CA3AF;
-}
 
-.pageContainer {
     display: flex;
     min-height: 100vh;
     background-color: var(--bg-page);
