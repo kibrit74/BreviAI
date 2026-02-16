@@ -37,6 +37,7 @@ interface NodeExample {
     title: string;
     code: string;
     explanation: string;
+    image?: string; // Optional image for example
 }
 
 interface NodeDoc {
@@ -51,286 +52,152 @@ interface NodeDoc {
     credentials?: string;
 }
 
-// --- V12: ENCYCLOPEDIA CONTENT (EVERY NODE DETAILED) ---
 const NODES: NodeDoc[] = [
     // ═════════════════════════════════════════
-    // TRIGGERS (Tetikleyiciler)
+    // AI (YAPAY ZEKA) - V13 UPDATED
     // ═════════════════════════════════════════
     {
-        id: 'MANUAL', title: 'Manual Trigger', type: 'trigger', summary: 'Akışı elle veya butonla başlatır.',
+        id: 'REALTIME_AI', title: 'Realtime AI (Live)', type: 'ai', summary: 'Gemini Live ile anlık sesli sohbet.',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🔍 Nasıl Çalışır?</h3>
-                <p>Bu düğüm, akışın başlangıç noktasıdır. Genellikle test amaçlı veya kullanıcının bir butona basarak başlattığı senaryolarda kullanılır.</p>
-                <div class="tip-box">💡 <strong>İpucu:</strong> Akışınızı test ederken her zaman bu düğümü kullanın. "Play" butonuna bastığınızda bu düğüm tetiklenir.</div>
+                <h3>🎙️ Gerçek Zamanlı AI (Realtime)</h3>
+                <p>Bu düğüm, <strong>Gemini Live</strong> teknolojisini kullanarak yapay zeka ile <u>gecikmesiz</u> (milisayine hızında) sesli sohbet etmenizi sağlar.</p>
+                <div class="tip-box">💡 <strong>Kullanım Alanı:</strong> Telefonla konuşur gibi AI ile konuşmak, anlık çeviri yapmak veya eller serbest asistan oluşturmak için kullanın.</div>
             </div>
             <div class="guide-section">
-                <h3>📝 Form Alanları (Form Fields)</h3>
-                <p>Eğer akış başladığında kullanıcıdan bilgi istemek istiyorsanız (örn: "Hangi e-postayı özetleyeyim?"), <code>Form Fields</code> parametresini kullanın.</p>
+                <h3>🚀 Özellikler</h3>
                 <ul>
-                    <li><strong>Text:</strong> Metin girişi.</li>
-                    <li><strong>Number:</strong> Sayı girişi.</li>
-                    <li><strong>Select:</strong> Seçim listesi.</li>
+                    <li><strong>Kesintisiz Sohbet:</strong> Siz sözünüzü bitirmeden araya girebilir.</li>
+                    <li><strong>Duygu Analizi:</strong> Ses tonunuzdan sinirli veya mutlu olduğunuzu anlar.</li>
+                    <li><strong>Araç Kullanımı:</strong> Sohbet sırasında "Işığı aç" derseniz diğer düğümleri tetikler.</li>
                 </ul>
             </div>
         `,
-        params: [{ name: 'Form Fields', type: 'Array', required: false, desc: 'Kullanıcıdan istenecek verilerin listesi (JSON formatında).' }],
-        outputs: [{ field: 'formData', type: 'Object', desc: 'Kullanıcının girdiği veriler. Örn: {{formData.query}}' }],
+        params: [
+            { name: 'Model', type: 'Select', required: true, desc: 'Gemini 1.5 Pro (Sesli)' },
+            { name: 'Voice', type: 'Select', required: true, desc: 'Ses Tonu (Nova, Alloy, Echo)' },
+            { name: 'System Prompt', type: 'Text', required: false, desc: 'AI\'ın kişiliği (Örn: Sen benim İngilizce öğretmenimsin).' }
+        ],
+        outputs: [{ field: 'transcript', type: 'String', desc: 'Konuşma metni.' }, { field: 'audio', type: 'File', desc: 'Ses kaydı.' }],
         examples: [
             {
-                title: 'Basit Kullanıcı Girişi',
-                code: `// Form Fields Parametresi:
-[
-  { "name": "konu", "type": "text", "label": "Ne hakkında şiir yazayım?" },
-  { "name": "uzunluk", "type": "number", "label": "Kaç kıta olsun?" }
-]`,
-                explanation: 'Bu ayar ile akış başladığında kullanıcıya iki soru sorulur. Girilen cevaplar sonraki düğümlerde {{formData.konu}} olarak kullanılabilir.'
+                title: '🇬🇧 İngilizce Pratik Arkadaşı',
+                code: 'System Prompt: "Sen benim İngilizce öğretmenimsin. Hatalarımı düzelt ve benimle sohbet et."',
+                explanation: 'Sizinle sesli olarak İngilizce konuşur ve telaffuz hatalarınızı anlık düzeltir.'
+            },
+            {
+                title: '🚗 Araç İçi Asistan',
+                code: `System Prompt: "Sen bir araç asistanısın. Kısa cevaplar ver."\nTools: [Spotify, Maps, Call]`,
+                explanation: 'Araba kullanırken "Eve git", "Müzik aç" gibi komutları sesli algılar ve yapar.'
             }
         ]
     },
-    {
-        id: 'TIME_TRIGGER', title: 'Cron / Interval', type: 'trigger', summary: 'Zamanlanmış görevler oluşturur.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>⏰ Zamanlayıcı Nedir?</h3>
-                <p>Bu düğüm, akışın sizin müdahaleniz olmadan, belirli zamanlarda otomatik çalışmasını sağlar. İki modu vardır:</p>
-                <ul>
-                    <li><strong>Interval (Aralık):</strong> "Her 15 dakikada bir çalış", "Her 2 saatte bir çalış" gibi tekrarlı işlemler.</li>
-                    <li><strong>Cron (Takvim):</strong> "Her Pazartesi sabah 09:00'da çalış" gibi hassas zamanlamalar.</li>
-                </ul>
-            </div>
-            <div class="guide-section">
-                <h3>⚠️ Önemli Uyarılar</h3>
-                <div class="alert-box">Android kısıtlamaları nedeniyle, zamanlayıcılar bazen "Doze Mode" (Pil Tasarrufu) yüzünden birkaç dakika gecikebilir. Kesin saniye hassasiyeti beklemeyin.</div>
-            </div>
-        `,
-        params: [
-            { name: 'Mode', type: 'Select', required: true, desc: 'Interval (Basit) veya Cron (Gelişmiş).' },
-            { name: 'Value', type: 'String', required: true, desc: 'Dakika sayısı veya Cron ifadesi.' }
-        ],
-        outputs: [{ field: 'timestamp', type: 'Number', desc: 'Tetiklenme zamanı (Unix Time).' }],
-        examples: [
-            { title: 'Her Sabah 08:30 (Cron)', code: '30 8 * * *', explanation: 'Cron formatı: Dakika(30) Saat(8) Gün(*) Ay(*) HaftanınGünü(*)' },
-            { title: 'Hafta İçi Her Gün (Cron)', code: '0 9 * * 1-5', explanation: 'Sadece Pazartesi(1) - Cuma(5) arası sabah 09:00.' }
-        ]
-    },
-    {
-        id: 'WEBHOOK', title: 'Webhook', type: 'trigger', summary: 'Dış dünyadan gelen verileri yakalar.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>🌐 Webhook Nedir?</h3>
-                <p>Webhook, BreviAI'ye dışarıdan (IFTTT, Zapier, kendi sunucunuz veya bir web formu) veri göndermenin yoludur. Size özel bir URL üretilir.</p>
-            </div>
-            <div class="guide-section">
-                <h3>🚀 Nasıl Kullanılır?</h3>
-                <ol>
-                    <li>Bu düğümü ekleyin ve bir <code>Path</code> (örn: <code>/form-submit</code>) belirleyin.</li>
-                    <li>Size verilen URL'i kopyalayın: <code>https://api.breviai.com/webhook/form-submit</code></li>
-                    <li>Bu URL'e POST isteği atıldığında akış çalışır.</li>
-                </ol>
-            </div>
-        `,
-        params: [
-            { name: 'Path', type: 'String', required: true, desc: 'URL\'in son kısmı. Benzersiz olmalı.' },
-            { name: 'Method', type: 'Select', required: true, desc: 'HTTP Metodu (Genellikle POST).' }
-        ],
-        outputs: [{ field: 'body', type: 'Object', desc: 'Gelen JSON verisi.' }, { field: 'query', type: 'Object', desc: 'URL parametreleri.' }],
-        examples: [
-            { title: 'Google Forms Entegrasyonu', code: 'Path: /basvuru-al', explanation: 'Google Forms\'tan bu adrese veri gönderildiğinde akış başlar ve gelen veriyi işler.' }
-        ]
-    },
-    {
-        id: 'NOTIFICATION_TRIGGER', title: 'Notification Trigger', type: 'trigger', summary: 'Gelen bildirimleri yakalar.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>🔔 Bildirim Yakalama</h3>
-                <p>Telefonunuza gelen herhangi bir bildirimi (WhatsApp, Banka, SMS) okuyarak tetiklenir. Bu sayede API'si olmayan uygulamaları bile otomatize edebilirsiniz.</p>
-            </div>
-             <div class="guide-section">
-                <h3>🔒 İzinler Hakkında</h3>
-                <div class="alert-box">Bu özelliğin çalışması için Android ayarlarından BreviAI'ye "Bildirimlere Erişim İzni" vermeniz gerekir. İlk kurulumda size sorulacaktır.</div>
-            </div>
-        `,
-        params: [
-            { name: 'App Name', type: 'String', required: true, desc: 'Uygulamanın adı (Örn: WhatsApp, Mesajlar).' },
-            { name: 'Filter', type: 'String', required: false, desc: 'Sadece bu kelimeyi içeren bildirimleri yakala.' }
-        ],
-        outputs: [{ field: 'title', type: 'String', desc: 'Bildirimi gönderen (Kişi/Kurum).' }, { field: 'text', type: 'String', desc: 'Bildirim içeriği.' }],
-        examples: [
-            { title: 'Banka Harcama Takibi', code: 'App: Mesajlar\nFilter: "Harcama"', explanation: 'Bankadan "Harcama" kelimesi içeren bir SMS geldiğinde çalışır ve harcamayı Excel\'e kaydeder.' },
-            { title: 'OTP (Şifre) Yakalama', code: 'App: Mesajlar\nFilter: "Doğrulama kodu"', explanation: 'SMS ile gelen doğrulama kodunu yakalar ve panoya kopyalar.' }
-        ]
-    },
-    {
-        id: 'CALL_TRIGGER', title: 'Call Trigger', type: 'trigger', summary: 'Telefon aramalarını takip eder.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>📞 Arama Yönetimi</h3>
-                <p>Gelen, giden veya sonlanan aramaları algılar. Sekreterya otomasyonları veya CRM kayıtları için idealdir.</p>
-            </div>
-            <div class="guide-section">
-                <h3>🎛️ Durumlar (States)</h3>
-                <ul>
-                    <li><strong>Incoming:</strong> Telefon çalmaya başladığında (Henüz açılmadı).</li>
-                    <li><strong>Connected:</strong> Görüşme başladığında.</li>
-                    <li><strong>Ended:</strong> Görüşme bittiğinde (Kapadığında).</li>
-                </ul>
-            </div>
-        `,
-        params: [
-            { name: 'State', type: 'Select', required: true, desc: 'Hangi durumda çalışsın?' },
-            { name: 'Phone Number', type: 'String', required: false, desc: 'Sadece bu numara ararsa çalış.' }
-        ],
-        outputs: [{ field: 'number', type: 'String', desc: 'Arayan/Aranan numara.' }, { field: 'name', type: 'String', desc: 'Rehberdeki adı (varsa).' }],
-        examples: [
-            { title: 'Meşgulken SMS At', code: 'State: Incoming\nPhone: (Boş)', explanation: 'Telefon çaldığında arayan kişiye "Şu an toplantıdayım" mesajı atar.' },
-            { title: 'Görüşme Kaydı', code: 'State: Ended', explanation: 'Görüşme bitince kiminle ne zaman konuştuğunuzu Google Sheets\'e yazar.' }
-        ]
-    },
-    {
-        id: 'GEOFENCE_ENTER', title: 'Geofence Enter', type: 'trigger', summary: 'Bir konuma girince çalışır.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>📍 Coğrafi Çit (Geofence) Nedir?</h3>
-                <p>Haritada sanal bir daire çizersiniz (Ev, İş, Okul). Telefonunuz bu dairenin içine girdiğinde akış otomatik başlar.</p>
-            </div>
-             <div class="guide-section">
-                <h3>🔋 Pil Tüketimi</h3>
-                <p>BreviAI, pil tasarrufu için GPS'i sürekli kullanmaz. Baz istasyonu ve Wi-Fi verilerini kullanır. Bu yüzden algılama 1-2 dakika gecikmeli olabilir.</p>
-            </div>
-        `,
-        params: [
-            { name: 'Lat/Long', type: 'Coordinates', required: true, desc: 'Merkez koordinat.' },
-            { name: 'Radius', type: 'Number', required: true, desc: 'Dairenin yarıçapı (Metre cinsinden). En az 100m önerilir.' }
-        ],
-        outputs: [],
-        examples: [
-            { title: 'Eve Geldim Modu', code: 'Konum: Evim\nRadius: 150m', explanation: 'Eve 150m yaklaştığınızda Wi-Fi\'yi açar ve eşinize "Geldim" mesajı atar.' }
-        ]
-    },
-
-    // ═════════════════════════════════════════
-    // AI (YAPAY ZEKA) - EXPANDED
-    // ═════════════════════════════════════════
     {
         id: 'AGENT_AI', title: 'AI Agent (LLM)', type: 'ai', summary: 'Akıllı metin işleme ve üretme asistanı.',
         overviewHTML: `
             <div class="guide-section">
                 <h3>🧠 Agent AI: BreviAI'nin Beyni</h3>
-                <p>Bu düğüm, dünyanın en gelişmiş yapay zeka modellerine (GPT-4o, Gemini 1.5 Pro) doğrudan erişim sağlar. Sadece "sohbet etmek" için değil, karmaşık verileri analiz etmek, karar vermek ve içerik üretmek için kullanılır.</p>
+                <p>Bu düğüm, dünyanın en gelişmiş yapay zeka modellerine doğrudan erişim sağlar. Sadece "sohbet etmek" için değil, karmaşık verileri analiz etmek, karar vermek ve içerik üretmek için kullanılır.</p>
             </div>
             
             <div class="guide-section">
-                <h3>🤖 Modeller Arasındaki Farklar</h3>
+                <h3>🤖 GÜNCEL Model Listesi (V13)</h3>
                 <ul>
-                    <li><strong>Gemini 1.5 Flash:</strong> Çok hızlı ve ucuz. Basit işlemler (Özetleme, Sınıflandırma) için ideal.</li>
-                    <li><strong>GPT-4o:</strong> En zeki model. Karmaşık mantık, kod yazma ve yaratıcı içerik için en iyisi.</li>
-                    <li><strong>Claude 3.5 Sonnet:</strong> Kodlama ve doğal dilde çok başarılı.</li>
+                    <li><strong>Gemini 1.5 Pro:</strong> 2 Milyon token hafızası (Kitap yükleyip soru sorabilirsiniz).</li>
+                    <li><strong>GPT-4o:</strong> Çok modlu (Resim, Ses, Metin) ve çok hızlı.</li>
+                    <li><strong>Claude 3.5 Sonnet:</strong> Kodlama ve yaratıcı yazarlıkta en iyisi.</li>
+                    <li><strong>GPT-4 Turbo:</strong> Klasik ve güvenilir.</li>
                 </ul>
             </div>
 
             <div class="guide-section">
-                <h3>✨ Prompt Mühendisliği 101 (Nasıl Emir Verilir?)</h3>
+                <h3>✨ Prompt Mühendisliği 101</h3>
                 <div class="tip-box">Yapay zeka bir stajyer gibidir. Ne kadar net olursanız o kadar iyi sonuç alırsınız.</div>
-                <p><strong>Kötü Prompt:</strong> "Bunu özetle." (Neyi? Ne kadar kısa? Hangi dilde?)</p>
                 <p><strong>Mükemmel Prompt:</strong> "Aşağıdaki müşteri şikayet mailini oku. 1. Müşterinin ana sorunu ne? 2. Duygu durumu ne (Sinirli/Üzgün)? 3. Ona kibar bir cevap taslağı hazırla. Metin: {{mail_body}}"</p>
             </div>
-
-             <div class="guide-section">
-                 <h3>📄 Output Format (Çıktı Formatı)</h3>
-                 <p>Genellikle AI size düz yazı (String) döner. Ama bir sonraki düğümde kullanmak için <strong>JSON</strong> isteyebilirsiniz.</p>
-                 <p>Promptunuza şunu ekleyin: <em>"Cevabı sadece geçerli bir JSON formatında ver. Örn: { 'ozet': '...', 'duygu': '...' }"</em></p>
-             </div>
         `,
         params: [
-            { name: 'Model', type: 'Select', required: true, desc: 'İşin zorluğuna göre model seçin.' },
+            { name: 'Model', type: 'Select', required: true, desc: 'Gemini 1.5 Pro, GPT-4o, Claude 3.5 Sonnet' },
             { name: 'Prompt', type: 'Text', required: true, desc: 'AI\'a verilecek detaylı talimat.' },
             { name: 'System Prompt', type: 'Text', required: false, desc: 'AI\'ın rolü (Örn: "Sen uzman bir avukatsın").' }
         ],
         outputs: [{ field: 'content', type: 'String', desc: 'AI\'ın ürettiği cevap (Text veya JSON).' }],
         examples: [
             {
-                title: '📧 E-posta Sınıflandırma & Yanıtlama',
-                code: `Prompt:
-"Aşağıdaki e-postayı analiz et ve kategorisini bul (Fatura / Destek / Reklam).
-Eğer Destek ise, kullanıcıya çözüm öneren kısa bir cevap yaz.
-Değilse 'İşlem Gerekmiyor' yaz.
-E-posta: {{gmail.body}}"`,
-                explanation: 'Gelen mailleri otomatik olarak okur, anlar ve sadece gerekli olanlara cevap taslağı hazırlar.'
-            },
-            {
-                title: '📊 Veri Çıkarma (Extraction)',
-                code: `Prompt:
-"Aşağıdaki metinden tarih, saat ve yer bilgilerini çıkarıp JSON olarak ver.
-Metin: 'Yarın akşam 8'de Kadıköy Starbucks'ta buluşalım.'
-Beklenen Çıktı: { 'date': '...', 'time': '...', 'location': '...' }"`,
-                explanation: 'Doğal dildeki mesajlardan yapılandırılmış veri (Tarih, Yer) çıkarır. Bu veriyi Takvim düğümüne gönderebilirsiniz.'
+                title: '📧 E-posta Sınıflandırma',
+                code: `Prompt: "Bu e-posta Fatura mı, Destek mi? Sadece kategoriyi yaz."`,
+                explanation: 'Gelen mailleri otomatik olarak okur ve sınıflandırır.'
             },
             {
                 title: '💻 Kod / Script Yazma',
-                code: `Prompt: "Bana Python ile bir PDF birleştirme scripti yaz. Kodun içine yorum satırları ekle."`,
+                code: `Prompt: "Bana Python ile bir PDF birleştirme scripti yaz."`,
                 explanation: 'Teknik işleriniz için kod parçacıkları üretir.'
             }
         ]
     },
-
-    // ═════════════════════════════════════════
-    // LOGIC & CONTROL (Karar Mekanizması)
-    // ═════════════════════════════════════════
     {
-        id: 'IF_ELSE', title: 'IF / Else', type: 'control', summary: 'Karar verme mekanizması.',
+        id: 'IMAGE_GENERATOR', title: 'Image Gen (Nanobana)', type: 'ai', summary: 'Gelişmiş görsel üretimi.',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🤔 Karar Ağacı</h3>
-                <p>Akışın gidişatını bir koşula göre değiştirir. Otomasyonun "Zekası" buradadır.</p>
+                <h3>🎨 Nanobana & Pollinations Desteği</h3>
+                <p>Sadece metin girerek profesyonel kalitede görseller üretin. Artık <strong>Nanobana</strong> altyapısı ile daha hızlı ve sansürsüz üretim.</p>
+            </div>
+             <div class="guide-section">
+                <h3>📐 Ayarlar</h3>
                 <ul>
-                    <li><strong>True (Doğru):</strong> Koşul sağlanırsa (Örn: Fiyat > 100) üstteki yeşil porttan devam eder.</li>
-                    <li><strong>False (Yanlış):</strong> Koşul sağlanmazsa alttaki kırmızı porttan devam eder.</li>
+                    <li><strong>Provider:</strong> Nanobana (Hızlı), DALL-E 3 (Kaliteli), Pollinations (Ücretsiz).</li>
+                    <li><strong>Aspect Ratio:</strong> 1:1 (Kare), 16:9 (Yatay), 9:16 (Hikaye).</li>
                 </ul>
             </div>
-            <div class="guide-section">
-                <h3>📝 Operatörler Rehberi</h3>
-                <table class="simple-table">
-                    <tr><td>==</td><td>Eşittir</td><td>{{age}} == 18</td></tr>
-                    <tr><td>!=</td><td>Eşit Değil</td><td>{{status}} != "Active"</td></tr>
-                    <tr><td>></td><td>Büyüktür</td><td>{{price}} > 5000</td></tr>
-                    <tr><td>includes</td><td>İçerir</td><td>{{text}}.includes("Hata")</td></tr>
-                </table>
-            </div>
         `,
-        params: [{ name: 'Condition', type: 'Expression', required: true, desc: 'JavaScript mantıksal ifadesi.' }],
-        outputs: [],
+        params: [
+            { name: 'Provider', type: 'Select', required: true, desc: 'Nanobana / DALL-E / Pollinations' },
+            { name: 'Prompt', type: 'Text', required: true, desc: 'Görsel tarifi (İngilizce önerilir).' },
+            { name: 'Size', type: 'Select', required: false, desc: '1024x1024' }
+        ],
+        outputs: [{ field: 'imageUrl', type: 'String', desc: 'Resim URL\'i.' }],
         examples: [
-            { title: 'Mesai Saati Kontrolü', code: 'new Date().getHours() >= 9 && new Date().getHours() <= 18', explanation: 'Sadece sabah 9 ile akşam 6 arasında çalışır.' },
-            { title: 'Anahtar Kelime Filtresi', code: '{{sms.message}}.toLowerCase().includes("acil")', explanation: 'Mesajda "acil" kelimesi geçiyorsa True yoluna gider.' }
+            { title: 'Instagram Hikaye Arkaplanı', code: 'Prompt: "Cyberpunk city aesthetics, neon lights, 9:16 vertical"', explanation: 'Hikayeleriniz için dikey duvar kağıdı üretir.' }
         ]
     },
+
+    // ═════════════════════════════════════════
+    // WEB AUTOMATION & SCRAPING - V13
+    // ═════════════════════════════════════════
     {
-        id: 'LOOP', title: 'Loop (Döngü)', type: 'control', summary: 'Bir liste üzerinde tek tek işlem yapar.',
+        id: 'WEB_AUTOMATION', title: 'Web Automation', type: 'web', summary: 'Web sitesi otomasyonu (Tıkla/Yaz).',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🔄 Döngü Nedir?</h3>
-                <p>Elinizde bir liste varsa (Örn: 50 tane e-posta, 10 tane fotoğraf), bu düğüm her biri için akışı tekrar çalıştırır.</p>
+                <h3>🌍 Tarayıcıyı Kontrol Edin (RPA)</h3>
+                <p>Bu düğüm, sanki siz tıklıyormuşsunuz gibi bir web sitesine girer, butonlara basar, form doldurur ve veri çeker.</p>
+                <div class="tip-box">🔍 <strong>Selector Nedir?</strong> Hangi butona basılacağını belirtmek için CSS Selector kullanılır (Örn: <code>#login-button</code>).</div>
             </div>
             <div class="guide-section">
-                <h3>⚙️ Çalışma Mantığı</h3>
+                <h3>🛠️ Aksiyonlar</h3>
                 <ol>
-                    <li><strong>Giriş (Array):</strong> Listeyi alır (Örn: <code>{{gmail.emails}}</code>).</li>
-                    <li><strong>İşlem (Loop Body):</strong> Listedeki 1. elemanı alır, işlem yapar. Sonra 2. elemanı alır...</li>
-                    <li><strong>Bitiş (Done):</strong> Liste bitince "Loop End" portundan çıkar.</li>
+                    <li><strong>Go to URL:</strong> Siteye git.</li>
+                    <li><strong>Type:</strong> Metin kutusuna yazı yaz.</li>
+                    <li><strong>Click:</strong> Butona veya linke tıkla.</li>
+                    <li><strong>Wait:</strong> Yüklenmesini bekle.</li>
+                    <li><strong>Scrape:</strong> Metni veya resmi kaydet.</li>
                 </ol>
             </div>
         `,
-        params: [{ name: 'Items', type: 'Array', required: true, desc: 'İşlenecek liste verisi.' }],
-        outputs: [{ field: 'item', type: 'Any', desc: 'O an işlenen tekil eleman.' }, { field: 'index', type: 'Number', desc: 'Sıra numarası (0, 1, 2...)' }],
+        params: [
+            { name: 'URL', type: 'String', required: true, desc: 'Başlangıç adresi.' },
+            { name: 'Mode', type: 'Select', required: true, desc: 'Headless (Arkaplanda) / Visible (Ekranda görerek).' },
+            { name: 'Actions', type: 'List', required: true, desc: 'Sırasıyla yapılacak işlemler.' }
+        ],
+        outputs: [{ field: 'scrapedData', type: 'Object', desc: 'Toplanan veriler.' }],
         examples: [
-            { title: 'Toplu SMS Gönderimi', code: 'Items: {{google_sheets.rows}}\nAction: SMS Send (To: {{loop.item.phone}})', explanation: 'Excel listesindeki herkese sırayla SMS atar.' }
+            {
+                title: 'E-Ticaret Fiyat Takibi',
+                code: `1. Go to URL (amazon.com/product...)
+2. Scrape (Selector: #price-block, Variable: "fiyat")`,
+                explanation: 'Ürün sayfasına gider ve fiyatı okuyup değişkene kaydeder.'
+            }
         ]
     },
-
-    // ═════════════════════════════════════════
-    // WEB & API
-    // ═════════════════════════════════════════
     {
         id: 'HTTP_REQUEST', title: 'HTTP Request', type: 'web', summary: 'API isteği yap.',
         overviewHTML: `
@@ -361,94 +228,189 @@ Beklenen Çıktı: { 'date': '...', 'time': '...', 'location': '...' }"`,
     },
 
     // ═════════════════════════════════════════
-    // DEVICE & PHONE (Cihaz Kontrolü)
+    // WORKFLOW CHAINING - V13
     // ═════════════════════════════════════════
     {
-        id: 'NOTIFICATION', title: 'Notification', type: 'device', summary: 'Bildirim göster.',
+        id: 'EXECUTE_WORKFLOW', title: 'Sub-Workflow', type: 'control', summary: 'Başka bir akışı çalıştırır.',
         overviewHTML: `
             <div class="guide-section">
-                <h3>📱 Bildirim Gösterme</h3>
-                <p>Kullanıcıya bilgi vermek için telefonun kendi bildirim sistemini kullanır. Sesli uyarı veya titreşim de verebilir.</p>
+                <h3>🔗 Otomasyonları Birleştirme</h3>
+                <p>Bir akışın içinden başka bir akışı (Sub-Workflow) çağırmanıza yarar. Tekrar eden işler için "Fonksiyon" gibi kullanabilirsiniz.</p>
             </div>
-        `,
-        params: [
-            { name: 'Title', type: 'String', required: false, desc: 'Bildirim başlığı (Kalın yazı).' },
-            { name: 'Message', type: 'String', required: true, desc: 'Bildirim metni.' }
-        ],
-        outputs: [],
-        examples: [{ title: 'Akış Bitti Bilgisi', code: 'Title: BreviAI\nMessage: "Rapor başarıyla gönderildi! ✅"', explanation: 'İşlem tamamlanınca kullanıcıyı uyarır.' }]
-    },
-    {
-        id: 'APP_LAUNCH', title: 'Launch App', type: 'device', summary: 'Uygulama aç.',
-        overviewHTML: `
             <div class="guide-section">
-                <h3>🚀 Uygulama Başlatıcı</h3>
-                <p>Telefondaki yüklü bir uygulamayı açar. Rutinlerin sonunda kullanıcıyı yönlendirmek için harikadır.</p>
-            </div>
-             <div class="guide-section">
-                <h3>📦 Paket Adı (Package Name) Bulma</h3>
-                <p>Uygulamaların kimlik numarasıdır. Google Play linkine bakarak bulabilirsiniz: <code>id=com.whatsapp</code></p>
+                <h3>⚙️ Ayarlar</h3>
                 <ul>
-                    <li>WhatsApp: <code>com.whatsapp</code></li>
-                    <li>Youtube: <code>com.google.android.youtube</code></li>
-                    <li>Maps: <code>com.google.android.apps.maps</code></li>
+                    <li><strong>Wait for Completion:</strong> Çağırdığınız akış bitene kadar beklesin mi? (Evet derseniz sonucunu alabilirsiniz).</li>
+                    <li><strong>Pass Variables:</strong> Mevcut değişkenleri (Örn: Gelen SMS) alt akışa gönder.</li>
                 </ul>
             </div>
         `,
-        params: [{ name: 'Package Name', type: 'String', required: true, desc: 'Örn: com.instagram.android' }],
-        outputs: [],
-        examples: [{ title: 'Sabah Rutini', code: 'Package: com.spotify.music', explanation: 'Günaydın mesajı okunduktan sonra müziği açar.' }]
+        params: [
+            { name: 'Workflow', type: 'Select', required: true, desc: 'Çalıştırılacak otomasyon.' },
+            { name: 'Wait', type: 'Boolean', required: true, desc: 'Bitmesini bekle?' }
+        ],
+        outputs: [{ field: 'result', type: 'Any', desc: 'Alt akıştan dönen sonuç.' }],
+        examples: [
+            { title: 'Hata Bildirim Modülü', code: 'Select Workflow: "Yöneticiye Mesaj At"', explanation: 'Herhangi bir akışta hata olursa, bu hazır modülü çağırarak yöneticiye mesaj atar.' }
+        ]
     },
+
+    // ═════════════════════════════════════════
+    // SENSORS - V13
+    // ═════════════════════════════════════════
     {
-        id: 'BATTERY_CHECK', title: 'Battery Level', type: 'device', summary: 'Pil durumunu kontrol eder.',
+        id: 'LIGHT_SENSOR', title: 'Light Sensor', type: 'input', summary: 'Ortam ışığını ölçer.',
         overviewHTML: `
             <div class="guide-section">
-                <h3>🔋 Güç Yönetimi</h3>
-                <p>Şarj seviyesini (%) veya şarjda olup olmadığını (Charging) kontrol eder. "Pil azsa parlaklığı kıs" gibi senaryolarda kullanılır.</p>
+                <h3>💡 Işık Sensörü (Lux)</h3>
+                <p>Telefonun önündeki ışık sensörünü kullanarak ortamın aydınlık seviyesini (Lux) ölçer.</p>
+            </div>
+        `,
+        params: [{ name: 'Variable', type: 'String', required: true, desc: 'Sonucu kaydetmek için değişken adı.' }],
+        outputs: [{ field: 'lux', type: 'Number', desc: '0 (Karanlık) - 10000 (Güneşli)' }],
+        examples: [{ title: 'Gece Okuma Modu', code: 'IF {{lux}} < 10 THEN Ekran Parlaklığını Kıs', explanation: 'Ortam karanıksa ekranı otomatik karartır.' }]
+    },
+    {
+        id: 'PEDOMETER', title: 'Pedometer', type: 'input', summary: 'Adım sayar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>👣 Adımsayar</h3>
+                <p>Bugün attığınız adım sayısını verir.</p>
             </div>
         `,
         params: [],
-        outputs: [{ field: 'level', type: 'Number', desc: '0 ile 100 arası pil yüzdesi.' }, { field: 'isCharging', type: 'Boolean', desc: 'Şarj oluyor mu?' }],
-        examples: [{ title: 'Düşük Pil Uyarısı', code: 'IF {{battery.level}} < 20', explanation: 'Pil %20 altına düştüyse tasarruf modunu aç.' }]
+        outputs: [{ field: 'steps', type: 'Number', desc: 'Günlük adım sayısı.' }],
+        examples: [{ title: 'Hedef Takibi', code: 'IF {{steps}} >= 10000 THEN Bildirim: "Hedefe Ulaştın!"', explanation: '10 bin adıma ulaşınca kutlama mesajı atar.' }]
+    },
+    {
+        id: 'MAGNETOMETER', title: 'Compass', type: 'input', summary: 'Pusula ve yön bilgisi.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🧭 Manyetometre</h3>
+                <p>Telefonun hangi yöne (Kuzey, Güney vb.) baktığını derece cinsinden verir.</p>
+            </div>
+        `,
+        params: [],
+        outputs: [{ field: 'azimuth', type: 'Number', desc: '0-360 derece (0=Kuzey).' }],
+        examples: [{ title: 'Kıble Bulucu', code: 'Yönü göster', explanation: 'Basit yön bulma uygulaması.' }]
+    },
+
+    // ═════════════════════════════════════════
+    // TRIGGERS (Tetikleyiciler) - EXISTING
+    // ═════════════════════════════════════════
+    {
+        id: 'MANUAL', title: 'Manual Trigger', type: 'trigger', summary: 'Akışı elle veya butonla başlatır.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔍 Nasıl Çalışır?</h3>
+                <p>Bu düğüm, akışın başlangıç noktasıdır. Genellikle test amaçlı veya kullanıcının bir butona basarak başlattığı senaryolarda kullanılır.</p>
+                <div class="tip-box">💡 <strong>İpucu:</strong> Akışınızı test ederken her zaman bu düğümü kullanın. "Play" butonuna bastığınızda bu düğüm tetiklenir.</div>
+            </div>
+        `,
+        params: [{ name: 'Form Fields', type: 'Array', required: false, desc: 'Kullanıcıdan istenecek verilerin listesi (JSON formatında).' }],
+        outputs: [{ field: 'formData', type: 'Object', desc: 'Kullanıcının girdiği veriler. Örn: {{formData.query}}' }],
+        examples: [{ title: 'Test Başlatma', code: 'Play butonuna bas', explanation: 'Akışı çalıştırır.' }]
+    },
+    {
+        id: 'TIME_TRIGGER', title: 'Cron / Interval', type: 'trigger', summary: 'Zamanlanmış görevler oluşturur.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>⏰ Zamanlayıcı</h3>
+                <p>Bu düğüm, akışın sizin müdahaleniz olmadan, belirli zamanlarda otomatik çalışmasını sağlar.</p>
+            </div>
+        `,
+        params: [
+            { name: 'Mode', type: 'Select', required: true, desc: 'Interval (Basit) veya Cron (Gelişmiş).' },
+            { name: 'Value', type: 'String', required: true, desc: 'Dakika sayısı veya Cron ifadesi.' }
+        ],
+        outputs: [{ field: 'timestamp', type: 'Number', desc: 'Tetiklenme zamanı.' }],
+        examples: [{ title: 'Her Sabah 08:30 (Cron)', code: '30 8 * * *', explanation: 'Sabah 08:30\'da çalışır.' }]
+    },
+    {
+        id: 'NOTIFICATION_TRIGGER', title: 'Notification Trigger', type: 'trigger', summary: 'Gelen bildirimleri yakalar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔔 Bildirim Yakalama</h3>
+                <p>Telefonunuza gelen herhangi bir bildirimi (WhatsApp, Banka, SMS) okuyarak tetiklenir.</p>
+            </div>
+        `,
+        params: [
+            { name: 'App Name', type: 'String', required: true, desc: 'Uygulamanın adı (Örn: WhatsApp).' },
+            { name: 'Filter', type: 'String', required: false, desc: 'Filtre kelimesi.' }
+        ],
+        outputs: [{ field: 'text', type: 'String', desc: 'Bildirim içeriği.' }],
+        examples: [{ title: 'Banka SMS Takibi', code: 'App: Mesajlar\nFilter: Harcama', explanation: 'SMS gelince harcamayı kaydeder.' }]
+    },
+
+    // ═════════════════════════════════════════
+    // LOGIC & CONTROL
+    // ═════════════════════════════════════════
+    {
+        id: 'IF_ELSE', title: 'IF / Else', type: 'control', summary: 'Karar verme mekanizması.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🤔 Karar Ağacı</h3>
+                <p>Akışın gidişatını bir koşula göre değiştirir.</p>
+            </div>
+        `,
+        params: [{ name: 'Condition', type: 'Expression', required: true, desc: 'JavaScript mantıksal ifadesi.' }],
+        outputs: [],
+        examples: [{ title: 'Koşullu Çalışma', code: '{{fiyat}} > 100', explanation: 'Fiyat 100\'den büyükse çalışır.' }]
+    },
+    {
+        id: 'LOOP', title: 'Loop (Döngü)', type: 'control', summary: 'Liste üzerinde işlem yapar.',
+        overviewHTML: `
+            <div class="guide-section">
+                <h3>🔄 Döngü</h3>
+                <p>Elinizde bir liste varsa, bu düğüm her biri için akışı tekrar çalıştırır.</p>
+            </div>
+        `,
+        params: [{ name: 'Items', type: 'Array', required: true, desc: 'İşlenecek liste.' }],
+        outputs: [{ field: 'item', type: 'Any', desc: 'Tekil eleman.' }],
+        examples: [{ title: 'Toplu İşlem', code: 'Items: {{emails}}', explanation: 'Her e-posta için işlem yapar.' }]
+    },
+
+    // ═════════════════════════════════════════
+    // DEVICE & PHONE
+    // ═════════════════════════════════════════
+    {
+        id: 'NOTIFICATION', title: 'Notification', type: 'device', summary: 'Bildirim göster.',
+        overviewHTML: '<p>Kullanıcıya bildirim gösterir.</p>',
+        params: [{ name: 'Message', type: 'String', required: true, desc: 'Mesaj.' }],
+        outputs: [],
+        examples: [{ title: 'Bilgi Ver', code: 'Message: "İşlem Tamam!"', explanation: 'Bittiğinde haber verir.' }]
+    },
+    {
+        id: 'BATTERY_CHECK', title: 'Battery Check', type: 'device', summary: 'Pil durumunu sorgular.',
+        overviewHTML: '<p>Pil seviyesini kontrol eder.</p>',
+        params: [],
+        outputs: [{ field: 'level', type: 'Number', desc: 'Pil yüzdesi.' }],
+        examples: [{ title: 'Pil Kontrolü', code: 'IF {{level}} < 20', explanation: 'Pil azsa uyarır.' }]
+    },
+    {
+        id: 'APP_LAUNCH', title: 'Launch App', type: 'device', summary: 'Uygulama aç.',
+        overviewHTML: '<p>Telefondaki bir uygulamayı başlatır.</p>',
+        params: [{ name: 'Package Name', type: 'String', required: true, desc: 'Örn: com.whatsapp' }],
+        outputs: [],
+        examples: [{ title: 'Spotify Aç', code: 'com.spotify.music', explanation: 'Müzik uygulamasını açar.' }]
     },
 
     // ═════════════════════════════════════════
     // GOOGLE & SOCIAL
     // ═════════════════════════════════════════
     {
-        id: 'GMAIL_SEND', title: 'Gmail Send', type: 'google', summary: 'E-posta gönderir.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>✉️ Gmail Otomasyonu</h3>
-                <p>Sizin adınıza (connected account) e-posta gönderir. Dosya eki (Attachment) ve HTML formatını destekler.</p>
-            </div>
-            <div class="guide-section">
-                <h3>🔑 Yetkilendirme</h3>
-                <p>Bu düğümü kullanmak için BreviAI'ye Google hesabınızla giriş yapıp izin vermeniz (Sign in with Google) yeterlidir.</p>
-            </div>
-        `,
-        params: [
-            { name: 'To', type: 'String', required: true, desc: 'Alıcı e-posta adresi.' },
-            { name: 'Subject', type: 'String', required: true, desc: 'Konu.' },
-            { name: 'Body', type: 'Text', required: true, desc: 'Mesaj içeriği (HTML olabilir).' }
-        ],
+        id: 'GMAIL_SEND', title: 'Gmail Send', type: 'google', summary: 'E-posta gönder.',
+        overviewHTML: '<p>Gmail üzerinden e-posta atar.</p>',
+        params: [{ name: 'To', type: 'String', required: true, desc: 'Alıcı.' }, { name: 'Subject', type: 'String', required: true, desc: 'Konu.' }],
         outputs: [],
-        examples: [{ title: 'Günlük Rapor', code: 'To: patron@sirket.com\nSubject: Günlük Satışlar\nBody: {{report.text}}', explanation: 'Hazırlanan raporu yöneticiye mail atar.' }]
+        examples: [{ title: 'Mail At', code: 'To: me@test.com', explanation: 'Mail gönderir.' }]
     },
     {
-        id: 'SHEETS_WRITE', title: 'Sheets Row', type: 'google', summary: 'Google tablosuna satır ekler.',
-        overviewHTML: `
-            <div class="guide-section">
-                <h3>📊 Veri Kaydı</h3>
-                <p>Google Sheets dosyanıza yeni bir satır ekler. En çok form verilerini, harcamaları veya müşteri kayıtlarını saklamak için kullanılır.</p>
-            </div>
-        `,
-        params: [
-            { name: 'Spreadsheet ID', type: 'String', required: true, desc: 'Dosya URL\'sindeki uzun kod.' },
-            { name: 'Values', type: 'Array', required: true, desc: 'Sırasıyla sütunlara yazılacak veriler: ["Ali", "500 TL", "Onaylandı"]' }
-        ],
+        id: 'SHEETS_WRITE', title: 'Sheets Row', type: 'google', summary: 'Satır ekle.',
+        overviewHTML: '<p>Google Sheets\'e satır ekler.</p>',
+        params: [{ name: 'Spreadsheet ID', type: 'String', required: true, desc: 'ID.' }, { name: 'Values', type: 'Array', required: true, desc: '["A", "B"]' }],
         outputs: [],
-        examples: [{ title: 'Harcama Ekleme', code: 'Values: ["Kahve", "80 TL", "{{date}}"]', explanation: 'Harcamayı tarihle birlikte tabloya kaydeder.' }]
+        examples: [{ title: 'Veri Kaydet', code: 'Values: ["Test", 123]', explanation: 'Veriyi kaydeder.' }]
     }
 ];
 
@@ -483,12 +445,12 @@ export default function DocsPage() {
             <aside className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
                     <div className={styles.logo}>BreviAI Encyclopedia</div>
-                    <div className={styles.version}>v12.0</div>
+                    <div className={styles.version}>v13.0</div>
                 </div>
                 <div className={styles.searchContainer}>
                     <input
                         type="text"
-                        placeholder="Rehberde ara..."
+                        placeholder="Ara (Realtime, Web...)"
                         className={styles.searchInput}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -574,7 +536,6 @@ export default function DocsPage() {
                             {selectedNode.outputs.length > 0 && (
                                 <div className={styles.outputSection}>
                                     <h3 className={styles.sectionHeader}>Çıktılar (Outputs)</h3>
-                                    <p className={styles.textMuted}>Bu düğüm çalıştıktan sonra elinizde şu veriler olur:</p>
                                     <ul className={styles.outputList}>
                                         {selectedNode.outputs.map((o, i) => (
                                             <li key={i}><code className={styles.outputField}>{o.field}</code> ({o.type}): {o.desc}</li>
