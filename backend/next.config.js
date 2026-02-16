@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     // Enable experimental features for better performance
+    trailingSlash: true,
     eslint: {
         ignoreDuringBuilds: true,
     },

@@ -1,6 +1,6 @@
 import styles from './docs.module.css';
 
-export const dynamic = 'force-static';
+
 
 export default function DocsPage() {
     return (
