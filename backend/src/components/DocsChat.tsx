@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import styles from '../pages/docs_chat.module.css';
 import { NODES } from '../data/docsData';
@@ -14,11 +13,63 @@ interface DocsChatProps {
     onNavigate: (nodeId: string) => void;
 }
 
+// Intent Logic: Simple keyword matching for smarter responses
+const checkIntent = (query: string) => {
+    const q = query.toLowerCase();
+
+    // 1. Google Drive & Dosya
+    if (q.includes('drive') || (q.includes('google') && q.includes('dosya'))) {
+        const related = NODES.filter(n => n.title.toLowerCase().includes('drive'));
+        return {
+            text: "Google Drive dosyalarınızı yönetmek için 'Google Drive' düğümlerini kullanabilirsiniz. Dosya yüklemek için 'Upload', listelemek için 'List' düğümünü seçin. Bağlantı sorunu yaşıyorsanız hesabınızı yeniden yetkilendirmeyi deneyin.",
+            links: related.map(n => ({ id: n.id, title: n.title }))
+        };
+    }
+
+    // 2. WhatsApp
+    if (q.includes('whatsapp') || q.includes('mesaj')) {
+        const related = NODES.filter(n => n.title.toLowerCase().includes('whatsapp'));
+        return {
+            text: "WhatsApp entegrasyonu ile otomatik mesaj atabilirsiniz. Mesaj gitmiyorsa 'Servis Durumu'nun 'Connected' olduğundan emin olun.",
+            links: related.map(n => ({ id: n.id, title: n.title }))
+        };
+    }
+
+    // 3. Excel / Sheets
+    if (q.includes('excel') || q.includes('sheet') || q.includes('tablo')) {
+        const related = NODES.filter(n => n.title.toLowerCase().includes('sheet'));
+        return {
+            text: "Verilerinizi Google Sheets veya Excel'e kaydetmek için 'Add Row' düğümünü kullanın. Veri okumak için 'Read Sheet' düğümü mevcuttur.",
+            links: related.map(n => ({ id: n.id, title: n.title }))
+        };
+    }
+
+    // 4. Zamanlayıcı / Cron
+    if (q.includes('zaman') || q.includes('saat') || q.includes('her gün') || q.includes('cron')) {
+        const related = NODES.filter(n => n.title.toLowerCase().includes('cron'));
+        return {
+            text: "Periyodik işlemler (her sabah, her saat başı vb.) için 'Cron Job' tetikleyicisini kullanabilirsiniz.",
+            links: related.map(n => ({ id: n.id, title: n.title }))
+        };
+    }
+
+    // 5. AI / Yapay Zeka
+    if (q.includes('ai') || q.includes('zeka') || q.includes('gpt')) {
+        const related = NODES.filter(n => n.type === 'ai' || n.title.toLowerCase().includes('ai'));
+        return {
+            text: "AI Agent ve Text Generator düğümleri ile GPT-4 veya Gemini modellerini kullanabilirsiniz.",
+            links: related.slice(0, 3).map(n => ({ id: n.id, title: n.title }))
+        };
+    }
+
+    return null;
+};
+
 const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', text: '👋 Merhaba! BreviAI dokümantasyon asistanıyım. Ne aramıştınız?', sender: 'bot' }
+        { id: '1', text: '👋 Merhaba! BreviAI dokümantasyon asistanıyım. "Drive nasıl bağlanır?", "WhatsApp mesaj sorunu" gibi konularda yardımcı olabilirim.', sender: 'bot' }
     ]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -37,29 +88,40 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
         setMessages(prev => [...prev, userMsg]);
         setInput('');
 
-        // Simple Search Logic
         const query = input.toLowerCase();
-        const results = NODES.filter(n =>
-            n.title.toLowerCase().includes(query) ||
-            n.tags.some(t => t.includes(query)) ||
-            n.summary.toLowerCase().includes(query)
-        ).slice(0, 3); // Top 3 results
 
+        // Simulate thinking delay
         setTimeout(() => {
             let botText = '';
             let links: { id: string, title: string }[] = [];
 
-            if (results.length > 0) {
-                botText = `Şunları buldum:`;
-                links = results.map(n => ({ id: n.id, title: n.title }));
+            // 1. Intent Check
+            const intent = checkIntent(query);
+            if (intent) {
+                botText = intent.text;
+                links = intent.links || [];
             } else {
-                // Fallback check for common keywords
-                if (query.includes('fiyat') || query.includes('ücret')) {
-                    botText = 'Fiyatlandırma hakkında bilgi için ana sayfadaki "Pricing" bölümüne bakabilirsiniz.';
-                } else if (query.includes('destek') || query.includes('iletişim')) {
-                    botText = 'Destek için support@breviai.com adresine mail atabilirsiniz.';
+                // 2. Search Fallback
+                const results = NODES.filter(n =>
+                    n.title.toLowerCase().includes(query) ||
+                    n.summary.toLowerCase().includes(query) ||
+                    (n.tags && n.tags.some(t => t.includes(query)))
+                ).slice(0, 3);
+
+                if (results.length > 0) {
+                    botText = 'Aradığınız konuyla ilgili şunları buldum:';
+                    links = results.map(n => ({ id: n.id, title: n.title }));
                 } else {
-                    botText = 'Üzgünüm, bununla ilgili doğrudan bir düğüm bulamadım. Farklı bir kelime dener misiniz?';
+                    // 3. Conversational Fallback
+                    if (query.includes('merhaba') || query.includes('selam')) {
+                        botText = 'Merhaba! Size nasıl yardımcı olabilirim?';
+                    } else if (query.includes('teşekkür')) {
+                        botText = 'Rica ederim! Başka sorunuz var mı?';
+                    } else if (query.includes('hata')) {
+                        botText = 'Hata kodlarıyla ilgili detaylar için "SSS & Hata" bölümüne bakabilirsiniz.';
+                    } else {
+                        botText = 'Üzgünüm, bunu tam anlayamadım. Lütfen "Drive", "WhatsApp", "API" gibi anahtar kelimeler kullanmayı deneyin.';
+                    }
                 }
             }
 
@@ -69,7 +131,7 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
                 sender: 'bot',
                 links
             }]);
-        }, 600);
+        }, 700);
     };
 
     return (
@@ -85,10 +147,16 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
             {isOpen && (
                 <div className={styles.chatWindow}>
                     <div className={styles.chatHeader}>
-                        <span>🤖 Docs Asistan</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '1.2rem' }}>🤖</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontWeight: 600 }}>Docs Asistan</span>
+                                <span style={{ fontSize: '0.7rem', opacity: 0.8, fontWeight: 400 }}>Online</span>
+                            </div>
+                        </span>
                         <button
                             onClick={() => setIsOpen(false)}
-                            style={{ background: 'transparent', border: 'none', color: '#9CA3AF', cursor: 'pointer', fontSize: '1.2rem' }}
+                            style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: '1.2rem', opacity: 0.7 }}
                         >
                             ✕
                         </button>
@@ -101,23 +169,29 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
                                     {msg.text}
                                 </div>
                                 {msg.links && msg.links.length > 0 && (
-                                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                                    <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem', width: '100%' }}>
                                         {msg.links.map(link => (
                                             <button
                                                 key={link.id}
                                                 onClick={() => onNavigate(link.id)}
                                                 style={{
-                                                    background: '#374151',
-                                                    border: '1px solid #4B5563',
-                                                    color: '#60A5FA',
-                                                    padding: '0.4rem 0.8rem',
-                                                    borderRadius: '6px',
+                                                    background: 'rgba(255, 255, 255, 0.05)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                    color: '#A5B4FC',
+                                                    padding: '0.6rem 0.8rem',
+                                                    borderRadius: '8px',
                                                     cursor: 'pointer',
                                                     fontSize: '0.85rem',
-                                                    textAlign: 'left'
+                                                    textAlign: 'left',
+                                                    transition: 'all 0.2s',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px'
                                                 }}
+                                                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                                                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                                             >
-                                                👉 {link.title}
+                                                <span>📄</span> {link.title}
                                             </button>
                                         ))}
                                     </div>
@@ -130,7 +204,7 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
                     <div className={styles.chatInputArea}>
                         <input
                             className={styles.chatInput}
-                            placeholder="Bir şeyler sorun..."
+                            placeholder="Bir şeyler sorun... (Örn: Drive bağla)"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
