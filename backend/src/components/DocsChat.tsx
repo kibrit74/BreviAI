@@ -79,6 +79,7 @@ const DocsChat: React.FC<DocsChatProps> = ({ onNavigate }) => {
 
     useEffect(() => {
         scrollToBottom();
+        console.log('DocsChat v2.1 Activated');
     }, [messages, isOpen]);
 
     const handleSend = () => {
