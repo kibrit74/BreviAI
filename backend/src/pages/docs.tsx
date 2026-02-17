@@ -128,6 +128,241 @@ const STATIC_SECTIONS = {
                     <h3>3. "Client not ready" Hatası</h3>
                     <p><strong>Çözüm:</strong> Backend servisi WhatsApp'a henüz bağlanmamıştır. Birkaç saniye bekleyin veya servisi yeniden başlatın.</p>
                 </div>
+
+                <div className={styles.faqItem}>
+                    <h3>4. Cron Job Çalışmıyor</h3>
+                    <p><strong>Çözüm:</strong> Time Trigger kullanıyorsanız sunucu saat diliminin (Timezone) doğru ayarlandığından emin olun. Varsayılan GMT+3 (Europe/Istanbul) olmalıdır.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>5. AI Cevap Vermiyor (Timeout)</h3>
+                    <p><strong>Çözüm:</strong> Çok uzun promptlar veya yavaş modeller (örn: GPT-4) zaman aşımına uğrayabilir. <code>Timeout</code> süresini artırın veya daha hızlı bir model (Gemini Flash) seçin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>6. Webhook Tetiklenmiyor</h3>
+                    <p><strong>Çözüm:</strong> Webhook URL'sinin doğru kopyalandığından ve gönderilen isteğin metodunun (GET/POST) düğüm ayarlarıyla eşleştiğinden emin olun.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>7. Excel Dosyasını Okuyamıyorum</h3>
+                    <p><strong>Çözüm:</strong> Dosyanın OneDrive veya Google Drive üzerinde olduğundan ve BreviAI'ye gerekli okuma izinlerinin verildiğinden emin olun. Yerel dosyalar desteklenmez.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>8. Instagram Post Hatası</h3>
+                    <p><strong>Çözüm:</strong> Instagram Business hesabınızın Facebook Sayfası ile bağlantılı olması gerekir. Kişisel profiller API desteği sunmaz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>9. Değişkenler Çalışmıyor ({{ variable }})</h3>
+                    <p><strong>Çözüm:</strong> Değişken isminin tam olarak doğru yazıldığından emin olun (büyük/küçük harf duyarlı). Bir önceki düğümün çıktısını kontrol etmek için "Test Run" yapın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>10. "ReferenceError: x is not defined"</h3>
+                    <p><strong>Çözüm:</strong> Kullanmaya çalıştığınız değişken henüz tanımlanmamış. Değişkeni üreten düğümün, mevcut düğümden ÖNCE çalıştığından emin olun.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>11. Sesli Asistan Beni Duymuyor</h3>
+                    <p><strong>Çözüm:</strong> Tarayıcı veya uygulama mikrofon izninin verildiğini kontrol edin. Gürültülü ortamlarda "Silence Threshold" ayarını artırın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>12. Döngü (Loop) Sonsuza Girdi</h3>
+                    <p><strong>Çözüm:</strong> Loop içinde "Wait" düğümü yoksa sistem çok hızlı çalışıp kitlenebilir. Her iterasyona en az 1 saniye bekleme ekleyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>13. API Rate Limit Hatası (429)</h3>
+                    <p><strong>Çözüm:</strong> Çok sık istek atıyorsunuz. Loop kullanıyorsanız "Batch Size" küçültün veya araya "Wait" ekleyerek istekleri yavaşlatın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>14. PDF Oluşturma Bozuk Görünüyor</h3>
+                    <p><strong>Çözüm:</strong> Kullandığınız HTML şablonunda desteklenmeyen CSS özellikleri olabilir. Flexbox yerine daha basit Table yapısı kullanmayı deneyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>15. Konum (Geofence) Algılamıyor</h3>
+                    <p><strong>Çözüm:</strong> GPS'in açık olduğundan ve uygulamanın "Arka Planda Konum Kullanımı" iznine sahip olduğundan emin olun. Radius'u 200m altına düşürmeyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>16. Bildirim Yakalama Gecikiyor</h3>
+                    <p><strong>Çözüm:</strong> Bazı telefon markaları (Xiaomi, Huawei) arka plan uygulamalarını agresif şekilde kapatır. Pil ayarlarından BreviAI için "Kısıtlama Yok" seçin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>17. "Network Error" Alıyorum</h3>
+                    <p><strong>Çözüm:</strong> İnternet bağlantınızı kontrol edin. Eğer yerel bir sunucu (Localhost) kullanıyorsanız, telefondan erişmek için aynı Wi-Fi ağında olmalısınız.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>18. Image Generator Siyah Çıktı Veriyor</h3>
+                    <p><strong>Çözüm:</strong> "Safety Filter"a takılmış olabilirsiniz. Prompt içeriğinde yasaklı kelimeler (şiddet, +18 vb.) olup olmadığını kontrol edin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>19. Hafıza (Memory) Hatırlamıyor</h3>
+                    <p><strong>Çözüm:</strong> "Min Similarity" ayarı çok yüksek olabilir (örn: 0.9). Bunu 0.7 veya 0.6 seviyesine düşürerek daha esnek arama yapın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>20. Pro Lisans Hatası</h3>
+                    <p><strong>Çözüm:</strong> Lisans anahtarınızın süresi dolmuş veya başka bir cihazda kullanılıyor olabilir. Ayarlar &gt; Hesap sayfasından durumu kontrol edin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>21. JavaScript "Code" Düğümü Kütüphane Desteği</h3>
+                    <p><strong>Soru:</strong> npm paketlerini import edebilir miyim?<br /><strong>Cevap:</strong> Güvenlik nedeniyle harici npm paketleri yüklenemez. Ancak <code>lodash</code>, <code>moment</code> ve <code>axios</code> yerleşik olarak gelir.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>22. Değişken Tipi Dönüşümü</h3>
+                    <p><strong>Soru:</strong> Metin olarak gelen "100" sayısını matematikte nasıl kullanırım?<br /><strong>Cevap:</strong> Code düğümünde <code>parseInt(input)</code> kullanın veya Code düğümü olmadan matematiksel işlem yapıyorsanız sistem otomatik dener.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>23. Akışları Dışa/İçe Aktarma</h3>
+                    <p><strong>Soru:</strong> Akışımı arkadaşıma nasıl gönderirim?<br /><strong>Cevap:</strong> Editörde sağ üst menüden "Export JSON" diyerek indirin. Diğer kişi "Import Workflow" ile yükleyebilir.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>24. Büyük Listeleri Bölme (Batching)</h3>
+                    <p><strong>Soru:</strong> 5000 kişiye mail atınca sistem donuyor.<br /><strong>Cevap:</strong> "Split Batches" düğümü kullanın. Listenizi 50'şerli gruplara bölün ve Loop içine "Wait 5s" ekleyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>25. Paralel Kolların Birleşmesi</h3>
+                    <p><strong>Soru:</strong> İki farklı koldan gelen veriyi nasıl birleştiririm?<br /><strong>Cevap:</strong> "Merge" düğümü kullanın. "Wait for both" seçeneğini işaretleyerek iki kolun da bitmesini bekleyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>26. OAuth vs API Key</h3>
+                    <p><strong>Soru:</strong> Hangisini kullanmalıyım?<br /><strong>Cevap:</strong> Mümkünse her zaman OAuth (kullanıcı girişi) kullanın. Daha güvenlidir ve token yenilemeyi sistem otomatik yapar.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>27. Gizli Mod (Incognito)</h3>
+                    <p><strong>Soru:</strong> Akış loglarının tutulmamasını sağlayabilir miyim?<br /><strong>Cevap:</strong> Akış ayarlarından "Log Level: None" seçerseniz hiçbir veri veritabanına kaydedilmez.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>28. Docker / Self-Hosted</h3>
+                    <p><strong>Soru:</strong> Kendi sunucumda barındırabilir miyim?<br /><strong>Cevap:</strong> Evet, Enterprise lisans sahipleri Docker imajını kendi sunucularına (On-Premise) kurabilir.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>29. Veritabanı Bağlantısı</h3>
+                    <p><strong>Soru:</strong> MySQL veya PostgreSQL'e bağlanabilir miyim?<br /><strong>Cevap:</strong> Evet, "SQL Query" düğümü ile bağlantı stringi girerek sorgu çalıştırabilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>30. Geçmiş Versiyona Dönüş</h3>
+                    <p><strong>Soru:</strong> Yanlışlıkla akışı bozdum, geri alabilir miyim?<br /><strong>Cevap:</strong> "History" sekmesinden son 50 değişikliği görebilir ve tek tıkla geri yükleyebilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>31. Karanlık Mod Ayarı</h3>
+                    <p><strong>Soru:</strong> Tema ayarı kayboluyor.<br /><strong>Cevap:</strong> Tema tercihi tarayıcı çerezi (cookie) olarak saklanır. Çerezleri temizlerseniz varsayılana döner.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>32. Klavye Kısayolları</h3>
+                    <p><strong>Soru:</strong> Hızlı işlem menüsü var mı?<br /><strong>Cevap:</strong> Editörde <code>Ctrl + K</code> (Mac: Cmd + K) basarak komut paletini açabilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>33. "Wait" Düğümü Hassasiyeti</h3>
+                    <p><strong>Soru:</strong> Milisaniye cinsinden bekletebilir miyim?<br /><strong>Cevap:</strong> Hayır, minimum bekleme süresi 1 saniyedir. Daha kısa süreler için Code düğümünde <code>await new Promise(...)</code> kullanabilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>34. Switch Büyük/Küçük Harf</h3>
+                    <p><strong>Soru:</strong> "Evet" ile "evet" farklı algılanıyor.<br /><strong>Cevap:</strong> Switch düğümü varsayılan olarak harf duyarlıdır (Case Sensitive). Ayarlardan "Case Insensitive" kutusunu işaretleyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>35. Regex Test Etme</h3>
+                    <p><strong>Soru:</strong> Yazdığım Regex'in çalıştığını nasıl anlarım?<br /><strong>Cevap:</strong> Notification Trigger içindeki "Test Regex" butonunu kullanın veya regex101.com sitesinden yardım alın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>36. Dosya Boyut Sınırı</h3>
+                    <p><strong>Soru:</strong> Maksimum kaç MB dosya yükleyebilirim?<br /><strong>Cevap:</strong> Cloud sürümde 25MB, Self-Hosted sürümde sunucu ayarına bağlıdır (genellikle 100MB).</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>37. Desteklenen Görsel Formatları</h3>
+                    <p><strong>Soru:</strong> HEIC dosyalarını işleyebilir miyim?<br /><strong>Cevap:</strong> Sistem JPG, PNG ve WebP destekler. HEIC formatındaki fotoğraflar otomatik olarak JPG'ye çevrilir.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>38. Hata Yakalama (Try/Catch)</h3>
+                    <p><strong>Soru:</strong> Bir düğüm hata verirse akış durmasın istiyorum.<br /><strong>Cevap:</strong> Düğüm ayarlarında "Continue on Error" seçeneğini aktif edin. Hata çıktısını bir sonraki düğümde kontrol edebilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>39. Bildirim Kanalları</h3>
+                    <p><strong>Soru:</strong> Sadece Push bildirimi gönderemez miyim?<br /><strong>Cevap:</strong> Evet, "App Push" düğümü ile sadece BreviAI mobil uygulamasına bildirim gönderebilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>40. Tetikleyici Çakışması (Overlap)</h3>
+                    <p><strong>Soru:</strong> Akış bitmeden tekrar tetiklenirse ne olur?<br /><strong>Cevap:</strong> Varsayılan olarak yeni bir "Execution" başlar ve paralel çalışır. Bunu engellemek için akış ayarlarında "Sequential Mode" seçin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>41. Manual Trigger Form Tipleri</h3>
+                    <p><strong>Soru:</strong> Formda tarih seçici var mı?<br /><strong>Cevap:</strong> Evet, Input Schema'da tip olarak <code>Date</code>, <code>Time</code>, <code>Select</code>, <code>Number</code> ve <code>Boolean</code> seçebilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>42. Alt Akış (Sub-workflow) Limiti</h3>
+                    <p><strong>Soru:</strong> İç içe kaç akış çağırabilirim?<br /><strong>Cevap:</strong> Maksimum derinlik 5'tir. Bu, sonsuz döngüleri engellemek için konulmuş bir sınırdır.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>43. Yaz Saati Uygulaması (DST)</h3>
+                    <p><strong>Soru:</strong> Saatler ileri/geri alınınca Cron bozulur mu?<br /><strong>Cevap:</strong> Timezone ayarı (Europe/Istanbul) seçiliyse sistem DST değişikliklerini otomatik yönetir.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>44. Türkçe Karakter Sorunu</h3>
+                    <p><strong>Soru:</strong> CSV çıktısında Ş, İ, Ğ harfleri bozuk çıkıyor.<br /><strong>Cevap:</strong> Dosya oluştururken encoding olarak "UTF-8 with BOM" seçtiğinizden emin olun.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>45. HTML to PDF Tasarımı</h3>
+                    <p><strong>Soru:</strong> CSS Grid neden çalışmıyor?<br /><strong>Cevap:</strong> PDF motoru eski web standartlarını kullanır. Modern CSS (Grid, Flexbox gap) yerine <code>table</code>, <code>block</code> ve <code>inline-block</code> kullanın.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>46. Önbellek Temizleme</h3>
+                    <p><strong>Soru:</strong> Yaptığım değişiklikler görünmüyor.<br /><strong>Cevap:</strong> Tarayıcınızda <code>Ctrl + Shift + R</code> yaparak önbelleği yok sayıp yenileyin (Hard Reload).</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>47. Destek Talebi Önceliği</h3>
+                    <p><strong>Soru:</strong> Acil durumlarda nasıl hızlı destek alırım?<br /><strong>Cevap:</strong> Pro ve Enterprise müşterileri "Priority Support" hakkına sahiptir. Talebinize "URGENT" etiketi ekleyin.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>48. Topluluk Forumu</h3>
+                    <p><strong>Soru:</strong> Diğer kullanıcıların akışlarını görebilir miyim?<br /><strong>Cevap:</strong> community.breviai.com adresinden şablon paylaşım platformuna erişebilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>49. Özellik İsteği</h3>
+                    <p><strong>Soru:</strong> Yeni bir düğüm eklenmesini istiyorum.<br /><strong>Cevap:</strong> GitHub repomuzda "Feature Request" açabilir veya toplulukta oylamaya sunabilirsiniz.</p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>50. API Dokümantasyonu</h3>
+                    <p><strong>Soru:</strong> Kendi uygulamamdan BreviAI'yi nasıl kontrol ederim?<br /><strong>Cevap:</strong> developers.breviai.com adresinde REST API ve WebSocket dokümantasyonu mevcuttur.</p>
+                </div>
             </>
         )
     }
