@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import Head from 'next/head';
 import styles from './docs.module.css';
 import { NODES, CATS } from '../data/docsData';
+import DocsChat from '../components/DocsChat';
 import { ReactNode } from 'react';
 
 // --- Types ---
@@ -693,6 +694,13 @@ export default function DocsPage() {
             {renderSidebar()}
 
             {currentSection === 'nodes' ? renderNodeDetail() : renderStaticSection()}
+
+            <DocsChat onNavigate={(id) => {
+                setSelectedNodeId(id);
+                setCurrentSection('nodes');
+                setActiveTab('overview');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }} />
 
         </div>
     );
