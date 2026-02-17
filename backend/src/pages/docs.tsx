@@ -48,34 +48,72 @@ const STATIC_SECTIONS = {
         content: (
             <>
                 <h2>Veri Akışı ve JSON</h2>
-                <p>BreviAI'de düğümler arasındaki veri alışverişi <strong>JSON</strong> formatında olur. Bir düğümün çıktısı, kendisinden sonra gelen düğümün girdisi olur.</p>
+                <p>BreviAI'de tüm veriler düğümler arasında <strong>JSON (JavaScript Object Notation)</strong> formatında akar. Her düğüm bir girdi (Input) alır ve işlem yaptıktan sonra bir çıktı (Output) üretir. Bu çıktı, kendisinden sonra gelen tüm düğümler tarafından kullanılabilir.</p>
 
                 <div className={styles.codeBlock}>
                     <pre>{`[
   {
     "id": 1,
-    "name": "Örnek Müşteri",
-    "email": "ornek@breviai.com"
+    "user": {
+        "name": "Ahmet Yılmaz",
+        "email": "ahmet@ornek.com"
+    },
+    "message": "Merhaba, siparişim nerede?",
+    "timestamp": "2023-10-27T10:00:00Z"
   }
 ]`}</pre>
                 </div>
 
-                <h3>İfadeler (Expressions) ve Değişkenler</h3>
-                <p>Bir düğümün ayarlarında, önceki düğümlerden gelen verileri dinamik olarak kullanabilirsiniz. Bu yapı, <code>{`{{ ... }}`}</code> sözdizimi ile çalışır.</p>
+                <hr className={styles.divider} />
 
-                <h4>1. Temel Kullanım</h4>
+                <h3>İfadeler (Expressions) ve Dinamik Veri</h3>
+                <p>Bir düğümün ayarlarında, önceki düğümlerden gelen verileri dinamik olarak kullanabilirsiniz. Bunun için <code>{`{{ ... }}`}</code> (çift süslü parantez) sözdizimi kullanılır.</p>
+
+                <h4>1. Değişken Kullanımı</h4>
                 <ul>
-                    <li><strong>Doğrudan Değişken:</strong> <code>{`{{degiskenAdi}}`}</code></li>
-                    <li><strong>JSON Yolu:</strong> <code>{`{{degiskenAdi.altAlan.deger}}`}</code></li>
-                    <li><strong>Dizi Erişimi:</strong> <code>{`{{liste[0].ad}}`}</code></li>
+                    <li><strong>Basit Alan:</strong> <code>{`{{message}}`}</code> &rarr; "Merhaba, siparişim nerede?"</li>
+                    <li><strong>İç İçe Nesne:</strong> <code>{`{{user.name}}`}</code> &rarr; "Ahmet Yılmaz"</li>
+                    <li><strong>Dizi Elemanı:</strong> <code>{`{{items[0].price}}`}</code></li>
                 </ul>
 
-                <h4>2. Özel Değişkenler</h4>
+                <h4>2. Özel Sistem Değişkenleri</h4>
                 <ul>
-                    <li><code>{`{{userInput}}`}</code>: Kullanıcının chat ekranından girdiği son mesaj.</li>
-                    <li><code>{`{{$json}}`}</code>: Mevcut düğüme gelen tüm JSON verisi.</li>
-                    <li><code>{`{{$now}}`}</code>: Şu anki zaman damgası (ISO formatında).</li>
+                    <li><code>{`{{userInput}}`}</code>: Kullanıcının Chat ekranından yazdığı son mesaj.</li>
+                    <li><code>{`{{$json}}`}</code>: O anki düğüme gelen tüm veri paketi.</li>
+                    <li><code>{`{{$now}}`}</code>: Şu anki tarih ve saat (ISO formatında).</li>
+                    <li><code>{`{{$executionId}}`}</code>: O an çalışan akışın benzersiz kimliği.</li>
                 </ul>
+
+                <hr className={styles.divider} />
+
+                <h3>Mantık ve Kontrol Akışı</h3>
+                <p>Akışınızı yönlendirmek için mantıksal operatörler kullanabilirsiniz.</p>
+
+                <h4>IF / ELSE (Koşul)</h4>
+                <p>Veriyi kontrol eder ve yolu ikiye ayırır. Örneğin: "Gelen e-posta 'Fatura' içeriyor mu?"</p>
+                <ul>
+                    <li><strong>True (Doğru):</strong> Koşul sağlanırsa bu yoldan devam eder.</li>
+                    <li><strong>False (Yanlış):</strong> Sağlanmazsa diğer yoldan gider.</li>
+                </ul>
+
+                <h4>LOOP (Döngü)</h4>
+                <p>Bir liste üzerinde (örneğin 100 müşteri) tek tek işlem yapmanızı sağlar. Döngü içindeki işlemler her bir öğe için tekrarlanır.</p>
+
+                <h4>SWITCH (Çoklu Yol)</h4>
+                <p>Veriyi birden fazla olasılığa göre yönlendirir. Örn: Müşteri tipi "VIP" ise A, "Standart" ise B, "Yeni" ise C yoluna git.</p>
+
+                <hr className={styles.divider} />
+
+                <h3>Veri Dönüştürme (Transformation)</h3>
+                <p>Bazen API'den gelen veriyi düzenlemeniz gerekir. Bunun için <strong>Code</strong> düğümünü kullanabilirsiniz.</p>
+                <p>Örnek: İsim ve Soyisimi birleştirmek.</p>
+                <div className={styles.codeBlock}>
+                    {`// Code Düğümü (JavaScript)
+return {
+  fullName: input.firstName + " " + input.lastName,
+  email: input.email.toLowerCase()
+};`}
+                </div>
             </>
         )
     },
@@ -84,26 +122,75 @@ const STATIC_SECTIONS = {
         icon: "🍳",
         content: (
             <>
-                <h2>Popüler Otomasyon Örnekleri</h2>
+                <h2>Popüler Otomasyon Senaryoları</h2>
+                <p>Aşağıdaki senaryoları şablon olarak kullanabilir veya kendi ihtiyaçlarınıza göre özelleştirebilirsiniz.</p>
 
                 <div className={styles.exampleCard}>
-                    <h3>🗞️ Senaryo 1: RSS'den Özet Çıkarıp WhatsApp'a Gönder</h3>
-                    <p><strong>Akış:</strong> Cron → HTTP Request → Code (Parse) → Loop → AI Agent → WhatsApp Send</p>
+                    <h3>🗞️ 1. RSS Haber akışını WhatsApp'a Gönder</h3>
+                    <p>Sevdiğiniz blogların son yazılarını yapay zeka ile özetleyip size WhatsApp'tan atar.</p>
+                    <div className={styles.flowStep}>Akış Adımları:</div>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#9CA3AF' }}>
+                        <li><strong>Cron:</strong> Her sabah 08:00'de tetikle.</li>
+                        <li><strong>HTTP Request:</strong> RSS Feed URL'sine istek at (XML/JSON).</li>
+                        <li><strong>Code:</strong> Gelen veriden son 5 haberi ayıkla.</li>
+                        <li><strong>Loop:</strong> Her haber için döngü başlat.</li>
+                        <li><strong>AI Agent:</strong> Haber metnini 2 cümlelik özet haline getir.</li>
+                        <li><strong>WhatsApp Send:</strong> Özeti ve linki telefonunuza gönder.</li>
+                    </ul>
                 </div>
 
                 <div className={styles.exampleCard}>
-                    <h3>📊 Senaryo 2: Döviz Kuru Takip + Excel Kayıt</h3>
-                    <p><strong>Akış:</strong> Cron (5dk) → HTTP (Kur API) → Sheets (Yaz) → IF (Kur &gt; 35?) → True: Bildirim</p>
+                    <h3>📊 2. Döviz/Kripto Takip ve Alarmı</h3>
+                    <p>Dolar veya Bitcoin belirlediğiniz seviyeyi geçerse anında bildirim alın.</p>
+                    <div className={styles.flowStep}>Akış Adımları:</div>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#9CA3AF' }}>
+                        <li><strong>Cron:</strong> Her 5 dakikada bir çalıştır.</li>
+                        <li><strong>HTTP Request:</strong> Güncel kur API'sine istek at.</li>
+                        <li><strong>IF (Koşul):</strong> <code>{`{{price}} > 95000`}</code> mi?</li>
+                        <li><strong>True:</strong> <strong>App Push</strong> ile "BTC Yükseldi: {`{{price}}`}" bildirimi gönder.</li>
+                        <li><strong>False:</strong> Hiçbir şey yapma (Akışı bitir).</li>
+                    </ul>
                 </div>
 
                 <div className={styles.exampleCard}>
-                    <h3>📱 Senaryo 3: Banka SMS'i ile Otomatik Harcama Kaydı</h3>
-                    <p><strong>Akış:</strong> Bildirim Yakala → Code (Parse) → Sheets (Kaydet) → AI (Kategorize)</p>
+                    <h3>🛍️ 3. E-Ticaret Yeni Sipariş Bildirimi</h3>
+                    <p>Web sitenizden sipariş geldiğinde faturasını oluşturup müşteriye mail, size de SMS atar.</p>
+                    <div className={styles.flowStep}>Akış Adımları:</div>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#9CA3AF' }}>
+                        <li><strong>Webhook:</strong> Shopify/WooCommerce'den gelen "Order Created" verisini yakala.</li>
+                        <li><strong>Google Drive Upload:</strong> Sipariş bilgilerini Google E-Tablo'ya yeni satır olarak ekle.</li>
+                        <li><strong>Code (HTML):</strong> Sipariş detaylarıyla bir fatura şablonu oluştur.</li>
+                        <li><strong>PDF Generator:</strong> HTML faturayı PDF'e çevir.</li>
+                        <li><strong>Gmail Send:</strong> PDF'i ekleyip müşteriye "Siparişiniz Alındı" maili at.</li>
+                        <li><strong>SMS Send:</strong> Yöneticiye "Yeni Sipariş: {`{{amount}} TL`} - {`{{customerName}}`}" mesajı at.</li>
+                    </ul>
                 </div>
 
                 <div className={styles.exampleCard}>
-                    <h3>🎨 Senaryo 4: Yapay Zeka ile Görsel Üretim ve Paylaşım</h3>
-                    <p><strong>Akış:</strong> Text Input → Image Generator → WhatsApp Send</p>
+                    <h3>🎙️ 4. Kişisel Sesli Asistan (Jarvis)</h3>
+                    <p>Sesli komutla not alın, hatırlatıcı kurun veya akıllı evinize hükmedin.</p>
+                    <div className={styles.flowStep}>Akış Adımları:</div>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#9CA3AF' }}>
+                        <li><strong>App Trigger (Voice):</strong> Telefonda sesli komutu dinle.</li>
+                        <li><strong>Speech-to-Text:</strong> Sesi metne çevir.</li>
+                        <li><strong>AI Agent (Router):</strong> Komutun ne olduğunu anla (Hatırlatıcı mı? Soru mu? Işık mı?).</li>
+                        <li><strong>Switch:</strong> Niyete (Intent) göre yönlendir.</li>
+                        <li><strong>Case "Calendar":</strong> Google Takvim'e etkinlik ekle.</li>
+                        <li><strong>Case "Spotify":</strong> Spotify üzerinden çalma listesi başlat.</li>
+                        <li><strong>Speak Text:</strong> Sonucu sesli olarak kullanıcıya söyle ("Toplantınız eklendi efendim").</li>
+                    </ul>
+                </div>
+
+                <div className={styles.exampleCard}>
+                    <h3>📸 5. Instagram İçerik Üreticisi</h3>
+                    <p>Sadece bir konu başlığı girin, AI görseli ve metni hazırlayıp paylaşsın.</p>
+                    <div className={styles.flowStep}>Akış Adımları:</div>
+                    <ul style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#9CA3AF' }}>
+                        <li><strong>Manual Trigger:</strong> Konu başlığını girin (Örn: "Yaz Tatili İpuçları").</li>
+                        <li><strong>AI Agent (Writer):</strong> Instagram için hashtag'li, emojili bir açıklama metni yaz.</li>
+                        <li><strong>Image Generator:</strong> Konuya uygun yüksek kaliteli bir görsel oluştur (SDXL/DALL-E).</li>
+                        <li><strong>Instagram Share:</strong> Oluşan resmi ve metni profilinizde paylaşın.</li>
+                    </ul>
                 </div>
             </>
         )
