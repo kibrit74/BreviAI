@@ -30,9 +30,12 @@
     right: 2rem;
     width: 350px;
     height: 500px;
-    background: #1F2937;
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    background: rgba(31, 41, 55, 0.85);
+    /* Transparent */
+    backdrop-filter: blur(16px);
+    /* Glassmorphism */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
     box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
     z-index: 101;
     display: flex;
@@ -44,23 +47,24 @@
 @keyframes slideUp {
     from {
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(20px) scale(0.95);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
 .chatHeader {
     padding: 1rem;
-    background: var(--bg-card);
-    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 600;
+    color: #fff;
 }
 
 .chatMessages {
