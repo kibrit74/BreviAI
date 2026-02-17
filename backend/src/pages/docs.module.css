@@ -19,12 +19,6 @@
     background-color: var(--bg-page);
     color: var(--text-main);
     font-family: 'Inter', -apple-system, sans-serif;
-
-    /* Premium Selection */
-    ::selection {
-        background: rgba(139, 92, 246, 0.3);
-        color: #fff;
-    }
 }
 
 /* SIDEBAR */
