@@ -162,50 +162,6 @@
     margin: 0;
 }
 
-.mockupContainer {
-    width: 200px;
-}
-
-/* MOCKUP (Mini Node) */
-.nodeMockup {
-    background: #1E2128;
-    border: 2px solid;
-    /* Color dynamic */
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
-.mockupHeader {
-    padding: 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.mockupIcon {
-    font-size: 1rem;
-}
-
-.mockupTitle {
-    font-weight: 700;
-    font-size: 0.9rem;
-    color: #fff;
-}
-
-.mockupBody {
-    padding: 1rem;
-    height: 60px;
-    background: #16181D;
-}
-
-.mockupLine {
-    height: 6px;
-    background: #2D313A;
-    border-radius: 3px;
-    margin-bottom: 8px;
-}
-
 /* TABS */
 .tabsContainer {
     display: flex;
@@ -254,6 +210,19 @@
     color: #D1D5DB;
 }
 
+.prose h2 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
+.prose h3 {
+    font-size: 1.4rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: #fff;
+}
+
 .prose p {
     margin-bottom: 1rem;
 }
@@ -299,18 +268,6 @@
     border-bottom: none;
 }
 
-.fontMono {
-    font-family: 'Fira Code', monospace;
-    color: #fff;
-    font-size: 0.9rem;
-}
-
-.fontMonoSmall {
-    font-family: 'Fira Code', monospace;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
-
 .tag {
     background: #2D313A;
     padding: 2px 6px;
@@ -326,6 +283,12 @@
     border-radius: 12px;
     padding: 1.5rem;
     margin-bottom: 1.5rem;
+}
+
+.exampleCard h3 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: #fff;
 }
 
 .exampleCard h4 {
@@ -345,42 +308,110 @@
     overflow-x: auto;
 }
 
-.credentialsBox {
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.2);
-    padding: 1.5rem;
+/* New Styles */
+.alert {
+    padding: 1rem;
     border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+}
+
+.alertTip {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: #D1FAE5;
+}
+
+.alertWarn {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
     color: #FEF3C7;
 }
 
-.sectionHeader {
-    margin-top: 2rem;
-    font-size: 1.2rem;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 0.5rem;
-    margin-bottom: 1rem;
+.divider {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
 }
 
-.outputList {
-    list-style: none;
-    padding: 0;
+.emptyMessage {
+    padding: 2rem;
+    text-align: center;
+    color: #6B7280;
 }
 
-.outputList li {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #1E2128;
+.requiredBadge {
+    color: #EF4444;
+    font-size: 0.7em;
+    margin-left: 0.5rem;
 }
 
-.outputField {
-    font-family: 'Fira Code', monospace;
-    color: var(--primary);
-    margin-right: 8px;
+.optionalBadge {
+    color: #6B7280;
+    font-size: 0.7em;
+    margin-left: 0.5rem;
 }
 
-.outputType {
-    color: var(--text-muted);
+.descCell {
+    color: #D1D5DB;
+    font-size: 0.9rem;
+}
+
+.defaultVal {
+    margin-top: 4px;
+    font-size: 0.8em;
+    color: #6B7280;
+}
+
+.defaultVal code {
+    background: #000;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.flowStep {
+    background: #2D313A;
+    padding: 6px 10px;
+    border-radius: 6px;
     font-size: 0.85rem;
-    margin-right: 8px;
+    color: #E6E8EC;
+}
+
+.faqItem {
+    background: #16181D;
+    padding: 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+}
+
+.faqItem h3 {
+    margin-top: 0;
+    font-size: 1.1rem;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+.tagsContainer {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+}
+
+.heroTag {
+    background: #2D313A;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #9CA3AF;
+    border: 1px solid transparent;
+}
+
+.emptySearch {
+    padding: 2rem;
+    text-align: center;
+    color: #6B7280;
 }
 
 @media (max-width: 1024px) {
