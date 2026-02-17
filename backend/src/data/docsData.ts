@@ -188,6 +188,59 @@ export const NODES = [
       { title: 'Ev Otomasyonu', flow: ['Geofence (Enter)', 'Smart Home API', 'Speak "Hoş geldin"'], desc: 'Eve varınca ışıklar, ısıtma ve sesli karşılama.' },
     ]
   },
+  {
+    id: 'SMS_TRIGGER',
+    title: 'SMS Trigger',
+    type: 'trigger',
+    summary: 'Gelen SMS mesajlarını yakala ve içeriğine göre otomasyon başlat.',
+    tags: ['trigger', 'sms', 'mesaj', 'text', 'gelen kutusu'],
+    overview: [
+      { type: 'section', title: '📩 Mesaj Yakalama', body: 'Telefonunuza gelen SMS\'leri anlık olarak dinler. Banka OTP kodları, kargo bildirimleri veya özel mesajlar için tetikleyici olarak kullanabilirsiniz.' },
+      { type: 'warn', title: 'İzin Gerekli', body: 'Android SMS okuma izni gerektirir. Uygulama ilk açılışta bu izni isteyecektir.' },
+    ],
+    params: [
+      { name: 'Sender Filter', type: 'String', required: false, desc: 'Gönderen adı veya numarası. Örn: "Bank", "Kargo"' },
+      { name: 'Message Filter', type: 'Regex', required: false, desc: 'Mesaj içeriği filtresi. Regex destekler.' },
+    ],
+    output: {
+      schema: `{
+  "sender": "+90532...",
+  "message": "Kodunuz: 1234",
+  "timestamp": 1708934000000
+}`,
+      desc: 'Mesaj içeriği ve gönderen bilgisi.'
+    },
+    examples: [
+      { title: 'OTP Yakalayıcı', code: 'Sender: "Banka"\nMessage Filter: "\\d{6}"', explanation: 'Bankadan gelen 6 haneli kodları yakalar.' },
+    ],
+    usecases: [
+      { title: 'OTP Oto-Kopyala', flow: ['SMS Trigger', 'Regex Extract', 'Notification'], desc: 'Gelen doğrulama kodunu bildirim olarak göster.' },
+    ]
+  },
+  {
+    id: 'MOTION_TRIGGER',
+    title: 'Motion Trigger',
+    type: 'trigger',
+    summary: 'Cihaz hareketini ve sarsıntıyı algıla (İvmeölçer).',
+    tags: ['trigger', 'hareket', 'motion', 'shake', 'sarsıntı', 'hırsız'],
+    overview: [
+      { type: 'section', title: '👋 Hareket Algılama', body: 'Cihazın ivmeölçer sensörünü kullanır. Telefon masadan alındığında, sallandığında veya düştüğünde tetiklenir.' },
+      { type: 'tip', title: 'Hırsız Alarmı', body: 'Telefonunuzu bir yere bırakıp bu modu açarsanız, biri telefonu eline aldığında alarm çalabilir veya fotoğraf çekip size atabilir.' },
+    ],
+    params: [
+      { name: 'Sensitivity', type: 'Slider', required: true, default: 'Medium', desc: 'Hassasiyet seviyesi. Düşük: Sadece sert sarsıntı. Yüksek: Hafif dokunuş.' },
+    ],
+    output: {
+      schema: `{ "event": "shake", "force": 1.5 }`,
+      desc: 'Hareket türü ve şiddeti.'
+    },
+    examples: [
+      { title: 'Salla-Çalıştır', code: 'Sensitivity: Medium\nAction: Feneri Aç', explanation: 'Telefonu sallayınca feneri açar.' },
+    ],
+    usecases: [
+      { title: 'Hırsız Alarmı', flow: ['Motion Trigger', 'Speak "Bırak telefonu!"', 'Camera Photo', 'Email Send'], desc: 'İzinsiz kullanımda fotoğraf çekip uyarı verir.' },
+    ]
+  },
 
   // ─── AI ───
   {
@@ -488,6 +541,71 @@ export const NODES = [
       { title: 'Otonom Sanat Hesabı', flow: ['Cron Günlük', 'AI (Tema Üret)', 'Image Gen', 'AI (Caption Yaz)', 'Instagram Post'], desc: 'Tamamen otonom Instagram sanat hesabı.' },
     ]
   },
+  {
+    id: 'SMS_SEND',
+    title: 'SMS Send',
+    type: 'communication',
+    summary: 'Yerel SMS gönderimi yap.',
+    tags: ['communication', 'sms', 'mesaj', 'gönder'],
+    overview: [
+      { type: 'section', title: '📤 Yerel Gönderim', body: 'Cihazın kendi SIM kartını kullanarak SMS gönderir. Operatör tarifenizden düşer.' },
+    ],
+    params: [
+      { name: 'Phone Number', type: 'String', required: true, desc: 'Alıcı numarası.' },
+      { name: 'Message', type: 'Text', required: true, desc: 'Mesaj metni.' },
+    ],
+    output: { schema: `{ "status": "sent" }`, desc: 'Gönderim durumu.' },
+    examples: [
+      { title: 'Acil Durum Mesajı', code: 'To: Anne\nMessage: "Ben iyiyim, konumum: {{loc}}"', explanation: 'Tek tıkla güvendeyim mesajı.' },
+    ],
+    usecases: [
+      { title: 'SOS', flow: ['Manual Trigger', 'Location', 'SMS Send'], desc: 'Acil durumda konum paylaşır.' },
+    ]
+  },
+  {
+    id: 'GMAIL_READ',
+    title: 'Gmail Read',
+    type: 'communication',
+    summary: 'Gmail hesabınızdaki e-postaları okuyun ve arayın.',
+    tags: ['communication', 'email', 'gmail', 'oku', 'google'],
+    overview: [
+      { type: 'section', title: '🔍 E-posta Arama', body: 'Gmail arama operatörlerini (from:, is:unread, subject:) destekler.' },
+      { type: 'tip', title: 'OAuth', body: 'Güvenli Google girişi kullanır. Şifrenizi paylaşmazsınız.' },
+    ],
+    params: [
+      { name: 'Query', type: 'String', required: false, default: 'is:unread', desc: 'Gmail arama sorgusu.' },
+      { name: 'Limit', type: 'Number', required: false, default: '5', desc: 'Maksimum e-posta sayısı.' },
+    ],
+    output: { schema: `{ "emails": [{ "subject": "...", "from": "...", "snippet": "..." }] }`, desc: 'E-posta listesi.' },
+    examples: [
+      { title: 'Faturaları Bul', code: 'Query: "subject:fatura is:unread"', explanation: 'Okunmamış fatura maillerini bulur.' },
+    ],
+    usecases: [
+      { title: 'Mail Özeti', flow: ['Cron 09:00', 'Gmail Read', 'AI Summary', 'Speak'], desc: 'Sabah önemli mailleri özetle.' },
+    ]
+  },
+  {
+    id: 'GMAIL_SEND',
+    title: 'Gmail Send',
+    type: 'communication',
+    summary: 'Gmail hesabınız üzerinden e-posta gönderin.',
+    tags: ['communication', 'email', 'gmail', 'gönder', 'google'],
+    overview: [
+      { type: 'section', title: '📧 Güvenli Gönderim', body: 'Kendi Gmail hesabınızı kullanarak mail atar. Ek dosya destekler.' },
+    ],
+    params: [
+      { name: 'To', type: 'String', required: true, desc: 'Alıcı adresi.' },
+      { name: 'Subject', type: 'String', required: true, desc: 'Konu.' },
+      { name: 'Body', type: 'HTML', required: true, desc: 'Mesaj içeriği.' },
+    ],
+    output: { schema: `{ "id": "msg_123", "status": "sent" }`, desc: 'Gönderilen mail ID.' },
+    examples: [
+      { title: 'Rapor Gönder', code: 'To: boss@sirket.com\nSubject: Rapor\nBody: "Ektedir."', explanation: 'Hazırlanan raporu mail atar.' },
+    ],
+    usecases: [
+      { title: 'Otomatik Yanıt', flow: ['Gmail Read', 'AI Generate Reply', 'Gmail Send'], desc: 'Maillere otomatik cevap taslağı hazırlar.' },
+    ]
+  },
 
   // ─── MICROSOFT ───
   {
@@ -540,6 +658,47 @@ export const NODES = [
       { title: 'Kişisel Muhasebe', flow: ['Notif. Trigger', 'Code (Parse)', 'Excel Write', 'Monthly Summary'], desc: 'Banka bildirimlerini otomatik Excel muhasebe defterine kaydet.' },
     ]
   },
+  {
+    id: 'ONEDRIVE_UPLOAD',
+    title: 'OneDrive Upload',
+    type: 'microsoft',
+    summary: 'Dosyalarınızı OneDrive bulutuna yükleyin.',
+    tags: ['microsoft', 'onedrive', 'upload', 'yükle', 'bulut'],
+    overview: [
+      { type: 'section', title: '☁️ Bulut Yedekleme', body: 'Oluşturulan PDF, görsel veya raporları OneDrive klasörüne kaydeder.' },
+    ],
+    params: [
+      { name: 'File', type: 'File', required: true, desc: 'Yüklenecek dosya.' },
+      { name: 'Path', type: 'String', required: false, default: '/', desc: 'Hedef klasör yolu.' },
+    ],
+    output: { schema: `{ "id": "file_123", "webUrl": "https://1drv.ms/..." }`, desc: 'Yüklenen dosya bağlantısı.' },
+    examples: [
+      { title: 'Fotoğraf Yedekle', code: 'File: {{camera.photo}}\nPath: /CameraUploads', explanation: 'Çekilen fotoğrafı buluta yükler.' },
+    ],
+    usecases: [
+      { title: 'Belge Arşivi', flow: ['Scanner', 'PDF Create', 'OneDrive Upload'], desc: 'Taranan belgeleri arşivler.' },
+    ]
+  },
+  {
+    id: 'ONEDRIVE_LIST',
+    title: 'OneDrive List',
+    type: 'microsoft',
+    summary: 'OneDrive klasöründeki dosyaları listele.',
+    tags: ['microsoft', 'onedrive', 'list', 'dosya', 'oku'],
+    overview: [
+      { type: 'section', title: '📂 Dosya Yönetimi', body: 'Belirli bir klasördeki dosyaları listeler, filtreler ve indirme linklerini alır.' },
+    ],
+    params: [
+      { name: 'Path', type: 'String', required: true, desc: 'Klasör yolu.' },
+    ],
+    output: { schema: `{ "files": [{ "name": "...", "id": "..." }] }`, desc: 'Dosya listesi.' },
+    examples: [
+      { title: 'Son Dosyalar', code: 'Path: /Projects', explanation: 'Proje klasöründeki dosyaları listeler.' },
+    ],
+    usecases: [
+      { title: 'Rapor Kontrolü', flow: ['OneDrive List', 'Loop', 'Check Name'], desc: 'Klasörde yeni rapor var mı kontrol et.' },
+    ]
+  },
 
   // ─── GOOGLE ───
   {
@@ -564,6 +723,70 @@ export const NODES = [
     ],
     usecases: [
       { title: 'Kur Takip Dashboard', flow: ['Cron 5dk', 'HTTP (Kur API)', 'Sheets (Yaz)', 'IF (Alarm?)', 'WhatsApp'], desc: 'Döviz kurunu takip et, belirli seviyeye gelince bildir.' },
+    ]
+  },
+  {
+    id: 'DRIVE_UPLOAD',
+    title: 'Google Drive Upload',
+    type: 'google',
+    summary: 'Dosyaları Google Drive\'a yükle.',
+    tags: ['google', 'drive', 'upload', 'yedek', 'bulut'],
+    overview: [
+      { type: 'section', title: '☁️ Google Drive', body: 'Dosyalarınızı güvenle Google Drive hesabınıza yükleyin.' },
+    ],
+    params: [
+      { name: 'File', type: 'File', required: true, desc: 'Yüklenecek dosya.' },
+      { name: 'Folder', type: 'String', required: false, desc: 'Hedef klasör ID veya adı.' },
+    ],
+    output: { schema: `{ "fileId": "1AbCd...", "webViewLink": "..." }`, desc: 'Dosya linki.' },
+    examples: [
+      { title: 'Yedekle', code: 'File: {{pdf}}\nFolder: Backups', explanation: 'PDF\'i yedekler.' },
+    ],
+    usecases: [
+      { title: 'Otomatik Arşiv', flow: ['Gen PDF', 'Drive Upload', 'Email Send'], desc: 'Raporu oluştur, yükle ve linkini mail at.' },
+    ]
+  },
+  {
+    id: 'CALENDAR_READ',
+    title: 'Google Calendar Read',
+    type: 'google',
+    summary: 'Yaklaşan etkinlikleri ve toplantıları listele.',
+    tags: ['google', 'calendar', 'takvim', 'etkinlik', 'ajanda'],
+    overview: [
+      { type: 'section', title: '📅 Günlük Plan', body: 'Bugünkü veya belirli bir tarih aralığındaki etkinlikleri çeker.' },
+    ],
+    params: [
+      { name: 'Time Range', type: 'Select', required: true, default: 'Today', desc: 'Today • Tomorrow • Week' },
+      { name: 'Calendar ID', type: 'String', required: false, default: 'primary', desc: 'Takvim ID.' },
+    ],
+    output: { schema: `{ "events": [{ "summary": "Toplantı", "start": "..." }] }`, desc: 'Etkinlik listesi.' },
+    examples: [
+      { title: 'Sabah Ajandası', code: 'Time: Today', explanation: 'Bugünkü toplantıları getir.' },
+    ],
+    usecases: [
+      { title: 'Toplantı Hatırlatıcı', flow: ['Calendar Read', 'Loop', 'WhatsApp Send'], desc: 'Günün toplantılarını sabah özet geç.' },
+    ]
+  },
+  {
+    id: 'CALENDAR_CREATE',
+    title: 'Google Calendar Create',
+    type: 'google',
+    summary: 'Takvime yeni etkinlik ekle.',
+    tags: ['google', 'calendar', 'oluştur', 'randevu', 'plan'],
+    overview: [
+      { type: 'section', title: '➕ Etkinlik Ekleme', body: 'Hızlıca takvime yeni bir etkinlik veya hatırlatıcı ekleyin.' },
+    ],
+    params: [
+      { name: 'Summary', type: 'String', required: true, desc: 'Etkinlik başlığı.' },
+      { name: 'Start Time', type: 'Date', required: true, desc: 'Başlangıç zamanı.' },
+      { name: 'Duration', type: 'Number', required: false, default: '60', desc: 'Süre (dakika).' },
+    ],
+    output: { schema: `{ "eventId": "...", "status": "confirmed" }`, desc: 'Oluşturulan etkinlik.' },
+    examples: [
+      { title: 'Randevu Al', code: 'Summary: "Dişçi"\nStart: "2026-02-20T14:00:00"', explanation: 'Randevuyu kaydeder.' },
+    ],
+    usecases: [
+      { title: 'Otomatik Planlama', flow: ['Email Read', 'AI Extract Date', 'Calendar Create'], desc: 'Maildeki randevu tarihini takvime işler.' },
     ]
   },
 
@@ -701,6 +924,24 @@ export const NODES = [
     ],
     usecases: [
       { title: 'Fitness Takip', flow: ['Cron 21:00', 'Pedometer', 'Sheets (Günlük Log)', 'IF (Hedef)', 'WhatsApp Tebrik'], desc: 'Günlük adım hedefini takip et, ulaşınca tebrik gönder.' },
+    ]
+  },
+  {
+    id: 'BATTERY_LEVEL',
+    title: 'Battery Level',
+    type: 'device',
+    summary: 'Cihazın pil durumunu ve şarj bilgisini oku.',
+    tags: ['device', 'pil', 'şarj', 'battery', 'güç'],
+    overview: [
+      { type: 'section', title: '🔋 Güç Yönetimi', body: 'Pil seviyesini (%) ve şarj durumunu (Şarj oluyor/olmuyor) kontrol eder. Düşük pil otomasyonları için idealdir.' },
+    ],
+    params: [],
+    output: { schema: `{ "level": 85, "isCharging": true }`, desc: 'Pil yüzdesi ve durumu.' },
+    examples: [
+      { title: 'Düşük Pil Uyarısı', code: 'IF level < 20 AND isCharging == false\n→ Speak "Şarja tak!"', explanation: 'Pil %20 altına inince sesli uyarır.' },
+    ],
+    usecases: [
+      { title: 'Şarj Dolunca Uyar', flow: ['Cron 5dk', 'Battery Level', 'IF level > 90', 'Speak "Şarj doldu"'], desc: 'Pil sağlığı için tam dolmadan uyar.' },
     ]
   },
 ];
