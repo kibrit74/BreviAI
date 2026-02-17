@@ -362,7 +362,81 @@ const STATIC_SECTIONS = {
 
                 <div className={styles.faqItem}>
                     <h3>50. API Dokümantasyonu</h3>
-                    <p><strong>Soru:</strong> Kendi uygulamamdan BreviAI'yi nasıl kontrol ederim?<br /><strong>Cevap:</strong> developers.breviai.com adresinde REST API ve WebSocket dokümantasyonu mevcuttur.</p>
+                    <p><strong>Soru:</strong> Kendi uygulamamdan BreviAI'yi nasıl kontrol ederim?<br /><strong>Cevap:</strong> Detaylı bilgi için sol menüdeki <strong>Geliştirici (API)</strong> bölümüne bakınız.</p>
+                </div>
+            </>
+        )
+    },
+    api: {
+        title: "Geliştirici API & SDK",
+        icon: "🔌",
+        content: (
+            <>
+                <h2>Geliştirici Dokümantasyonu</h2>
+                <p>BreviAI, harici uygulamalarınızla entegre olabilmeniz için <strong>REST API</strong> ve <strong>WebSocket</strong> arayüzleri sunar. Ayrıca <strong>Webhook</strong> desteği ile olay tabanlı tetiklemeler yapabilirsiniz.</p>
+
+                <hr className={styles.divider} />
+
+                <h3>🔐 Kimlik Doğrulama (Authentication)</h3>
+                <p>Tüm API isteklerinde <code>Authorization</code> başlığı (header) kullanılmalıdır.</p>
+                <div className={styles.codeBlock}>
+                    Authorization: Bearer YOUR_API_KEY
+                </div>
+                <p>API Anahtarınızı <strong>Ayarlar &gt; API</strong> menüsünden alabilirsiniz.</p>
+
+                <h3>📡 REST API Referansı</h3>
+
+                <h4>1. İş Akışlarını Listele</h4>
+                <div className={styles.codeBlock}>GET /api/v1/workflows</div>
+
+                <h4>2. İş Akışı Başlat (Trigger)</h4>
+                <div className={styles.codeBlock}>POST /api/v1/webhook/:webhookId</div>
+                <p>Body (JSON):</p>
+                <div className={styles.codeBlock}>
+                    {`{
+  "key": "value",
+  "userId": "12345"
+}`}
+                </div>
+
+                <h4>3. Geçmiş Sorgulama (History)</h4>
+                <div className={styles.codeBlock}>GET /api/v1/executions?workflowId=123</div>
+
+                <hr className={styles.divider} />
+
+                <h3>⚡ WebSocket (Gerçek Zamanlı)</h3>
+                <p>İş akışı durumlarını anlık takip etmek için WebSocket sunucusuna bağlanabilirsiniz.</p>
+                <div className={styles.codeBlock}>ws://api.breviai.com/ws?token=YOUR_TOKEN</div>
+
+                <h4>Olaylar (Events)</h4>
+                <ul>
+                    <li><code>execution.started</code>: Akış başladığında</li>
+                    <li><code>node.executed</code>: Her bir düğüm tamamlandığında</li>
+                    <li><code>execution.completed</code>: Akış bittiğinde</li>
+                </ul>
+
+                <hr className={styles.divider} />
+
+                <h3>🪝 Webhooks</h3>
+                <p>BreviAI, belirlediğiniz olaylar gerçekleştiğinde URL'nize POST isteği atabilir.</p>
+                <p><strong>Desteklenen Olaylar:</strong> <code>workflow_error</code>, <code>manual_intervention_needed</code></p>
+
+                <div className={styles.alertTip}>
+                    <strong>İpucu:</strong> Webhook güvenliği için gelen istekteki <code>X-Brevi-Signature</code> başlığını doğrulamanızı öneririz.
+                </div>
+
+                <h3>📦 SDK & Kütüphaneler</h3>
+                <p>Javscript ve Python için resmi SDK'larımız geliştirme aşamasındadır. Şimdilik standart HTTP istemcileri (Axios, Fetch, Requests) kullanabilirsiniz.</p>
+
+                <h4>Node.js Örneği (Axios)</h4>
+                <div className={styles.codeBlock}>
+                    {`const axios = require('axios');
+
+await axios.post('https://api.breviai.com/webhook/xyz', {
+    data: 'Hello World'
+}, {
+    headers: { 'Authorization': 'Bearer ...' }
+});`}
                 </div>
             </>
         )
@@ -440,6 +514,10 @@ export default function DocsPage() {
                         <button className={`${styles.nodeItem} ${currentSection === 'faq' ? styles.activeNode : ''}`}
                             onClick={() => setCurrentSection('faq')}>
                             SSS & Hata
+                        </button>
+                        <button className={`${styles.nodeItem} ${currentSection === 'api' ? styles.activeNode : ''}`}
+                            onClick={() => setCurrentSection('api')}>
+                            Geliştirici (API)
                         </button>
                     </div>
                 </div>
