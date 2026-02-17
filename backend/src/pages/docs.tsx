@@ -156,7 +156,7 @@ const STATIC_SECTIONS = {
                 </div>
 
                 <div className={styles.faqItem}>
-                    <h3>9. Değişkenler Çalışmıyor ({{ variable }})</h3>
+                    <h3>9. Değişkenler Çalışmıyor ({'{{variable}}'})</h3>
                     <p><strong>Çözüm:</strong> Değişken isminin tam olarak doğru yazıldığından emin olun (büyük/küçük harf duyarlı). Bir önceki düğümün çıktısını kontrol etmek için "Test Run" yapın.</p>
                 </div>
 
