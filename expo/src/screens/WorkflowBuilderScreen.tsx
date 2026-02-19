@@ -26,7 +26,13 @@ import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { WorkflowCanvas, NodePalette, NodeConfigModal } from '../components/workflow';
+import {
+    WorkflowCanvas,
+    NodePalette,
+    NodeConfigModal,
+    WorkflowAssistantPanel,
+    WorkflowFixPreviewModal,
+} from '../components/workflow';
 import {
     Workflow,
     WorkflowNode,
@@ -43,6 +49,8 @@ import { TemplateMigration } from '../services/TemplateMigration';
 import { useApp } from '../context/AppContext';
 import { ExecutionLogger, ExecutionLogEntry } from '../services/ExecutionLogger';
 import { explainWorkflowError } from '../services/WorkflowErrorExplainer';
+import { AssistantFixSuggestion } from '../services/assistant/WorkflowAssistantTypes';
+import { workflowPatchService } from '../services/assistant/WorkflowPatchService';
 
 // --- Default Theme Fallback (if not in context) ---
 const DEFAULT_THEME = {
@@ -111,6 +119,9 @@ export const WorkflowBuilderScreen: React.FC = () => {
     const [selectedErrorEntryId, setSelectedErrorEntryId] = useState<string | null>(null);
     const [showErrorGuideModal, setShowErrorGuideModal] = useState(false);
     const [didAutoOpenErrorModal, setDidAutoOpenErrorModal] = useState(false);
+    const [showAssistantModal, setShowAssistantModal] = useState(false);
+    const [showFixPreviewModal, setShowFixPreviewModal] = useState(false);
+    const [selectedFixSuggestion, setSelectedFixSuggestion] = useState<AssistantFixSuggestion | null>(null);
 
     // Engine Callbacks
     useEffect(() => {
@@ -325,6 +336,21 @@ export const WorkflowBuilderScreen: React.FC = () => {
         if (workflowErrorEntries.length === 0) return null;
         return workflowErrorEntries.find(entry => entry.id === selectedErrorEntryId) || workflowErrorEntries[0];
     }, [workflowErrorEntries, selectedErrorEntryId]);
+
+    const handlePreviewSuggestion = useCallback((suggestion: AssistantFixSuggestion) => {
+        setSelectedFixSuggestion(suggestion);
+        setShowFixPreviewModal(true);
+    }, []);
+
+    const handleApplySuggestion = useCallback((suggestion: AssistantFixSuggestion) => {
+        const updatedWorkflow = workflowPatchService.applyChanges(workflow, suggestion.changes);
+        setWorkflow(updatedWorkflow);
+        setHasChanges(true);
+        setShowFixPreviewModal(false);
+        setShowAssistantModal(false);
+        setSelectedFixSuggestion(null);
+        Alert.alert('Başarılı', 'Asistan önerisi workflow\'a uygulandı.');
+    }, [workflow]);
 
     const formatErrorTimestamp = useCallback((timestamp: number) => {
         return new Date(timestamp).toLocaleString('tr-TR', {
@@ -567,7 +593,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
             minute: '00',
             geofenceId: 'home',
             rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-            reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+            reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
             ...(configOverride || {}),
         };
 
@@ -632,11 +658,11 @@ export const WorkflowBuilderScreen: React.FC = () => {
             trigger.config = { ...(trigger.config || {}), hour, minute, repeat: true } as any;
             notification.config = {
                 ...(notification.config || {}),
-                title: 'Gunluk Hatirlatma',
-                message: config.reminderText || 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                title: 'Günlük Hatırlatma',
+                message: config.reminderText || 'Hatırlatma: bugünkü öncelikli işini tamamla.',
             } as any;
             newWorkflow = {
-                ...createWorkflow('Gunluk Hatirlatma'),
+                ...createWorkflow('Günlük Hatırlatma'),
                 nodes: [trigger, notification],
                 edges: [createEdge(trigger.id, notification.id, 'default')],
             };
@@ -649,7 +675,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
             const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
             input.config = {
                 ...(input.config || {}),
-                prompt: 'Aramak istediginiz kisi adi',
+                prompt: 'Aramak istediğiniz kişi adı',
                 variableName: 'contact_query',
             } as any;
             contactsRead.config = {
@@ -659,11 +685,11 @@ export const WorkflowBuilderScreen: React.FC = () => {
             } as any;
             show.config = {
                 ...(show.config || {}),
-                title: 'Kisi Sonuclari',
+                title: 'Kişi Sonuçları',
                 content: '{{contact_results}}',
             } as any;
             newWorkflow = {
-                ...createWorkflow('Kisi Bul ve Goster'),
+                ...createWorkflow('Kişi Bul ve Göster'),
                 nodes: [trigger, input, contactsRead, show],
                 edges: [
                     createEdge(trigger.id, input.id, 'default'),
@@ -680,7 +706,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
             const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
             input.config = {
                 ...(input.config || {}),
-                prompt: 'Cevrilecek metni yazin',
+                prompt: 'Çevrilecek metni yazın',
                 variableName: 'translation_input',
             } as any;
             translate.config = {
@@ -691,11 +717,11 @@ export const WorkflowBuilderScreen: React.FC = () => {
             } as any;
             show.config = {
                 ...(show.config || {}),
-                title: 'Ceviri Sonucu',
+                title: 'Çeviri Sonucu',
                 content: '{{translated_text}}',
             } as any;
             newWorkflow = {
-                ...createWorkflow('Hizli Ceviri'),
+                ...createWorkflow('Hızlı Çeviri'),
                 nodes: [trigger, input, translate, show],
                 edges: [
                     createEdge(trigger.id, input.id, 'default'),
@@ -830,7 +856,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                         }]}
                         onPress={() => {
                             if (workflowErrorEntries.length === 0) {
-                                Alert.alert('Bilgi', 'Bu workflow icin kayitli bir hata yok.');
+                                Alert.alert('Bilgi', 'Bu workflow için kayıtlı bir hata yok.');
                                 return;
                             }
                             setShowErrorGuideModal(true);
@@ -848,6 +874,15 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                 </Text>
                             </View>
                         )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionButton, {
+                            borderColor: 'rgba(37, 99, 235, 0.45)',
+                            backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                        }]}
+                        onPress={() => setShowAssistantModal(true)}
+                    >
+                        <Ionicons name="chatbubbles-outline" size={20} color="#2563EB" />
                     </TouchableOpacity>
                     {isExecuting ? (
                         <>
@@ -908,12 +943,12 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                     minute: '00',
                                     geofenceId: 'home',
                                     rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
                                 },
                             })}
                         >
                             <Text style={styles.recipeItemTitle}>Sabah Hava Durumu</Text>
-                            <Text style={styles.recipeItemDesc}>Her gun 08:00'de hava durumunu goster.</Text>
+                            <Text style={styles.recipeItemDesc}>Her gün 08:00'de hava durumunu göster.</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.recipeItem}
@@ -924,12 +959,12 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                     minute: '00',
                                     geofenceId: 'home',
                                     rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
                                 },
                             })}
                         >
-                            <Text style={styles.recipeItemTitle}>Eve Gelince Wi-Fi Ac</Text>
-                            <Text style={styles.recipeItemDesc}>Eve giriste Wi-Fi ayarini acar.</Text>
+                            <Text style={styles.recipeItemTitle}>Eve Gelince Wi-Fi Aç</Text>
+                            <Text style={styles.recipeItemDesc}>Eve girişte Wi-Fi ayarını açar.</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.recipeItem}
@@ -940,12 +975,12 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                     minute: '00',
                                     geofenceId: 'home',
                                     rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
                                 },
                             })}
                         >
                             <Text style={styles.recipeItemTitle}>Haberleri Oku</Text>
-                            <Text style={styles.recipeItemDesc}>Guncel haberleri tek ekranda goster.</Text>
+                            <Text style={styles.recipeItemDesc}>Güncel haberleri tek ekranda göster.</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.recipeItem}
@@ -956,26 +991,26 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                     minute: '00',
                                     geofenceId: 'home',
                                     rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
                                 },
                             })}
                         >
-                            <Text style={styles.recipeItemTitle}>Gunluk Hatirlatma</Text>
-                            <Text style={styles.recipeItemDesc}>Her gun belirledigin saatte bildirim gondersin.</Text>
+                            <Text style={styles.recipeItemTitle}>Günlük Hatırlatma</Text>
+                            <Text style={styles.recipeItemDesc}>Her gün belirlediğin saatte bildirim göndersin.</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.recipeItem}
                             onPress={() => applyRecipe('contact_search')}
                         >
-                            <Text style={styles.recipeItemTitle}>Kisi Bul ve Goster</Text>
-                            <Text style={styles.recipeItemDesc}>Isim gir, rehberde ara, sonucu ekranda goster.</Text>
+                            <Text style={styles.recipeItemTitle}>Kişi Bul ve Göster</Text>
+                            <Text style={styles.recipeItemDesc}>İsim gir, rehberde ara, sonucu ekranda göster.</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={styles.recipeItem}
                             onPress={() => applyRecipe('quick_translate')}
                         >
-                            <Text style={styles.recipeItemTitle}>Hizli Ceviri</Text>
-                            <Text style={styles.recipeItemDesc}>Metni yaz, otomatik cevir, sonucu goster.</Text>
+                            <Text style={styles.recipeItemTitle}>Hızlı Çeviri</Text>
+                            <Text style={styles.recipeItemDesc}>Metni yaz, otomatik çevir, sonucu göster.</Text>
                         </TouchableOpacity>
                         <View style={styles.recipesActions}>
                             <TouchableOpacity style={styles.recipeSecondary} onPress={() => setHideRecipes(true)}>
@@ -1111,7 +1146,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                         {recipeWizard && (recipeWizard.id === 'morning_weather' || recipeWizard.id === 'daily_reminder') && (
                             <>
                                 <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
-                                    Her gun kacta calissin?
+                                    Her gün kaçta çalışsın?
                                 </Text>
                                 <View style={styles.recipeTimeRow}>
                                     <TextInput
@@ -1147,7 +1182,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                             }]}
                                             value={recipeWizard.config.reminderText}
                                             onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, reminderText: t } } : prev)}
-                                            placeholder="Hatirlatma metnini yazin"
+                                            placeholder="Hatırlatma metnini yazın"
                                             placeholderTextColor={colors.textTertiary}
                                         />
                                     </>
@@ -1232,14 +1267,14 @@ export const WorkflowBuilderScreen: React.FC = () => {
 
                         {workflowErrorEntries.length === 0 && (
                             <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
-                                Bu workflow icin kayitli hata bulunmuyor.
+                                Bu workflow için kayıtlı hata bulunmuyor.
                             </Text>
                         )}
 
                         {workflowErrorEntries.length > 0 && (
                             <>
                                 <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
-                                    Son hatalar arasindan birini secin ve kolay anlatimla duzeltin.
+                                    Son hatalar arasından birini seçin ve kolay anlatımla düzeltin.
                                 </Text>
 
                                 <View style={styles.errorEntryList}>
@@ -1300,6 +1335,28 @@ export const WorkflowBuilderScreen: React.FC = () => {
                     </View>
                 </View>
             </Modal>
+
+            <WorkflowAssistantPanel
+                visible={showAssistantModal}
+                workflow={workflow}
+                latestError={selectedErrorEntry}
+                onClose={() => setShowAssistantModal(false)}
+                onPreviewSuggestion={handlePreviewSuggestion}
+                colors={colors}
+                isDark={isDark}
+            />
+
+            <WorkflowFixPreviewModal
+                visible={showFixPreviewModal}
+                suggestion={selectedFixSuggestion}
+                onClose={() => {
+                    setShowFixPreviewModal(false);
+                    setSelectedFixSuggestion(null);
+                }}
+                onApply={handleApplySuggestion}
+                colors={colors}
+                isDark={isDark}
+            />
 
             {/* AI Prompt Modal */}
             <Modal

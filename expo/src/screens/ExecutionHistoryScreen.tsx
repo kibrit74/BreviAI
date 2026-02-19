@@ -176,7 +176,7 @@ const ExecutionHistoryScreen: React.FC = () => {
                                 color="#FFFFFF"
                             />
                             <Text style={styles.openWorkflowButtonText}>
-                                {item.success ? 'Workflow\'u Ac' : 'Workflow\'u Ac ve Hatayi Incele'}
+                                {item.success ? 'Workflow\'u Aç' : 'Workflow\'u Aç ve Hatayı İncele'}
                             </Text>
                         </TouchableOpacity>
                     </View>

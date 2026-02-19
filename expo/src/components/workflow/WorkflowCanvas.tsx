@@ -199,7 +199,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         const sourceNode = workflow.nodes.find(n => n.id === sourceNodeId);
         const targetNode = workflow.nodes.find(n => n.id === targetNodeId);
         if (!sourceNode || !targetNode) {
-            return { compatible: false, reason: 'Node bulunamadi.' };
+            return { compatible: false, reason: 'Node bulunamadı.' };
         }
         return evaluateConnectionCompatibility(sourceNode, sourcePort, targetNode);
     }, [workflow.nodes]);
@@ -216,8 +216,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         const compatibility = checkConnectionCompatibility(sourceNodeId, targetNodeId, sourcePort);
         if (!compatibility.compatible) {
             Alert.alert(
-                'Uyumsuz baglanti',
-                `Bu node baglantisi veri tipi uyusmadigi icin kurulamaz.\n${compatibility.reason || ''}`
+                'Uyumsuz bağlantı',
+                `Bu node bağlantısı veri tipi uyuşmadığı için kurulamaz.\n${compatibility.reason || ''}`
             );
             return;
         }
@@ -342,8 +342,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 addEdge(sourceId, best.id, sourcePort);
             } else {
                 Alert.alert(
-                    'Uyumsuz baglanti',
-                    `Bu baglanti kurulamadi.\n${compatibility.reason || ''}`
+                    'Uyumsuz bağlantı',
+                    `Bu bağlantı kurulamadı.\n${compatibility.reason || ''}`
                 );
             }
         } else if (onQuickAddRequested) {
@@ -499,7 +499,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 {draggingConnection?.isCompatible === false && (
                     <View style={[styles.connectionIndicator, styles.connectionErrorIndicator]}>
                         <Text style={styles.connectionText}>
-                            Uyumsuz baglanti: {draggingConnection.mismatchReason || 'Veri tipi uyusmuyor'}
+                            Uyumsuz bağlantı: {draggingConnection.mismatchReason || 'Veri tipi uyuşmuyor'}
                         </Text>
                     </View>
                 )}

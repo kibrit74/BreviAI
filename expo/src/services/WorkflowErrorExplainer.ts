@@ -7,26 +7,26 @@ export interface FriendlyWorkflowError {
 }
 
 const DEFAULT_ACTIONS = [
-    'Node ayarlarini acip zorunlu alanlarin dolu oldugunu kontrol edin.',
-    'Bu nodea gelmeden once gerekli veriyi olusturan bir node baglayin.',
-    'Tekrar calistirmadan once workflowu kaydedin.',
+    'Node ayarlarını açıp zorunlu alanların dolu olduğunu kontrol edin.',
+    'Bu node\'a gelmeden önce gerekli veriyi oluşturan bir node bağlayın.',
+    'Tekrar çalıştırmadan önce workflow\'u kaydedin.',
 ];
 
 export function explainWorkflowError(rawError?: string, nodeLabel?: string): FriendlyWorkflowError {
     const message = (rawError || 'Bilinmeyen hata').trim();
     const lower = message.toLowerCase();
-    const nodeText = nodeLabel ? `"${nodeLabel}" adiminda` : 'Bu adimda';
+    const nodeText = nodeLabel ? `"${nodeLabel}" adımında` : 'Bu adımda';
 
     if (lower.includes('cannot read property') || lower.includes('cannot read properties')) {
         if (lower.includes("'query'") || lower.includes('query')) {
             return {
-                title: 'Eksik arama degeri',
-                beginnerMessage: `${nodeText} arama metni bos geldigi icin islem baslatilamadi.`,
-                intermediateMessage: 'Node icindeki "query" alani undefined geliyor. Genelde onceki noddan veri gelmediginde olur.',
+                title: 'Eksik arama değeri',
+                beginnerMessage: `${nodeText} arama metni boş geldiği için işlem başlatılamadı.`,
+                intermediateMessage: 'Node içindeki "query" alanı undefined geliyor. Genelde önceki node\'dan veri gelmediğinde olur.',
                 actionItems: [
-                    'Kisi Bul gibi arama yapan node oncesine Metin Girisi nodeu ekleyin.',
-                    'Arama alanina {{previous_output}} veya tanimli bir degisken yazin.',
-                    'Bos degerle calismayi engellemek icin IF/ELSE kontrolu ekleyin.',
+                    'Kişi Bul gibi arama yapan node öncesine Metin Girişi node\'u ekleyin.',
+                    'Arama alanına {{previous_output}} veya tanımlı bir değişken yazın.',
+                    'Boş değerle çalışmayı engellemek için IF/ELSE kontrolü ekleyin.',
                 ],
                 technicalMessage: message,
             };
@@ -34,12 +34,12 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
 
         return {
             title: 'Eksik veri',
-            beginnerMessage: `${nodeText} gereken bir bilgi gelmedigi icin hata olustu.`,
-            intermediateMessage: 'Kod, undefined olan bir alan okumaya calisti. Veri akisi veya degisken adi eslesmiyor olabilir.',
+            beginnerMessage: `${nodeText} gereken bir bilgi gelmediği için hata oluştu.`,
+            intermediateMessage: 'Kod, undefined olan bir alan okumaya çalıştı. Veri akışı veya değişken adı eşleşmiyor olabilir.',
             actionItems: [
-                'Node girisindeki degisken adlarini kontrol edin.',
-                'Bir onceki node cikisini SHOW_TEXT ile test edin.',
-                'Gerekirse bos deger kontrolu icin IF/ELSE ekleyin.',
+                'Node girişindeki değişken adlarını kontrol edin.',
+                'Bir önceki node çıkışını SHOW_TEXT ile test edin.',
+                'Gerekirse boş değer kontrolü için IF/ELSE ekleyin.',
             ],
             technicalMessage: message,
         };
@@ -47,13 +47,13 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
 
     if (lower.includes('permission') || lower.includes('not granted') || lower.includes('denied')) {
         return {
-            title: 'Izin gerekli',
-            beginnerMessage: `${nodeText} telefon izni olmadan calisamaz.`,
-            intermediateMessage: 'Isletim sistemi ilgili izni reddetti. Node API cagrisi izin kontrolunde duruyor.',
+            title: 'İzin gerekli',
+            beginnerMessage: `${nodeText} telefon izni olmadan çalışamaz.`,
+            intermediateMessage: 'İşletim sistemi ilgili izni reddetti. Node API çağrısı izin kontrolünde duruyor.',
             actionItems: [
-                'Uygulama ayarlarindan ilgili izni acin (Rehber, Konum, Mikrofon vb).',
-                'Izni actiktan sonra workflowu tekrar calistirin.',
-                'Ilk adima izin kontrolu veya bilgi mesaji ekleyin.',
+                'Uygulama ayarlarından ilgili izni açın (Rehber, Konum, Mikrofon vb).',
+                'İzni açtıktan sonra workflow\'u tekrar çalıştırın.',
+                'İlk adıma izin kontrolü veya bilgi mesajı ekleyin.',
             ],
             technicalMessage: message,
         };
@@ -67,13 +67,13 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
         lower.includes('internet')
     ) {
         return {
-            title: 'Baglanti sorunu',
-            beginnerMessage: `${nodeText} internete baglanamadigi icin tamamlanamadi.`,
-            intermediateMessage: 'HTTP istegi zaman asimina ugradi veya servis erisilemedi.',
+            title: 'Bağlantı sorunu',
+            beginnerMessage: `${nodeText} internete bağlanamadığı için tamamlanamadı.`,
+            intermediateMessage: 'HTTP isteği zaman aşımına uğradı veya servise erişilemedi.',
             actionItems: [
-                'Internet baglantisini kontrol edin.',
-                'Gerekirse URL/API endpoint bilgisini tekrar dogrulayin.',
-                'Ayni adimi 10-20 saniye sonra tekrar deneyin.',
+                'İnternet bağlantınızı kontrol edin.',
+                'Gerekirse URL/API endpoint bilgisini tekrar doğrulayın.',
+                'Aynı adımı 10-20 saniye sonra tekrar deneyin.',
             ],
             technicalMessage: message,
         };
@@ -81,13 +81,13 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
 
     if (lower.includes('api key') || lower.includes('unauthorized') || lower.includes('401') || lower.includes('403')) {
         return {
-            title: 'Yetkilendirme hatasi',
-            beginnerMessage: `${nodeText} servis kimlik dogrulamasini gecemedi.`,
-            intermediateMessage: 'API anahtari eksik, gecersiz veya izin kapsaminda degil.',
+            title: 'Yetkilendirme hatası',
+            beginnerMessage: `${nodeText} servis kimlik doğrulamasını geçemedi.`,
+            intermediateMessage: 'API anahtarı eksik, geçersiz veya izin kapsamında değil.',
             actionItems: [
-                'API anahtarinin kayitli oldugunu kontrol edin.',
-                'Anahtarin dogru ortam/proje icin uretildigini dogrulayin.',
-                'Servis panelinden yetki kapsamlarini kontrol edin.',
+                'API anahtarının kayıtlı olduğunu kontrol edin.',
+                'Anahtarın doğru ortam/proje için üretildiğini doğrulayın.',
+                'Servis panelinden yetki kapsamlarını kontrol edin.',
             ],
             technicalMessage: message,
         };
@@ -95,13 +95,13 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
 
     if (lower.includes('json') || lower.includes('unexpected token')) {
         return {
-            title: 'Veri formati hatasi',
-            beginnerMessage: `${nodeText} beklenen veri formatini okuyamadi.`,
-            intermediateMessage: 'JSON parse asamasinda format bozuklugu var veya beklenen yapiyla gelen yapi farkli.',
+            title: 'Veri formatı hatası',
+            beginnerMessage: `${nodeText} beklenen veri formatını okuyamadı.`,
+            intermediateMessage: 'JSON parse aşamasında format bozukluğu var veya beklenen yapıyla gelen yapı farklı.',
             actionItems: [
-                'Node girisindeki JSON metnini dogrulayin.',
-                'Gelen veriyi once SHOW_TEXT ile kontrol edin.',
-                'Mumkunse veri donusumunu CODE_EXECUTION yerine ayri adimlarla sade tutun.',
+                'Node girişindeki JSON metnini doğrulayın.',
+                'Gelen veriyi önce SHOW_TEXT ile kontrol edin.',
+                'Mümkünse veri dönüşümünü CODE_EXECUTION yerine ayrı adımlarla sade tutun.',
             ],
             technicalMessage: message,
         };
@@ -109,22 +109,22 @@ export function explainWorkflowError(rawError?: string, nodeLabel?: string): Fri
 
     if (lower.includes('not implemented') || lower.includes('not found in registry') || lower.includes('executor')) {
         return {
-            title: 'Node henuz hazir degil',
-            beginnerMessage: `${nodeText} uygulamada henuz tam desteklenmiyor olabilir.`,
-            intermediateMessage: 'Node tipi registry/executor katmaninda bulunamadi veya implement edilmemis.',
+            title: 'Node henüz hazır değil',
+            beginnerMessage: `${nodeText} uygulamada henüz tam desteklenmiyor olabilir.`,
+            intermediateMessage: 'Node tipi registry/executor katmanında bulunamadı veya implement edilmemiş.',
             actionItems: [
-                'Ayni sonucu veren alternatif bir node deneyin.',
-                'Node tipini degistirip tekrar test edin.',
-                'Gerekirse bu adimi gecici olarak devre disi birakin.',
+                'Aynı sonucu veren alternatif bir node deneyin.',
+                'Node tipini değiştirip tekrar test edin.',
+                'Gerekirse bu adımı geçici olarak devre dışı bırakın.',
             ],
             technicalMessage: message,
         };
     }
 
     return {
-        title: 'Calistirma hatasi',
+        title: 'Çalıştırma hatası',
         beginnerMessage: `${nodeText} beklenmedik bir hata verdi.`,
-        intermediateMessage: 'Teknik hata mesaji daha fazla ayrinti veriyor. Veri akisi veya node konfigurasyonu kontrol edilmeli.',
+        intermediateMessage: 'Teknik hata mesajı daha fazla ayrıntı veriyor. Veri akışı veya node konfigürasyonu kontrol edilmeli.',
         actionItems: DEFAULT_ACTIONS,
         technicalMessage: message,
     };

@@ -3645,7 +3645,7 @@ const ExcelWriteFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig })
                 style={styles.input}
                 value={config.values || '[[]]'}
                 onChangeText={(t) => updateConfig('values', t)}
-                placeholder='[["Isim", "Yas"], ["Ahmet", 30]]'
+                placeholder='[["İsim", "Yaş"], ["Ahmet", 30]]'
                 placeholderTextColor="#666"
             />
         </View>

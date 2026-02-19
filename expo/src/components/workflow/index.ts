@@ -6,3 +6,5 @@
 export { WorkflowCanvas } from './WorkflowCanvas';
 export { NodePalette } from './NodePalette';
 export { NodeConfigModal } from './NodeConfigModal';
+export { WorkflowAssistantPanel } from './WorkflowAssistantPanel';
+export { WorkflowFixPreviewModal } from './WorkflowFixPreviewModal';
