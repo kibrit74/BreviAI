@@ -4,7 +4,7 @@
  */
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
     View,
     StyleSheet,
@@ -22,22 +22,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorderState } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { WorkflowCanvas, NodePalette, NodeConfigModal } from '../components/workflow';
 import {
     Workflow,
     WorkflowNode,
     NodeType,
+    EdgePort,
     createWorkflow,
     createNode,
+    createEdge,
 } from '../types/workflow-types';
 import { WorkflowStorage } from '../services/WorkflowStorage';
 import { workflowEngine } from '../services/WorkflowEngine';
 import { apiService } from '../services/ApiService';
 import { TemplateMigration } from '../services/TemplateMigration';
 import { useApp } from '../context/AppContext';
+import { ExecutionLogger, ExecutionLogEntry } from '../services/ExecutionLogger';
+import { explainWorkflowError } from '../services/WorkflowErrorExplainer';
 
 // --- Default Theme Fallback (if not in context) ---
 const DEFAULT_THEME = {
@@ -51,12 +56,27 @@ const DEFAULT_THEME = {
 };
 
 type RootStackParamList = {
-    WorkflowBuilder: { workflowId?: string; autoOpenAI?: boolean; template?: any; autoRun?: boolean; workflow?: any };
+    WorkflowBuilder: {
+        workflowId?: string;
+        autoOpenAI?: boolean;
+        template?: any;
+        autoRun?: boolean;
+        workflow?: any;
+        openErrorModal?: boolean;
+        openErrorLogId?: string;
+    };
     WorkflowList: undefined;
 };
 
 type WorkflowBuilderRouteProp = RouteProp<RootStackParamList, 'WorkflowBuilder'>;
 type WorkflowBuilderNavigationProp = NativeStackNavigationProp<RootStackParamList, 'WorkflowBuilder'>;
+type RecipeId =
+    | 'morning_weather'
+    | 'arrive_home_wifi'
+    | 'news_rss'
+    | 'daily_reminder'
+    | 'contact_search'
+    | 'quick_translate';
 
 export const WorkflowBuilderScreen: React.FC = () => {
     const navigation = useNavigation<WorkflowBuilderNavigationProp>();
@@ -74,6 +94,23 @@ export const WorkflowBuilderScreen: React.FC = () => {
     const [hasChanges, setHasChanges] = useState(false);
 
     const [isPaused, setIsPaused] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [pendingQuickAdd, setPendingQuickAdd] = useState<{ sourceNodeId: string; port: EdgePort; position: { x: number; y: number } } | null>(null);
+    const [hideRecipes, setHideRecipes] = useState(false);
+    const [recipeWizard, setRecipeWizard] = useState<{
+        id: RecipeId;
+        config: {
+            hour: string;
+            minute: string;
+            geofenceId: string;
+            rssUrl: string;
+            reminderText: string;
+        };
+    } | null>(null);
+    const [workflowErrorEntries, setWorkflowErrorEntries] = useState<ExecutionLogEntry[]>([]);
+    const [selectedErrorEntryId, setSelectedErrorEntryId] = useState<string | null>(null);
+    const [showErrorGuideModal, setShowErrorGuideModal] = useState(false);
+    const [didAutoOpenErrorModal, setDidAutoOpenErrorModal] = useState(false);
 
     // Engine Callbacks
     useEffect(() => {
@@ -227,6 +264,77 @@ export const WorkflowBuilderScreen: React.FC = () => {
         loadWorkflow();
     }, [route.params?.workflow, route.params?.workflowId, route.params?.autoOpenAI, route.params?.template]);
 
+    useEffect(() => {
+        const loadOnboarding = async () => {
+            try {
+                const seen = await AsyncStorage.getItem('workflow_builder_onboarding_v1');
+                if (!seen) setShowOnboarding(true);
+            } catch (e) {
+                // If storage fails, still avoid blocking UI
+            }
+        };
+        loadOnboarding();
+    }, []);
+
+    const loadWorkflowErrors = useCallback(async (workflowId: string) => {
+        if (!workflowId) {
+            setWorkflowErrorEntries([]);
+            setSelectedErrorEntryId(null);
+            return;
+        }
+
+        const history = await ExecutionLogger.getHistoryByWorkflow(workflowId);
+        const failedOnly = history.filter(
+            entry => !entry.success && (!!entry.error || entry.nodeResults.some(node => !!node.error))
+        );
+
+        setWorkflowErrorEntries(failedOnly);
+
+        if (failedOnly.length === 0) {
+            setSelectedErrorEntryId(null);
+            return;
+        }
+
+        setSelectedErrorEntryId(prevId => {
+            if (prevId && failedOnly.some(entry => entry.id === prevId)) return prevId;
+            return failedOnly[0].id;
+        });
+
+        const shouldAutoOpen = !!route.params?.openErrorModal || !!route.params?.openErrorLogId;
+        if (!didAutoOpenErrorModal && shouldAutoOpen) {
+            const requestedId = route.params?.openErrorLogId;
+            if (requestedId && failedOnly.some(entry => entry.id === requestedId)) {
+                setSelectedErrorEntryId(requestedId);
+            }
+            setShowErrorGuideModal(true);
+            setDidAutoOpenErrorModal(true);
+        }
+    }, [didAutoOpenErrorModal, route.params?.openErrorLogId, route.params?.openErrorModal]);
+
+    useEffect(() => {
+        loadWorkflowErrors(workflow.id);
+    }, [workflow.id, loadWorkflowErrors]);
+
+    useFocusEffect(
+        useCallback(() => {
+            loadWorkflowErrors(workflow.id);
+        }, [workflow.id, loadWorkflowErrors])
+    );
+
+    const selectedErrorEntry = useMemo(() => {
+        if (workflowErrorEntries.length === 0) return null;
+        return workflowErrorEntries.find(entry => entry.id === selectedErrorEntryId) || workflowErrorEntries[0];
+    }, [workflowErrorEntries, selectedErrorEntryId]);
+
+    const formatErrorTimestamp = useCallback((timestamp: number) => {
+        return new Date(timestamp).toLocaleString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    }, []);
+
     // Handle workflow changes
     const handleWorkflowChange = useCallback((updatedWorkflow: Workflow) => {
         setWorkflow(updatedWorkflow);
@@ -248,13 +356,25 @@ export const WorkflowBuilderScreen: React.FC = () => {
         }
     }, [selectedNode]);
 
-    // Add new node with AUTO-CONNECTION
-    const handleAddNode = useCallback((type: NodeType) => {
-        const newNode = createNode(type, { x: 100, y: 100 + workflow.nodes.length * 100 });
-
-        // AUTO-CONNECTION: Connect to the last node (if exists)
-        let newEdges = workflow.edges;
+    useEffect(() => {
         if (workflow.nodes.length > 0) {
+            setHideRecipes(true);
+        }
+    }, [workflow.nodes.length]);
+
+    // Add new node with optional connection
+    const handleAddNode = useCallback((
+        type: NodeType,
+        options?: { position?: { x: number; y: number }; connectFrom?: { sourceNodeId: string; port: EdgePort } }
+    ) => {
+        const position = options?.position || { x: 100, y: 100 + workflow.nodes.length * 100 };
+        const newNode = createNode(type, position);
+
+        let newEdges = workflow.edges;
+        if (options?.connectFrom) {
+            const edge = createEdge(options.connectFrom.sourceNodeId, newNode.id, options.connectFrom.port);
+            newEdges = [...workflow.edges, edge];
+        } else if (workflow.nodes.length > 0) {
             const lastNode = workflow.nodes[workflow.nodes.length - 1];
             const edgeId = `edge_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
             const newEdge = {
@@ -342,8 +462,9 @@ export const WorkflowBuilderScreen: React.FC = () => {
         } finally {
             setIsExecuting(false);
             setIsPaused(false);
+            await loadWorkflowErrors(workflow.id);
         }
-    }, [workflow]);
+    }, [workflow, loadWorkflowErrors]);
 
     // Handle back navigation
     const handleBack = useCallback(() => {
@@ -425,12 +546,181 @@ export const WorkflowBuilderScreen: React.FC = () => {
             } else {
                 Alert.alert('⚠️ Uyarı', 'AI mantıklı bir workflow üretemedi.');
             }
-        } catch (error) {
-            Alert.alert('❌ Hata', 'AI yanıt vermedi veya bir hata oluştu.');
+        } catch (error: any) {
+            const msg = error?.message || 'AI yanıt vermedi veya bir hata oluştu.';
+            Alert.alert('❌ Hata', msg);
         } finally {
             setIsGenerating(false);
         }
     };
+
+    const applyRecipe = useCallback((recipeId: RecipeId, configOverride?: {
+        hour?: string;
+        minute?: string;
+        geofenceId?: string;
+        rssUrl?: string;
+        reminderText?: string;
+    }) => {
+        let newWorkflow: Workflow | null = null;
+        const config = {
+            hour: '08',
+            minute: '00',
+            geofenceId: 'home',
+            rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+            reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+            ...(configOverride || {}),
+        };
+
+        const normalizeNumber = (value: string, fallback: number, max: number) => {
+            const parsed = parseInt(value, 10);
+            if (Number.isNaN(parsed)) return fallback;
+            return Math.max(0, Math.min(max, parsed));
+        };
+
+        if (recipeId === 'morning_weather') {
+            const trigger = createNode('TIME_TRIGGER', { x: 80, y: 120 });
+            const weather = createNode('WEATHER_GET', { x: 320, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 560, y: 120 });
+            const hour = normalizeNumber(config.hour, 8, 23);
+            const minute = normalizeNumber(config.minute, 0, 59);
+            trigger.config = { ...(trigger.config || {}), hour, minute, repeat: true } as any;
+            weather.config = { ...(weather.config || {}), variableName: 'weather' } as any;
+            show.config = { ...(show.config || {}), content: '{{weather}}', title: 'Hava Durumu' } as any;
+            newWorkflow = {
+                ...createWorkflow('Sabah Hava Durumu'),
+                nodes: [trigger, weather, show],
+                edges: [
+                    createEdge(trigger.id, weather.id, 'default'),
+                    createEdge(weather.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'arrive_home_wifi') {
+            const trigger = createNode('GEOFENCE_ENTER_TRIGGER', { x: 80, y: 120 });
+            const settings = createNode('SETTINGS_OPEN', { x: 320, y: 120 });
+            trigger.config = { ...(trigger.config || {}), geofenceId: config.geofenceId || 'home' } as any;
+            settings.config = { ...(settings.config || {}), setting: 'wifi' } as any;
+            newWorkflow = {
+                ...createWorkflow('Eve Gelince Wi‑Fi Aç'),
+                nodes: [trigger, settings],
+                edges: [createEdge(trigger.id, settings.id, 'default')],
+            };
+        }
+
+        if (recipeId === 'news_rss') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const rss = createNode('RSS_READ', { x: 320, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 560, y: 120 });
+            rss.config = { ...(rss.config || {}), url: config.rssUrl || 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr', variableName: 'rssItems' } as any;
+            show.config = { ...(show.config || {}), content: '{{rssItems}}', title: 'Haberler' } as any;
+            newWorkflow = {
+                ...createWorkflow('Haberleri Oku'),
+                nodes: [trigger, rss, show],
+                edges: [
+                    createEdge(trigger.id, rss.id, 'default'),
+                    createEdge(rss.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'daily_reminder') {
+            const trigger = createNode('TIME_TRIGGER', { x: 80, y: 120 });
+            const notification = createNode('NOTIFICATION', { x: 320, y: 120 });
+            const hour = normalizeNumber(config.hour, 9, 23);
+            const minute = normalizeNumber(config.minute, 0, 59);
+            trigger.config = { ...(trigger.config || {}), hour, minute, repeat: true } as any;
+            notification.config = {
+                ...(notification.config || {}),
+                title: 'Gunluk Hatirlatma',
+                message: config.reminderText || 'Hatirlatma: bugunku oncelikli isini tamamla.',
+            } as any;
+            newWorkflow = {
+                ...createWorkflow('Gunluk Hatirlatma'),
+                nodes: [trigger, notification],
+                edges: [createEdge(trigger.id, notification.id, 'default')],
+            };
+        }
+
+        if (recipeId === 'contact_search') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const input = createNode('TEXT_INPUT', { x: 320, y: 120 });
+            const contactsRead = createNode('CONTACTS_READ', { x: 560, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
+            input.config = {
+                ...(input.config || {}),
+                prompt: 'Aramak istediginiz kisi adi',
+                variableName: 'contact_query',
+            } as any;
+            contactsRead.config = {
+                ...(contactsRead.config || {}),
+                query: '{{contact_query}}',
+                variableName: 'contact_results',
+            } as any;
+            show.config = {
+                ...(show.config || {}),
+                title: 'Kisi Sonuclari',
+                content: '{{contact_results}}',
+            } as any;
+            newWorkflow = {
+                ...createWorkflow('Kisi Bul ve Goster'),
+                nodes: [trigger, input, contactsRead, show],
+                edges: [
+                    createEdge(trigger.id, input.id, 'default'),
+                    createEdge(input.id, contactsRead.id, 'default'),
+                    createEdge(contactsRead.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'quick_translate') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const input = createNode('TEXT_INPUT', { x: 320, y: 120 });
+            const translate = createNode('GOOGLE_TRANSLATE', { x: 560, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
+            input.config = {
+                ...(input.config || {}),
+                prompt: 'Cevrilecek metni yazin',
+                variableName: 'translation_input',
+            } as any;
+            translate.config = {
+                ...(translate.config || {}),
+                text: '{{translation_input}}',
+                targetLanguage: 'en',
+                variableName: 'translated_text',
+            } as any;
+            show.config = {
+                ...(show.config || {}),
+                title: 'Ceviri Sonucu',
+                content: '{{translated_text}}',
+            } as any;
+            newWorkflow = {
+                ...createWorkflow('Hizli Ceviri'),
+                nodes: [trigger, input, translate, show],
+                edges: [
+                    createEdge(trigger.id, input.id, 'default'),
+                    createEdge(input.id, translate.id, 'default'),
+                    createEdge(translate.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (newWorkflow) {
+            setWorkflow(newWorkflow);
+            setHasChanges(true);
+            setHideRecipes(true);
+            setRecipeWizard(null);
+        }
+    }, []);
+
+    const dismissOnboarding = useCallback(async () => {
+        setShowOnboarding(false);
+        try {
+            await AsyncStorage.setItem('workflow_builder_onboarding_v1', '1');
+        } catch (e) {
+            // ignore
+        }
+    }, []);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -531,6 +821,34 @@ export const WorkflowBuilderScreen: React.FC = () => {
                     >
                         <Ionicons name="save-outline" size={20} color={hasChanges ? "#00F5FF" : colors.text} />
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionButton, {
+                            borderColor: workflowErrorEntries.length > 0 ? 'rgba(239, 68, 68, 0.4)' : colors.border,
+                            backgroundColor: workflowErrorEntries.length > 0
+                                ? 'rgba(239, 68, 68, 0.12)'
+                                : (isDark ? 'rgba(255, 255, 255, 0.05)' : '#E2E8F0')
+                        }]}
+                        onPress={() => {
+                            if (workflowErrorEntries.length === 0) {
+                                Alert.alert('Bilgi', 'Bu workflow icin kayitli bir hata yok.');
+                                return;
+                            }
+                            setShowErrorGuideModal(true);
+                        }}
+                    >
+                        <Ionicons
+                            name="alert-circle-outline"
+                            size={20}
+                            color={workflowErrorEntries.length > 0 ? '#EF4444' : colors.text}
+                        />
+                        {workflowErrorEntries.length > 0 && (
+                            <View style={styles.errorCountBadge}>
+                                <Text style={styles.errorCountBadgeText}>
+                                    {workflowErrorEntries.length > 9 ? '9+' : String(workflowErrorEntries.length)}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                     {isExecuting ? (
                         <>
                             {isPaused ? (
@@ -571,7 +889,105 @@ export const WorkflowBuilderScreen: React.FC = () => {
                 onWorkflowChange={handleWorkflowChange}
                 onNodeSelect={handleNodeSelect}
                 selectedNodeId={selectedNode?.id || null}
+                onQuickAddRequested={(req) => {
+                    setPendingQuickAdd(req);
+                    setShowNodePalette(true);
+                }}
             />
+
+            {!hideRecipes && workflow.nodes.length === 0 && (
+                <View style={styles.recipesOverlay} pointerEvents="box-none">
+                    <View style={styles.recipesCard}>
+                        <Text style={styles.recipesTitle}>Ne yapmak istersin?</Text>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => setRecipeWizard({
+                                id: 'morning_weather',
+                                config: {
+                                    hour: '08',
+                                    minute: '00',
+                                    geofenceId: 'home',
+                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                },
+                            })}
+                        >
+                            <Text style={styles.recipeItemTitle}>Sabah Hava Durumu</Text>
+                            <Text style={styles.recipeItemDesc}>Her gun 08:00'de hava durumunu goster.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => setRecipeWizard({
+                                id: 'arrive_home_wifi',
+                                config: {
+                                    hour: '08',
+                                    minute: '00',
+                                    geofenceId: 'home',
+                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                },
+                            })}
+                        >
+                            <Text style={styles.recipeItemTitle}>Eve Gelince Wi-Fi Ac</Text>
+                            <Text style={styles.recipeItemDesc}>Eve giriste Wi-Fi ayarini acar.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => setRecipeWizard({
+                                id: 'news_rss',
+                                config: {
+                                    hour: '08',
+                                    minute: '00',
+                                    geofenceId: 'home',
+                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                },
+                            })}
+                        >
+                            <Text style={styles.recipeItemTitle}>Haberleri Oku</Text>
+                            <Text style={styles.recipeItemDesc}>Guncel haberleri tek ekranda goster.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => setRecipeWizard({
+                                id: 'daily_reminder',
+                                config: {
+                                    hour: '09',
+                                    minute: '00',
+                                    geofenceId: 'home',
+                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                    reminderText: 'Hatirlatma: bugunku oncelikli isini tamamla.',
+                                },
+                            })}
+                        >
+                            <Text style={styles.recipeItemTitle}>Gunluk Hatirlatma</Text>
+                            <Text style={styles.recipeItemDesc}>Her gun belirledigin saatte bildirim gondersin.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('contact_search')}
+                        >
+                            <Text style={styles.recipeItemTitle}>Kisi Bul ve Goster</Text>
+                            <Text style={styles.recipeItemDesc}>Isim gir, rehberde ara, sonucu ekranda goster.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('quick_translate')}
+                        >
+                            <Text style={styles.recipeItemTitle}>Hizli Ceviri</Text>
+                            <Text style={styles.recipeItemDesc}>Metni yaz, otomatik cevir, sonucu goster.</Text>
+                        </TouchableOpacity>
+                        <View style={styles.recipesActions}>
+                            <TouchableOpacity style={styles.recipeSecondary} onPress={() => setHideRecipes(true)}>
+                                <Text style={styles.recipeSecondaryText}>Boş Başla</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.recipePrimary} onPress={() => setShowAIModal(true)}>
+                                <Text style={styles.recipePrimaryText}>AI ile Oluştur</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            )}
 
             {/* Add Node FAB */}
             <TouchableOpacity
@@ -620,8 +1036,25 @@ export const WorkflowBuilderScreen: React.FC = () => {
             {/* Modals */}
             <NodePalette
                 visible={showNodePalette}
-                onClose={() => setShowNodePalette(false)}
-                onSelectNode={handleAddNode}
+                onClose={() => {
+                    setShowNodePalette(false);
+                    setPendingQuickAdd(null);
+                }}
+                onSelectNode={(type) => {
+                    if (pendingQuickAdd) {
+                        handleAddNode(type, {
+                            position: pendingQuickAdd.position,
+                            connectFrom: {
+                                sourceNodeId: pendingQuickAdd.sourceNodeId,
+                                port: pendingQuickAdd.port,
+                            }
+                        });
+                        setPendingQuickAdd(null);
+                    } else {
+                        handleAddNode(type);
+                    }
+                    setShowNodePalette(false);
+                }}
             />
 
             <NodeConfigModal
@@ -632,6 +1065,241 @@ export const WorkflowBuilderScreen: React.FC = () => {
                 onSave={handleUpdateNode}
                 onDelete={handleDeleteNode}
             />
+
+            {/* Onboarding Overlay */}
+            <Modal
+                visible={showOnboarding}
+                transparent
+                animationType="fade"
+                onRequestClose={dismissOnboarding}
+            >
+                <View style={styles.onboardingOverlay}>
+                    <View style={styles.onboardingCard}>
+                        <Text style={styles.onboardingTitle}>Lego Gibi Kur!</Text>
+                        <Text style={styles.onboardingText}>
+                            1. Bir node’un sağındaki + butonuna dokun.
+                        </Text>
+                        <Text style={styles.onboardingText}>
+                            2. Boş alana dokununca node menüsü açılır.
+                        </Text>
+                        <Text style={styles.onboardingText}>
+                            3. Seçtiğin node otomatik bağlanır.
+                        </Text>
+                        <TouchableOpacity style={styles.onboardingButton} onPress={dismissOnboarding}>
+                            <Text style={styles.onboardingButtonText}>Anladım</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Recipe Wizard Modal */}
+            <Modal
+                visible={!!recipeWizard}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setRecipeWizard(null)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.aiModalContent, { backgroundColor: isDark ? '#121214' : colors.card }]}>
+                        <View style={styles.aiHeader}>
+                            <Text style={[styles.aiTitle, { color: colors.text }]}>🧙 Tarif Sihirbazı</Text>
+                            <TouchableOpacity onPress={() => setRecipeWizard(null)}>
+                                <Text style={[styles.closeIcon, { color: colors.textSecondary }]}>✕</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {recipeWizard && (recipeWizard.id === 'morning_weather' || recipeWizard.id === 'daily_reminder') && (
+                            <>
+                                <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                    Her gun kacta calissin?
+                                </Text>
+                                <View style={styles.recipeTimeRow}>
+                                    <TextInput
+                                        style={[styles.recipeTimeInput, { color: colors.text, borderColor: colors.border }]}
+                                        value={recipeWizard.config.hour}
+                                        onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, hour: t.replace(/[^0-9]/g, '').slice(0, 2) } } : prev)}
+                                        placeholder="08"
+                                        placeholderTextColor={colors.textTertiary}
+                                        keyboardType="number-pad"
+                                    />
+                                    <Text style={[styles.recipeTimeSeparator, { color: colors.textSecondary }]}>:</Text>
+                                    <TextInput
+                                        style={[styles.recipeTimeInput, { color: colors.text, borderColor: colors.border }]}
+                                        value={recipeWizard.config.minute}
+                                        onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, minute: t.replace(/[^0-9]/g, '').slice(0, 2) } } : prev)}
+                                        placeholder="00"
+                                        placeholderTextColor={colors.textTertiary}
+                                        keyboardType="number-pad"
+                                    />
+                                </View>
+                                {recipeWizard.id === 'daily_reminder' && (
+                                    <>
+                                        <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                            Bildirim metni
+                                        </Text>
+                                        <TextInput
+                                            style={[styles.aiInput, {
+                                                minHeight: 50,
+                                                height: 50,
+                                                backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                                color: colors.text,
+                                                borderColor: colors.border
+                                            }]}
+                                            value={recipeWizard.config.reminderText}
+                                            onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, reminderText: t } } : prev)}
+                                            placeholder="Hatirlatma metnini yazin"
+                                            placeholderTextColor={colors.textTertiary}
+                                        />
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        {recipeWizard && recipeWizard.id === 'arrive_home_wifi' && (
+                            <>
+                                <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                    Ev bölgesi (geofence) ID’sini yazın.
+                                </Text>
+                                <TextInput
+                                    style={[styles.aiInput, {
+                                        minHeight: 50,
+                                        height: 50,
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                        color: colors.text,
+                                        borderColor: colors.border
+                                    }]}
+                                    value={recipeWizard.config.geofenceId}
+                                    onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, geofenceId: t } } : prev)}
+                                    placeholder="home"
+                                    placeholderTextColor={colors.textTertiary}
+                                />
+                                <Text style={[styles.recipeHint, { color: colors.textSecondary }]}>
+                                    Örn: home, office
+                                </Text>
+                            </>
+                        )}
+
+                        {recipeWizard && recipeWizard.id === 'news_rss' && (
+                            <>
+                                <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                    RSS adresini girin.
+                                </Text>
+                                <TextInput
+                                    style={[styles.aiInput, {
+                                        minHeight: 50,
+                                        height: 50,
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                        color: colors.text,
+                                        borderColor: colors.border
+                                    }]}
+                                    value={recipeWizard.config.rssUrl}
+                                    onChangeText={(t) => setRecipeWizard(prev => prev ? { ...prev, config: { ...prev.config, rssUrl: t } } : prev)}
+                                    placeholder="https://example.com/rss"
+                                    placeholderTextColor={colors.textTertiary}
+                                    autoCapitalize="none"
+                                />
+                            </>
+                        )}
+
+                        <TouchableOpacity
+                            style={styles.generateButton}
+                            onPress={() => {
+                                if (!recipeWizard) return;
+                                applyRecipe(recipeWizard.id, recipeWizard.config);
+                            }}
+                        >
+                            <Text style={styles.generateButtonText}>Oluştur</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Workflow Error Guide Modal */}
+            <Modal
+                visible={showErrorGuideModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowErrorGuideModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.aiModalContent, { backgroundColor: isDark ? '#121214' : colors.card }]}>
+                        <View style={styles.aiHeader}>
+                            <Text style={[styles.aiTitle, { color: colors.text }]}>Workflow Hata Rehberi</Text>
+                            <TouchableOpacity onPress={() => setShowErrorGuideModal(false)}>
+                                <Text style={[styles.closeIcon, { color: colors.textSecondary }]}>x</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {workflowErrorEntries.length === 0 && (
+                            <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                Bu workflow icin kayitli hata bulunmuyor.
+                            </Text>
+                        )}
+
+                        {workflowErrorEntries.length > 0 && (
+                            <>
+                                <Text style={[styles.aiSubtitle, { color: colors.textSecondary }]}>
+                                    Son hatalar arasindan birini secin ve kolay anlatimla duzeltin.
+                                </Text>
+
+                                <View style={styles.errorEntryList}>
+                                    {workflowErrorEntries.slice(0, 5).map((entry) => (
+                                        <TouchableOpacity
+                                            key={entry.id}
+                                            style={[
+                                                styles.errorEntryChip,
+                                                selectedErrorEntry?.id === entry.id && styles.errorEntryChipActive,
+                                            ]}
+                                            onPress={() => setSelectedErrorEntryId(entry.id)}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.errorEntryChipText,
+                                                    selectedErrorEntry?.id === entry.id && styles.errorEntryChipTextActive,
+                                                ]}
+                                                numberOfLines={1}
+                                            >
+                                                {entry.failedNodeLabel || 'Workflow'}
+                                            </Text>
+                                            <Text style={styles.errorEntryChipTime}>
+                                                {formatErrorTimestamp(entry.timestamp)}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                {selectedErrorEntry && selectedErrorEntry.nodeResults
+                                    .filter(node => !!node.error)
+                                    .slice(0, 3)
+                                    .map((nodeResult) => {
+                                        const explanation = explainWorkflowError(nodeResult.error, nodeResult.nodeLabel);
+                                        return (
+                                            <View key={`${selectedErrorEntry.id}_${nodeResult.nodeId}`} style={styles.errorGuideCard}>
+                                                <Text style={[styles.errorGuideTitle, { color: colors.text }]}>
+                                                    {nodeResult.nodeLabel} - {explanation.title}
+                                                </Text>
+                                                <Text style={[styles.errorGuideLevel, { color: colors.textSecondary }]}>
+                                                    Basit: {explanation.beginnerMessage}
+                                                </Text>
+                                                <Text style={[styles.errorGuideLevel, { color: colors.textSecondary }]}>
+                                                    Orta: {explanation.intermediateMessage}
+                                                </Text>
+                                                {explanation.actionItems.map((item, index) => (
+                                                    <Text key={`${nodeResult.nodeId}_tip_${index}`} style={[styles.errorGuideTip, { color: colors.textSecondary }]}>
+                                                        - {item}
+                                                    </Text>
+                                                ))}
+                                                <Text style={[styles.errorGuideTech, { color: colors.textTertiary || colors.textSecondary }]}>
+                                                    Teknik: {explanation.technicalMessage}
+                                                </Text>
+                                            </View>
+                                        );
+                                    })}
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
             {/* AI Prompt Modal */}
             <Modal
@@ -933,6 +1601,79 @@ const styles = StyleSheet.create({
         lineHeight: 20,
         // color is set dynamically
     },
+    errorCountBadge: {
+        position: 'absolute',
+        top: -4,
+        right: -4,
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#EF4444',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: 3,
+    },
+    errorCountBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 10,
+        fontWeight: '700',
+    },
+    errorEntryList: {
+        marginBottom: 12,
+        gap: 8,
+    },
+    errorEntryChip: {
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(239, 68, 68, 0.35)',
+        backgroundColor: 'rgba(239, 68, 68, 0.06)',
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    errorEntryChipActive: {
+        backgroundColor: 'rgba(239, 68, 68, 0.18)',
+        borderColor: 'rgba(239, 68, 68, 0.65)',
+    },
+    errorEntryChipText: {
+        color: '#FCA5A5',
+        fontSize: 12,
+        fontWeight: '700',
+    },
+    errorEntryChipTextActive: {
+        color: '#FFFFFF',
+    },
+    errorEntryChipTime: {
+        color: '#FECACA',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    errorGuideCard: {
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        padding: 12,
+        marginBottom: 10,
+    },
+    errorGuideTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 6,
+    },
+    errorGuideLevel: {
+        fontSize: 12,
+        lineHeight: 18,
+        marginBottom: 6,
+    },
+    errorGuideTip: {
+        fontSize: 12,
+        lineHeight: 18,
+        marginBottom: 4,
+    },
+    errorGuideTech: {
+        fontSize: 11,
+        marginTop: 6,
+    },
     aiInput: {
         // backgroundColor is set dynamically
         borderRadius: 16,
@@ -988,6 +1729,137 @@ const styles = StyleSheet.create({
     micButtonText: {
         fontWeight: '600',
         // color is set dynamically
+    },
+    onboardingOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    onboardingCard: {
+        backgroundColor: '#10131A',
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        width: '100%',
+        maxWidth: 360,
+    },
+    onboardingTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    onboardingText: {
+        color: '#C7D2FE',
+        fontSize: 14,
+        marginBottom: 8,
+    },
+    onboardingButton: {
+        backgroundColor: '#00F5FF',
+        paddingVertical: 12,
+        borderRadius: 12,
+        marginTop: 12,
+    },
+    onboardingButtonText: {
+        color: '#000',
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    recipesOverlay: {
+        position: 'absolute',
+        top: 120,
+        left: 16,
+        right: 16,
+        zIndex: 10,
+    },
+    recipesCard: {
+        backgroundColor: '#0F1117',
+        borderRadius: 20,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.08)',
+    },
+    recipesTitle: {
+        color: '#E2E8F0',
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 10,
+    },
+    recipeItem: {
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: 12,
+        padding: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.06)',
+    },
+    recipeItemTitle: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    recipeItemDesc: {
+        color: '#94A3B8',
+        fontSize: 12,
+    },
+    recipesActions: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 8,
+    },
+    recipeSecondary: {
+        flex: 1,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    recipeSecondaryText: {
+        color: '#E2E8F0',
+        fontWeight: '600',
+        fontSize: 12,
+    },
+    recipePrimary: {
+        flex: 1,
+        backgroundColor: '#00F5FF',
+        paddingVertical: 10,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    recipePrimaryText: {
+        color: '#000',
+        fontWeight: '700',
+        fontSize: 12,
+    },
+    recipeTimeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        marginBottom: 16,
+    },
+    recipeTimeInput: {
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        minWidth: 64,
+        textAlign: 'center',
+        fontSize: 18,
+        borderWidth: 1,
+    },
+    recipeTimeSeparator: {
+        fontSize: 20,
+        fontWeight: '700',
+    },
+    recipeHint: {
+        fontSize: 12,
+        marginTop: -8,
+        marginBottom: 12,
     },
 });
 

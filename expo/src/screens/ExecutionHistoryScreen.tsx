@@ -43,6 +43,14 @@ const ExecutionHistoryScreen: React.FC = () => {
         setRefreshing(false);
     };
 
+    const openWorkflowBuilder = (item: ExecutionLogEntry) => {
+        (navigation as any).navigate('WorkflowBuilder', {
+            workflowId: item.workflowId,
+            openErrorModal: !item.success,
+            openErrorLogId: item.id,
+        });
+    };
+
     const handleClearHistory = () => {
         Alert.alert(
             'Geçmişi Temizle',
@@ -158,6 +166,19 @@ const ExecutionHistoryScreen: React.FC = () => {
                                 />
                             </View>
                         ))}
+                        <TouchableOpacity
+                            style={styles.openWorkflowButton}
+                            onPress={() => openWorkflowBuilder(item)}
+                        >
+                            <Ionicons
+                                name={item.success ? 'create-outline' : 'warning-outline'}
+                                size={16}
+                                color="#FFFFFF"
+                            />
+                            <Text style={styles.openWorkflowButtonText}>
+                                {item.success ? 'Workflow\'u Ac' : 'Workflow\'u Ac ve Hatayi Incele'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 )}
 
@@ -410,6 +431,22 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontSize: 12,
         color: colors.textMuted,
         marginRight: 8,
+    },
+    openWorkflowButton: {
+        marginTop: 10,
+        borderRadius: 10,
+        backgroundColor: '#2563EB',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+    },
+    openWorkflowButtonText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '700',
     },
     emptyContainer: {
         alignItems: 'center',
