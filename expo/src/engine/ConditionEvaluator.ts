@@ -33,8 +33,8 @@ export class ConditionEvaluator {
         left = this.normalizeValue(left);
         right = this.normalizeValue(right);
 
-        // Case insensitivity handling
-        const isCaseSensitive = item.caseSensitive !== false; // Default true
+        // Case insensitivity handling (default: case-insensitive for better UX)
+        const isCaseSensitive = item.caseSensitive === true; // Default false
         if (!isCaseSensitive) {
             if (typeof left === 'string') left = left.toLowerCase();
             if (typeof right === 'string') right = right.toLowerCase();
@@ -62,6 +62,19 @@ export class ConditionEvaluator {
             case 'isEmpty':
                 return left === undefined || left === null || left === '' ||
                     (Array.isArray(left) && left.length === 0);
+            case 'isNotEmpty':
+                return left !== undefined && left !== null && left !== '' &&
+                    !(Array.isArray(left) && left.length === 0);
+            case 'matches':
+                try {
+                    return new RegExp(String(right)).test(String(left));
+                } catch {
+                    return false;
+                }
+            case 'isNumber':
+                return !isNaN(Number(left)) && left !== '' && left !== null;
+            case 'isArray':
+                return Array.isArray(left);
             default:
                 return false;
         }

@@ -1447,17 +1447,15 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'bulk_add_to_memory',
-        description: 'Adds multiple records to vector memory from sheet data. Parses rows directly using column indices without AI interpretation.',
+        description: 'Adds multiple records to vector memory from sheet data. Auto-detects column headers and stores all fields. No specific column mapping needed - just provide the data variable name.',
         parameters: {
             type: 'OBJECT',
             properties: {
-                data: { type: 'STRING', description: 'Variable name containing the sheet data' },
-                contractColumn: { type: 'INTEGER', description: 'Column index for contract number (0=A, 1=B, etc.)' },
-                phoneColumn: { type: 'INTEGER', description: 'Column index for phone number' },
-                debtColumn: { type: 'INTEGER', description: 'Column index for debt amount' },
-                nameColumn: { type: 'INTEGER', description: 'Optional column index for name' }
+                data: { type: 'STRING', description: 'Variable name containing the sheet data (e.g., "sheet_data")' },
+                storageType: { type: 'STRING', description: 'Storage type: "auto", "local", or "backend" (default: "auto")' },
+                variableName: { type: 'STRING', description: 'Variable to store results (optional)' }
             },
-            required: ['data', 'contractColumn', 'phoneColumn', 'debtColumn']
+            required: ['data']
         },
         nodeType: 'BULK_ADD_TO_MEMORY',
         permissions: { requiresConfirmation: false, isSensitive: false }

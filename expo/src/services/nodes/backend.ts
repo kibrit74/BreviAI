@@ -10,7 +10,7 @@ const DEFAULT_AUTH_KEY = 'breviai-secret-password';
  * Backend yapılandırmasını güvenli depolamadan çeker.
  * SecureStore'da değer yoksa fallback kullanır.
  */
-async function getBackendConfig() {
+export async function getBackendConfig() {
     const url = await secureStorage.getSecure('backendUrl') || DEFAULT_BACKEND_URL;
     const key = await secureStorage.getSecure('backendAuthKey') || DEFAULT_AUTH_KEY;
     return { url, key };

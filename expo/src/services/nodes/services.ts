@@ -1088,18 +1088,21 @@ export async function executeAddToMemory(
 }
 
 /**
- * Bulk Add to Vector Memory (RAG) - Direct data population without AI
- * Parses sheet data directly using column indices
+ * Bulk Add to Vector Memory (RAG) - Generic data population
+ * Supports any tabular data format, auto-detects column headers
  */
 export async function executeBulkAddToMemory(
     config: {
         data: string;  // Variable name containing sheet data
-        contractColumn: number;  // 0-indexed column for contract number (A=0)
-        phoneColumn: number;     // Column for phone
-        debtColumn: number;      // Column for debt amount
-        nameColumn?: number;     // Column for name (optional)
-        muhatabColumn?: number;  // Column for muhatap tanımı (optional)
-        durumColumn?: number;    // Column for durum tanıtıcısı (optional)
+        columns?: Record<string, number>;  // Optional: custom column mapping { fieldName: columnIndex }
+        textTemplate?: string; // Optional: custom text template e.g. "Ad: {{Ad}}, Tel: {{Telefon}}"
+        // Legacy column index support (backward compatibility)
+        contractColumn?: number;
+        phoneColumn?: number;
+        debtColumn?: number;
+        nameColumn?: number;
+        muhatabColumn?: number;
+        durumColumn?: number;
         variableName?: string;
         storageType?: 'auto' | 'local' | 'backend';
     },
@@ -1133,7 +1136,6 @@ export async function executeBulkAddToMemory(
         } else if (Array.isArray(dataVar)) {
             rows = dataVar;
         } else if (dataVar.data && Array.isArray(dataVar.data)) {
-            // Check if dataVar.data has _raw
             if ((dataVar.data as any)._raw) {
                 console.log('[BulkAddToMemory] Using _raw from dataVar.data');
                 rows = (dataVar.data as any)._raw;
@@ -1142,75 +1144,107 @@ export async function executeBulkAddToMemory(
             }
         }
 
+        if (rows.length === 0) {
+            return { success: false, error: 'Veri dizisi boş' };
+        }
+
         console.log(`[BulkAddToMemory] Processing ${rows.length} rows. Storage: ${storageType}`);
 
         let addedCount = 0;
         let skippedCount = 0;
         let errors: string[] = [];
 
-        // Skip header row (index 0)
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
+        // Determine if rows are objects (JSON) or arrays (raw sheet data)
+        const firstDataRow = rows.length > 1 ? rows[1] : rows[0];
+        const isObjectFormat = firstDataRow && !Array.isArray(firstDataRow) && typeof firstDataRow === 'object';
+        console.log(`[BulkAddToMemory] Data format: ${isObjectFormat ? 'OBJECT' : 'ARRAY'}, firstRow type: ${typeof firstDataRow}, isArray: ${Array.isArray(firstDataRow)}, sample: ${JSON.stringify(firstDataRow)?.substring(0, 200)}`);
 
-            if (!row || !Array.isArray(row) || row.length === 0) {
-                skippedCount++;
-                continue;
-            }
+        if (isObjectFormat) {
+            // --- OBJECT FORMAT (e.g., from SHEETS_READ JSON conversion) ---
+            // Each row is already { "Column Name": "value", ... }
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || typeof row !== 'object') { skippedCount++; continue; }
 
-            // Extract values using column indices
-            const contract = String(row[config.contractColumn] || '').trim();
-            const phone = String(row[config.phoneColumn] || '').trim();
-            const debt = String(row[config.debtColumn] || '').trim();
-            const name = config.nameColumn !== undefined ? String(row[config.nameColumn] || '').trim() : '';
-            const muhatap = config.muhatabColumn !== undefined ? String(row[config.muhatabColumn] || '').trim() : '';
-            const durum = config.durumColumn !== undefined ? String(row[config.durumColumn] || '').trim() : '';
+                const keys = Object.keys(row);
+                const values = Object.values(row).map(v => String(v ?? '').trim());
 
-            if (!contract) {
-                // Debug log for first few skips to help user identify why
-                if (skippedCount < 3) {
-                    console.log(`[BulkAddToMemory] Row ${i} skipped: Contract column (${config.contractColumn}) is empty.`);
+                // Skip completely empty rows
+                if (values.every(v => !v)) { skippedCount++; continue; }
+
+                // Build text from all fields
+                const textParts = keys.map(key => `${key}: ${String(row[key] ?? '')}`);
+                const text = textParts.join(', ');
+
+                // Create metadata from all fields
+                const metadata: Record<string, any> = { type: 'bulk_import', rowIndex: i };
+                keys.forEach(key => { metadata[key] = row[key]; });
+
+                try {
+                    await vectorMemoryService.addMemory(text, metadata, storageType);
+                    addedCount++;
+                    if (addedCount % 10 === 0) {
+                        console.log(`[BulkAddToMemory] Added ${addedCount} records...`);
+                    }
+                } catch (err) {
+                    errors.push(`Row ${i}: ${err}`);
                 }
-                skippedCount++;
-                continue;  // Skip rows without contract number
             }
+        } else {
+            // --- ARRAY FORMAT (raw 2D array, first row = headers) ---
+            const headers: string[] = (rows[0] || []).map((h: any) => String(h || '').trim());
+            console.log(`[BulkAddToMemory] Detected headers: ${headers.join(', ')}`);
 
-            // Format the text for memory storage - include all searchable fields
-            let text = `Sözleşme: ${contract}, Telefon: ${phone}, Borç: ${debt} TL`;
-            if (name) text += `, Ad: ${name}`;
-            if (muhatap) text += `, Muhatap: ${muhatap}`;
-            if (durum) text += `, Durum: ${durum}`;
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
 
-            // Create metadata
-            const metadata = {
-                type: 'debtor',
-                contract: contract,
-                phone: phone,
-                debt: debt,
-                name: name,
-                muhatap: muhatap,
-                durum: durum,
-                rowIndex: i
-            };
-
-            try {
-                await vectorMemoryService.addMemory(text, metadata, storageType);
-                addedCount++;
-
-                if (addedCount % 10 === 0) {
-                    console.log(`[BulkAddToMemory] Added ${addedCount} records...`);
+                if (!row || !Array.isArray(row) || row.length === 0) {
+                    skippedCount++;
+                    continue;
                 }
-            } catch (err) {
-                errors.push(`Row ${i}: ${err}`);
+
+                // Skip completely empty rows
+                const rowValues = row.map((v: any) => String(v ?? '').trim());
+                if (rowValues.every((v: string) => !v)) {
+                    skippedCount++;
+                    continue;
+                }
+
+                const metadata: Record<string, any> = { type: 'bulk_import', rowIndex: i };
+
+                // Generic mode: use all columns with their headers
+                const parts: string[] = [];
+                for (let j = 0; j < row.length; j++) {
+                    const header = headers[j] || `Col${j}`;
+                    const value = String(row[j] ?? '').trim();
+                    if (value) {
+                        parts.push(`${header}: ${value}`);
+                        metadata[header] = value;
+                    }
+                }
+                const text = parts.join(', ');
+
+                if (!text) { skippedCount++; continue; }
+
+                try {
+                    await vectorMemoryService.addMemory(text, metadata, storageType);
+                    addedCount++;
+                    if (addedCount % 10 === 0) {
+                        console.log(`[BulkAddToMemory] Added ${addedCount} records...`);
+                    }
+                } catch (err) {
+                    errors.push(`Row ${i}: ${err}`);
+                }
             }
         }
 
-        console.log(`[BulkAddToMemory] Completed: ${addedCount} records added, ${skippedCount} skipped (empty contract), ${errors.length} errors`);
+        console.log(`[BulkAddToMemory] Completed: ${addedCount} records added, ${skippedCount} skipped, ${errors.length} errors`);
 
         const result = {
             success: true,
             addedCount: addedCount,
             skippedCount: skippedCount,
-            totalRows: rows.length - 1,
+            totalRows: rows.length - (isObjectFormat ? 0 : 1),
             errors: errors.length > 0 ? errors.slice(0, 5) : undefined
         };
 

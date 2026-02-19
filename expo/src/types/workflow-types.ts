@@ -24,14 +24,13 @@ export type NodeCategory =
     | 'files'
     | 'google'
     | 'microsoft'
-    | 'microsoft'
     | 'social'
     | 'data'
     | 'memory'
     | 'display';
 
 export type NodeType =
-    // Triggers (6)
+    // Triggers (10)
     | 'MANUAL_TRIGGER'
     | 'TIME_TRIGGER'
     | 'NOTIFICATION_TRIGGER'
@@ -42,7 +41,7 @@ export type NodeType =
     | 'GEOFENCE_EXIT_TRIGGER'
     | 'DEEP_LINK_TRIGGER'
     | 'CHAT_INPUT_TRIGGER'  // NEW: Start workflow with user text input
-    // Control (5)
+    // Control (7)
     | 'DELAY'
     | 'IF_ELSE'
     | 'VARIABLE'
@@ -60,7 +59,7 @@ export type NodeType =
     | 'SHARE_SHEET'
     | 'SHOW_TEXT'
     | 'SHOW_IMAGE'
-    // Device (6)
+    // Device (9)
     | 'SOUND_MODE'
     | 'SCREEN_WAKE'
     | 'APP_LAUNCH'
@@ -70,7 +69,7 @@ export type NodeType =
     | 'BLUETOOTH_CONTROL'
     | 'GLOBAL_ACTION'
     | 'MEDIA_CONTROL'
-    // Calendar (2)
+    // Calendar & Contacts (6)
     | 'CALENDAR_READ'
     | 'CALENDAR_CREATE'
     | 'CALENDAR_UPDATE'
@@ -90,14 +89,14 @@ export type NodeType =
     // State (2)
     | 'BATTERY_CHECK'
     | 'NETWORK_CHECK'
-    // Weather
+    // Weather (1)
     | 'WEATHER_GET'
-    // Audio (3)
+    // Audio (4)
     | 'VOLUME_CONTROL'
     | 'SPEAK_TEXT'
     | 'AUDIO_RECORD'
     | 'SPEECH_TO_TEXT'
-    // Communication
+    // Communication (7)
     | 'SMS_SEND'
     | 'EMAIL_SEND'
     | 'TELEGRAM_SEND'
@@ -105,10 +104,10 @@ export type NodeType =
     | 'DISCORD_SEND'
     | 'WHATSAPP_SEND'
     | 'INSTAGRAM_POST'
-    // Productivity
+    // Productivity (2)
     | 'NOTION_CREATE'
     | 'NOTION_READ'
-    // Web (5)
+    // Web (8)
     | 'HTTP_REQUEST'
     | 'OPEN_URL'
     | 'GOOGLE_TRANSLATE'
@@ -117,8 +116,6 @@ export type NodeType =
     | 'WEB_SEARCH'
     | 'HTML_EXTRACT'
     | 'FACEBOOK_LOGIN'
-    // Control
-    | 'SWITCH'
     | 'DYNAMIC_EXECUTOR'
     // Files (4)
     | 'FILE_WRITE'
@@ -127,7 +124,7 @@ export type NodeType =
     | 'FILE_PICK'
     // Alarm (1)
     | 'ALARM_SET'
-    // AI (1)
+    // AI (3)
     | 'AGENT_AI'
     | 'IMAGE_GENERATOR'
     | 'IMAGE_EDIT'
@@ -148,13 +145,13 @@ export type NodeType =
     | 'MAGNETOMETER'
     | 'BAROMETER'
     // Gestures (1)
-    // Gestures (1)
     | 'GESTURE_TRIGGER'
     | 'STEP_TRIGGER'
     // Call / Message Triggers
     | 'CALL_TRIGGER'
     | 'SMS_TRIGGER'
     | 'WHATSAPP_TRIGGER'
+    | 'WEB_HOOK_TRIGGER'
     // Microsoft
     | 'OUTLOOK_SEND'
     | 'OUTLOOK_READ'
@@ -242,6 +239,12 @@ export interface WhatsAppTriggerConfig {
     messageFilter?: string; // Filter by message content
     groupFilter?: string; // Filter by group name
     variableName: string; // Store message info
+}
+
+export interface WebhookTriggerConfig {
+    path: string;
+    method?: 'GET' | 'POST';
+    variableName?: string;
 }
 
 export interface TimeTriggerConfig {
@@ -499,6 +502,8 @@ export interface SpeechToTextConfig {
     variableName: string;
     continuous?: boolean;
     requiresOnDeviceRecognition?: boolean;
+    silenceTimeout?: number; // ms cinsinden
+    autoPunctuation?: boolean;
 }
 
 // Web / Translation
@@ -545,8 +550,12 @@ export interface TelegramSendConfig {
 }
 
 export interface SlackSendConfig {
-    webhookUrl: string;
-    message: string;
+    webhookUrl?: string; // Optional if using Bot Token
+    message?: string; // Optional if using blocks
+    blocks?: string; // JSON string for Block Kit
+    channel?: string; // Required for Bot Token
+    mode?: 'webhook' | 'bot'; // Default 'webhook'
+    botToken?: string;
 }
 
 export interface DiscordSendConfig {
@@ -614,10 +623,15 @@ export interface AddToMemoryConfig {
 
 export interface BulkAddToMemoryConfig {
     data: string; // Variable name containing array of objects (from Sheets)
+    columns?: Record<string, number>; // Optional: custom column mapping { fieldName: columnIndex }
+    textTemplate?: string; // Optional: custom text template
+    // Legacy support (backward compat)
     contractColumn?: number;
     phoneColumn?: number;
     debtColumn?: number;
     nameColumn?: number;
+    muhatabColumn?: number;
+    durumColumn?: number;
     variableName?: string;
     storageType?: 'auto' | 'local' | 'backend';
 }
@@ -727,6 +741,8 @@ export interface PdfCreateConfig {
     items: string; // Variable name containing text, html, or array of image URIs
     filename?: string;
     variableName: string; // Store PDF URI
+    pageSize?: 'a4' | 'letter';
+    orientation?: 'portrait' | 'landscape';
 }
 
 export interface FilePickConfig {
@@ -756,6 +772,17 @@ export interface AgentAIConfig {
     memoryKey?: string; // Unique key to store chat history (e.g., 'chat_english_tutor')
     systemPrompt?: string; // Optional override for system prompt
     tools?: string[]; // Optional list of allowed tools
+}
+
+export interface RealtimeAIConfig {
+    systemPrompt?: string;
+    voice?: string; // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede'
+    model?: string;
+    tools?: boolean; // Enable tool calling
+    maxDuration?: number; // Seconds
+    variableName?: string;
+    apiKey?: string;
+    speakerMode?: boolean;
 }
 
 // Backend Service Configs
@@ -1048,6 +1075,7 @@ export type NodeConfig =
     | OneDriveDownloadConfig
     | OneDriveListConfig
     | CodeExecutionConfig
+    | DynamicExecutorConfig
     | WebAutomationConfig
     | SearchMemoryConfig
     | AddToMemoryConfig
@@ -1063,6 +1091,12 @@ export type NodeConfig =
 export interface CodeExecutionConfig {
     code: string;
     variableName: string;
+}
+
+export interface DynamicExecutorConfig {
+    input?: string; // Optional input template or variable reference
+    parse?: 'auto' | 'json' | 'text';
+    variableName?: string; // Store output
 }
 
 export interface ContactsReadConfig {
@@ -1698,6 +1732,17 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         description: 'Link ile Tetikle',
         icon: 'link',
         color: '#EF4444',
+        hasInputPort: false,
+        outputPorts: ['default'],
+        isTrigger: true,
+    },
+    WEB_HOOK_TRIGGER: {
+        type: 'WEB_HOOK_TRIGGER',
+        category: 'trigger',
+        name: 'Webhook Tetikleyici',
+        description: 'Harici HTTP isteğiyle tetikler',
+        icon: 'globe-outline',
+        color: '#10B981',
         hasInputPort: false,
         outputPorts: ['default'],
         isTrigger: true,
@@ -2472,6 +2517,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'DND_CONTROL': return { enabled: true };
         case 'BRIGHTNESS_CONTROL': return { level: 50 };
         case 'FLASHLIGHT_CONTROL': return { mode: 'toggle' };
+        case 'BLUETOOTH_CONTROL': return { mode: 'toggle' };
         case 'GLOBAL_ACTION': return { action: 'home' };
         case 'MEDIA_CONTROL': return { action: 'play_pause' };
         // New nodes
@@ -2518,6 +2564,8 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         };
         case 'SHOW_TEXT': return { title: 'Sonuç', content: '{{previous_output}}' };
         case 'SHOW_MENU': return { title: 'Seçim Yapın', options: ['Seçenek 1', 'Seçenek 2'], variableName: 'selection' };
+        case 'DYNAMIC_EXECUTOR': return { input: '{{previous_output}}', parse: 'auto', variableName: 'dynamicOutput' };
+        case 'WEB_HOOK_TRIGGER': return { path: 'my-hook', method: 'POST', variableName: 'webhookData' };
         // Google nodes
         case 'GMAIL_SEND': return { to: '', subject: '', body: '', isHtml: false, variableName: 'emailResult' };
         case 'GMAIL_READ': return { maxResults: 5, query: 'is:unread', variableName: 'emails' };
@@ -2553,7 +2601,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'REMEMBER_INFO': return { key: '', value: '' };
         case 'SEARCH_MEMORY': return { query: '', variableName: 'searchResults', threshold: 0.7 };
         case 'ADD_TO_MEMORY': return { text: '', metadata: '{}', variableName: 'memoryId' };
-        case 'BULK_ADD_TO_MEMORY': return { data: 'sheet_data', contractColumn: 0, phoneColumn: 5, nameColumn: 6, debtColumn: 9 };
+        case 'BULK_ADD_TO_MEMORY': return { data: 'sheet_data', variableName: 'bulk_result' };
         case 'CLEAR_MEMORY': return { confirm: true };
 
         // Location (Missing)
@@ -2564,6 +2612,19 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'CRON_CREATE': return { name: 'My Cron', schedule: '*/5 * * * *', actionType: 'log', actionPayload: '{}' };
         case 'CRON_DELETE': return { jobId: '', variableName: 'cronDeleteResult' };
         case 'CRON_LIST': return { variableName: 'cronJobs' };
+
+        case 'REALTIME_AI': return {
+            systemPrompt: 'Sen BreviAI sesli asistanısın ve Türkçe konuşuyorsun.',
+            voice: 'Kore',
+            model: 'gemini-2.0-flash-live-001',
+            tools: true,
+            maxDuration: 300,
+            speakerMode: false
+        };
+
+        case 'DISCORD_SEND': return { webhookUrl: '', message: '{{previous_output}}', username: 'BreviBot' };
+        case 'NOTION_CREATE': return { apiKey: '', databaseId: '', properties: '{}', variableName: 'notionPage' };
+        case 'NOTION_READ': return { apiKey: '', databaseId: '', variableName: 'notionData' };
 
         default: return {} as NodeConfig;
     }

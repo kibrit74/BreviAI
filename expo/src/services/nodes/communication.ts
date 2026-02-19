@@ -145,7 +145,7 @@ export async function executeWhatsAppSend(
 ): Promise<any> {
     const phoneNumber = variableManager.resolveString(config.phoneNumber);
     const message = variableManager.resolveString(config.message);
-    const mode = config.mode || 'direct';
+    const mode = config.mode || 'backend';
 
     console.log('[WHATSAPP] Mode:', mode, '| Phone:', phoneNumber);
 
@@ -251,8 +251,17 @@ export async function executeWhatsAppSend(
     // ═══════════════════════════════════════════════════════════
     if (mode === 'backend') {
         try {
-            const backendUrl = variableManager.resolveString(config.backendUrl || 'http://136.109.124.154:3001/whatsapp');
-            const authKey = variableManager.resolveString(config.backendAuthKey || 'breviai-secret-password');
+            // Use config values if provided, otherwise fall back to centralized backend config
+            let backendUrl = config.backendUrl;
+            let authKey = config.backendAuthKey;
+            if (!backendUrl || !authKey) {
+                const { getBackendConfig } = require('./backend');
+                const centralConfig = await getBackendConfig();
+                backendUrl = backendUrl || `${centralConfig.url}/whatsapp`;
+                authKey = authKey || centralConfig.key;
+            }
+            backendUrl = variableManager.resolveString(backendUrl);
+            authKey = variableManager.resolveString(authKey);
 
             // Format phone number: remove ALL non-digit characters (handles ÷, +, spaces, etc.)
             let cleanPhone = phoneNumber.replace(/[^\d]/g, '');

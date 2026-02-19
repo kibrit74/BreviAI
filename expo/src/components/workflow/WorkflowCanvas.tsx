@@ -11,6 +11,7 @@ import {
     Dimensions,
     TouchableOpacity,
     Text,
+    Pressable,
     PanResponder,
     Animated as RNAnimated,
     Alert,
@@ -80,6 +81,7 @@ interface WorkflowCanvasProps {
     onWorkflowChange: (workflow: Workflow) => void;
     onNodeSelect: (node: WorkflowNode | null) => void;
     selectedNodeId: string | null;
+    onQuickAddRequested?: (req: { sourceNodeId: string; port: EdgePort; position: { x: number; y: number } }) => void;
 }
 
 export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
@@ -87,6 +89,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     onWorkflowChange,
     onNodeSelect,
     selectedNodeId,
+    onQuickAddRequested,
 }) => {
     const { theme, colors: appColors } = useApp();
     const colors = appColors || DEFAULT_THEME;
@@ -103,6 +106,15 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     // JS Logic State
     const [connectingFrom, setConnectingFrom] = useState<{ nodeId: string; port: EdgePort } | null>(null);
     const [activeMenuNodeId, setActiveMenuNodeId] = useState<string | null>(null);
+    const [draggingConnection, setDraggingConnection] = useState<{
+        sourceNodeId: string;
+        port: EdgePort;
+        start: { x: number; y: number };
+        end: { x: number; y: number };
+    } | null>(null);
+
+    const containerRef = useRef<View>(null);
+    const [containerOffset, setContainerOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
     // Wrapper to safely call from UI thread
     const closeMenu = () => {
@@ -112,7 +124,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     // Pan Gesture (for Canvas)
     const panGesture = Gesture.Pan()
         .minDistance(10) // Require explicit movement to start pan, allowing taps to pass through
-        .enabled(connectingFrom === null) // Disable pan when connecting to allow easier port clicking
+        .enabled(connectingFrom === null && draggingConnection === null) // Disable pan when connecting to allow easier port clicking
         .averageTouches(true)
         .onStart(() => {
             startX.value = translationX.value;
@@ -210,6 +222,100 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     }, [connectingFrom, addEdge]);
     const cancelConnection = useCallback(() => setConnectingFrom(null), []);
 
+    const pageToCanvas = useCallback((pageX: number, pageY: number) => {
+        const localX = pageX - containerOffset.x;
+        const localY = pageY - containerOffset.y;
+        const canvasX = (localX - translationX.value) / scale.value;
+        const canvasY = (localY - translationY.value) / scale.value;
+        return { x: canvasX, y: canvasY };
+    }, [containerOffset, translationX, translationY, scale]);
+
+    const getOutputPortPosition = useCallback((node: WorkflowNode, port: EdgePort) => {
+        const metadata = NODE_REGISTRY[node.type] || { outputPorts: ['default'] };
+        const { width, height } = getNodeDimensions(node.type);
+        const index = Math.max(0, metadata.outputPorts.indexOf(port));
+        const x = node.position.x + width + 20;
+        const y = node.position.y + (height / 2) + (index * 36);
+        return { x, y };
+    }, []);
+
+    const getInputPortPosition = useCallback((node: WorkflowNode) => {
+        const { height } = getNodeDimensions(node.type);
+        const x = node.position.x - 20;
+        const y = node.position.y + (height / 2);
+        return { x, y };
+    }, []);
+
+    const startDragConnection = useCallback((nodeId: string, port: EdgePort) => {
+        const node = workflow.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        const start = getOutputPortPosition(node, port);
+        setDraggingConnection({ sourceNodeId: nodeId, port, start, end: start });
+    }, [workflow.nodes, getOutputPortPosition]);
+
+    const updateDragConnection = useCallback((pageX: number, pageY: number) => {
+        setDraggingConnection(prev => {
+            if (!prev) return null;
+            const end = pageToCanvas(pageX, pageY);
+            return { ...prev, end };
+        });
+    }, [pageToCanvas]);
+
+    const endDragConnection = useCallback((sourceId: string, sourcePort: EdgePort, pageX: number, pageY: number, didMove: boolean) => {
+        if (!didMove) {
+            setDraggingConnection(null);
+            setConnectingFrom({ nodeId: sourceId, port: sourcePort });
+            return;
+        }
+
+        const end = pageToCanvas(pageX, pageY);
+        const candidates = workflow.nodes.filter(n => n.id !== sourceId);
+
+        let best: { id: string; dist: number } | null = null;
+        for (const node of candidates) {
+            const meta = NODE_REGISTRY[node.type] || { hasInputPort: true };
+            if (!meta.hasInputPort) continue;
+            const inputPos = getInputPortPosition(node);
+            const dx = inputPos.x - end.x;
+            const dy = inputPos.y - end.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 26 && (!best || dist < best.dist)) {
+                best = { id: node.id, dist };
+            }
+        }
+
+        if (best) {
+            addEdge(sourceId, best.id, sourcePort);
+        } else if (onQuickAddRequested) {
+            const snappedX = Math.round(end.x / GRID_SIZE) * GRID_SIZE;
+            const snappedY = Math.round(end.y / GRID_SIZE) * GRID_SIZE;
+            onQuickAddRequested({
+                sourceNodeId: sourceId,
+                port: sourcePort,
+                position: { x: snappedX, y: snappedY },
+            });
+        }
+
+        setDraggingConnection(null);
+    }, [workflow.nodes, pageToCanvas, getInputPortPosition, addEdge, onQuickAddRequested]);
+
+    const handleQuickAddPress = useCallback((e: any) => {
+        if (!connectingFrom || !onQuickAddRequested) return;
+
+        const { locationX, locationY } = e.nativeEvent;
+        const canvasX = (locationX - translationX.value) / scale.value;
+        const canvasY = (locationY - translationY.value) / scale.value;
+        const snappedX = Math.round(canvasX / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.round(canvasY / GRID_SIZE) * GRID_SIZE;
+
+        onQuickAddRequested({
+            sourceNodeId: connectingFrom.nodeId,
+            port: connectingFrom.port,
+            position: { x: snappedX, y: snappedY },
+        });
+        setConnectingFrom(null);
+    }, [connectingFrom, onQuickAddRequested, translationX, translationY, scale]);
+
     // Menu Actions
     const handleMenuAction = async (action: 'connect' | 'edit' | 'delete' | 'copy' | 'duplicate', nodeId: string) => {
         setActiveMenuNodeId(null);
@@ -246,15 +352,32 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
 
     return (
         <GestureDetector gesture={composedGesture}>
-            <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <View
+                ref={containerRef}
+                style={[styles.container, { backgroundColor: colors.background }]}
+                onLayout={() => {
+                    if (!containerRef.current) return;
+                    containerRef.current.measureInWindow((x, y) => {
+                        setContainerOffset({ x, y });
+                    });
+                }}
+            >
                 <Reanimated.View style={[styles.canvasContainer, animatedStyle]}>
                     <GridBackground isDark={isDark} />
+
+                    {connectingFrom && onQuickAddRequested && (
+                        <Pressable
+                            style={StyleSheet.absoluteFill}
+                            onPress={handleQuickAddPress}
+                        />
+                    )}
 
                     <EdgeLines
                         edges={workflow.edges}
                         nodes={workflow.nodes}
                         onDeleteEdge={deleteEdge}
                         connectingFrom={connectingFrom}
+                        draggingConnection={draggingConnection}
                         isDark={isDark}
                     />
 
@@ -283,6 +406,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                             isConnecting={connectingFrom !== null}
                             onStartConnection={(port) => startConnection(node.id, port)}
                             onCompleteConnection={() => completeConnection(node.id)}
+                            onDragStart={(port) => startDragConnection(node.id, port)}
+                            onDragMove={(pageX, pageY) => updateDragConnection(pageX, pageY)}
+                            onDragEnd={(port, pageX, pageY, didMove) => endDragConnection(node.id, port, pageX, pageY, didMove)}
                         />
                     ))}
 
@@ -303,7 +429,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 {/* Minimal Connection Mode Indicator - No overlay to block touches */}
                 {connectingFrom && (
                     <View style={styles.connectionIndicator}>
-                        <Text style={styles.connectionText}>🔗 Bağlantı modu: ⦿ butonuna dokun</Text>
+                        <Text style={styles.connectionText}>🔗 Bağlantı modu: girişe dokun veya boş alana dokunup node ekle</Text>
                         <TouchableOpacity onPress={cancelConnection} style={styles.cancelBtn}>
                             <Text style={styles.cancelText}>İptal</Text>
                         </TouchableOpacity>
@@ -358,6 +484,12 @@ interface EdgeLinesProps {
     nodes: WorkflowNode[];
     onDeleteEdge: (edgeId: string) => void;
     connectingFrom: { nodeId: string; port: EdgePort } | null;
+    draggingConnection?: {
+        sourceNodeId: string;
+        port: EdgePort;
+        start: { x: number; y: number };
+        end: { x: number; y: number };
+    } | null;
     isDark?: boolean;
 }
 
@@ -406,7 +538,7 @@ const SimpleLines = ({ edges, nodes }) => {
 };
 
 // Simplified Edge Lines without SVG
-const EdgeLines: React.FC<EdgeLinesProps> = ({ edges, nodes, onDeleteEdge, isDark }) => {
+const EdgeLines: React.FC<EdgeLinesProps> = ({ edges, nodes, onDeleteEdge, draggingConnection, isDark }) => {
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
     return (
@@ -440,6 +572,28 @@ const EdgeLines: React.FC<EdgeLinesProps> = ({ edges, nodes, onDeleteEdge, isDar
                         />
                     );
                 })}
+
+                {draggingConnection && (() => {
+                    const startX = draggingConnection.start.x;
+                    const startY = draggingConnection.start.y;
+                    const endX = draggingConnection.end.x;
+                    const endY = draggingConnection.end.y;
+                    const dist = Math.abs(endX - startX);
+                    const cp1x = startX + (dist * 0.5);
+                    const cp1y = startY;
+                    const cp2x = endX - (dist * 0.5);
+                    const cp2y = endY;
+                    const d = `M${startX},${startY} C${cp1x},${cp1y} ${cp2x},${cp2y} ${endX},${endY}`;
+
+                    return (
+                        <Path
+                            d={d}
+                            stroke={isDark ? "#34D399" : "#10B981"}
+                            strokeWidth="3"
+                            fill="none"
+                        />
+                    );
+                })()}
             </Svg>
 
             {/* Interactive Edge Buttons Layer */}
@@ -668,9 +822,20 @@ interface NodePortsProps {
     isConnecting: boolean;
     onStartConnection: (port: EdgePort) => void;
     onCompleteConnection: () => void;
+    onDragStart?: (port: EdgePort) => void;
+    onDragMove?: (pageX: number, pageY: number) => void;
+    onDragEnd?: (port: EdgePort, pageX: number, pageY: number, didMove: boolean) => void;
 }
 
-const NodePorts: React.FC<NodePortsProps> = ({ node, isConnecting, onStartConnection, onCompleteConnection }) => {
+const NodePorts: React.FC<NodePortsProps> = ({
+    node,
+    isConnecting,
+    onStartConnection,
+    onCompleteConnection,
+    onDragStart,
+    onDragMove,
+    onDragEnd,
+}) => {
     const metadata = NODE_REGISTRY[node.type] || { hasInputPort: true, outputPorts: ['default'] };
 
     return (
@@ -708,13 +873,32 @@ const NodePorts: React.FC<NodePortsProps> = ({ node, isConnecting, onStartConnec
                             styles.outputPort,
                             { top: (NODE_HEIGHT / 2) - 16 + (index * 36), right: 2 }
                         ]}
-                        onPress={(e) => {
-                            console.log('[DEBUG] Output port pressed! port:', port, 'nodeId:', node.id);
-                            e.stopPropagation();
-                            onStartConnection(port);
-                        }}
+                        onPress={() => onStartConnection(port)}
                         hitSlop={{ top: 25, bottom: 25, left: 25, right: 25 }}
                         activeOpacity={0.7}
+                        {...PanResponder.create({
+                            onStartShouldSetPanResponder: () => true,
+                            onMoveShouldSetPanResponder: () => true,
+                            onPanResponderGrant: () => {
+                                onDragStart && onDragStart(port);
+                            },
+                            onPanResponderMove: (_, gestureState) => {
+                                const { moveX, moveY, dx, dy } = gestureState;
+                                const moved = Math.abs(dx) > 6 || Math.abs(dy) > 6;
+                                if (moved && onDragMove) {
+                                    onDragMove(moveX, moveY);
+                                }
+                            },
+                            onPanResponderRelease: (_, gestureState) => {
+                                const { moveX, moveY, dx, dy } = gestureState;
+                                const moved = Math.abs(dx) > 6 || Math.abs(dy) > 6;
+                                if (onDragEnd) {
+                                    onDragEnd(port, moveX, moveY, moved);
+                                } else {
+                                    onStartConnection(port);
+                                }
+                            },
+                        }).panHandlers}
                     >
                         <View style={[
                             styles.portButton,

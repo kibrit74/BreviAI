@@ -65,9 +65,20 @@ export async function executeWorkflowNode(
         childVariables = { ...variableManager.getAll() };
     }
 
-    // Add metadata
-    childVariables._parentWorkflowId = variableManager.get('_workflowId');
+    // Add metadata & Circular execution check
+    const currentId = variableManager.get('_workflowId');
+    const parentChain = variableManager.get('_executionChain') || [];
+
+    // Check for circular dependency
+    // Check for circular dependency
+    if (parentChain.includes(targetWorkflow.id)) {
+        throw new Error(`Circular workflow execution detected! Workflow '${targetWorkflow.name}' (${targetWorkflow.id}) is already in the execution chain: ${parentChain.join(' -> ')}`);
+    }
+
+    childVariables._parentWorkflowId = currentId;
     childVariables._triggeredBy = 'EXECUTE_WORKFLOW';
+    // Add current workflow and target to the chain for the next level
+    childVariables._executionChain = [...parentChain, currentId].filter(Boolean);
 
     // 3. Execute
     const engine = WorkflowEngine.getInstance();

@@ -80,7 +80,7 @@ INSTRUCTIONS:
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout (increased from 30s)
+            const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for complex AI generation
 
             const response = await fetch(`${API_BASE_URL}/api/generate`, {
                 signal: controller.signal,
@@ -113,7 +113,11 @@ INSTRUCTIONS:
             }
 
             return data;
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.name === 'AbortError') {
+                console.warn('[ApiService] Request was aborted (timeout or navigation)');
+                throw new Error('AI yanıt süresi aşıldı. Lütfen tekrar deneyin.');
+            }
             console.error('Generate shortcut error:', error);
             throw error;
         }
@@ -258,7 +262,8 @@ INSTRUCTIONS:
     }
     async readSheet(
         spreadsheetId: string,
-        range: string
+        range: string,
+        accessToken?: string
     ): Promise<{ success: boolean; data?: any; error?: string }> {
         try {
             const controller = new AbortController();
@@ -271,7 +276,7 @@ INSTRUCTIONS:
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
-                body: JSON.stringify({ spreadsheetId, range }),
+                body: JSON.stringify({ spreadsheetId, range, accessToken }),
             }).finally(() => clearTimeout(timeoutId));
 
             const text = await response.text();

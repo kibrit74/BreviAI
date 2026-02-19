@@ -44,12 +44,6 @@
             "label": "Toplu Ekle",
             "config": {
                 "data": "sheet_data",
-                "contractColumn": 0,
-                "durumColumn": 1,
-                "phoneColumn": 5,
-                "muhatabColumn": 6,
-                "nameColumn": 6,
-                "debtColumn": 9,
                 "variableName": "bulk_result"
             },
             "position": {

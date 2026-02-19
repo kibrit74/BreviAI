@@ -61,4 +61,13 @@ export {
 export { executeNavigateTo } from './navigation';
 export { executeSettingsOpen } from './settings';
 export { executeDatabaseRead, executeDatabaseWrite } from './database';
-export { executeCodeExecution, executeSetValues } from './processing';
+export { executeCodeExecution, executeSetValues, executeDynamicExecutor } from './processing';
+export { executeCronCreate, executeCronDelete, executeCronList, executeBrowserScrape } from './backend';
+export { executeCameraCapture } from './camera';
+export {
+    executeLightSensor,
+    executePedometer,
+    executeMagnetometer,
+    executeBarometer,
+    executeGestureTrigger
+} from './sensors';

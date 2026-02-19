@@ -61,6 +61,7 @@ import {
     OneDriveUploadConfig,
     OneDriveDownloadConfig,
     OneDriveListConfig,
+    DynamicExecutorConfig,
     RssReadConfig,
     NavigateToConfig,
     SettingsOpenConfig,
@@ -157,6 +158,7 @@ import {
     executeAppLaunch,
     executeCodeExecution,
     executeSetValues,
+    executeDynamicExecutor,
     executeAddToMemory,
     executeSearchMemory,
     executeBulkAddToMemory,
@@ -304,6 +306,7 @@ const executorRegistry: Partial<Record<NodeType, ExecutorEntry>> = {
     'EXECUTE_WORKFLOW': { executor: executeWorkflowNode },
     'SWITCH': { executor: executeSwitch },
     'CODE_EXECUTION': { executor: executeCodeExecution },
+    'DYNAMIC_EXECUTOR': { executor: executeDynamicExecutor },
     'SET_VALUES': { executor: executeSetValues },
 
     // Social

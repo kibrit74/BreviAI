@@ -393,7 +393,7 @@ export async function executeGoogleSheetsRead(
         // 2. Fallback to Backend Proxy (Service Account)
         if (!data) {
             console.log('[GoogleSheets] Attempting Backend Proxy read...');
-            const response = await apiService.readSheet(spreadsheetId, range);
+            const response = await apiService.readSheet(spreadsheetId, range, authState.accessToken);
 
             if (response.success) {
                 data = response.data;

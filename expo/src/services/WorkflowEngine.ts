@@ -115,25 +115,27 @@ import {
     executeAppLaunch,
     executeCodeExecution,
     executeSetValues,
+    executeDynamicExecutor,
     executeWorkflowNode,
     // Vector Memory (RAG) tools
     executeSearchMemory,
     executeAddToMemory,
     executeBulkAddToMemory,
-    executeClearMemory
-} from './nodes';
-import {
+    executeClearMemory,
+    // Sensors
     executeLightSensor,
     executePedometer,
     executeMagnetometer,
     executeBarometer,
-    executeGestureTrigger
-} from './nodes/sensors';
-import { executeCameraCapture } from './nodes/camera';
-import {
+    executeGestureTrigger,
+    // Camera
+    executeCameraCapture,
+    // Backend
     executeCronCreate,
+    executeCronDelete,
+    executeCronList,
     executeBrowserScrape
-} from './nodes/backend';
+} from './nodes';
 import { debugLog } from './DebugLogger';
 import { userSettingsService } from './UserSettingsService';
 import { getToolByName } from './ToolRegistry';
@@ -310,6 +312,8 @@ export class WorkflowEngine {
         this.variableManager.clear();
 
         this.variableManager.clear();
+        this.variableManager.set('_workflowId', workflow.id);
+        this.variableManager.set('_workflowName', workflow.name);
 
         // 1. Load User Settings Variables (App Passwords, Custom Env Vars)
         // CRITICAL FIX: Wait for settings to load from disk!
@@ -566,10 +570,12 @@ export class WorkflowEngine {
                 case 'NOTIFICATION_TRIGGER':
                 case 'TELEGRAM_TRIGGER':
                 case 'EMAIL_TRIGGER':
+                case 'GEOFENCE_TRIGGER':
                 case 'DEEP_LINK_TRIGGER':
                 case 'SMS_TRIGGER':
                 case 'WHATSAPP_TRIGGER':
                 case 'STEP_TRIGGER':
+                case 'WEB_HOOK_TRIGGER':
                 case 'CHAT_INPUT_TRIGGER':
                     output = await executeTriggerNode(node, this.variableManager);
                     break;
@@ -598,6 +604,9 @@ export class WorkflowEngine {
                     break;
                 case 'CODE_EXECUTION':
                     output = await executeCodeExecution(node.config as any, this.variableManager);
+                    break;
+                case 'DYNAMIC_EXECUTOR':
+                    output = await executeDynamicExecutor(node.config as any, this.variableManager);
                     break;
                 case 'SET_VALUES':
                     output = await executeSetValues(node.config as any, this.variableManager);
@@ -637,6 +646,7 @@ export class WorkflowEngine {
                 case 'DND_CONTROL':
                 case 'BRIGHTNESS_CONTROL':
                 case 'FLASHLIGHT_CONTROL':
+                case 'BLUETOOTH_CONTROL':
                     output = await executeDeviceNode(node, this.variableManager);
                     break;
                 case 'GLOBAL_ACTION':
@@ -935,9 +945,6 @@ export class WorkflowEngine {
                 case 'CLEAR_MEMORY':
                     output = await executeClearMemory(node.config as any, this.variableManager);
                     break;
-                case 'REMEMBER_INFO':
-                    output = await executeRememberInfo(node.config as any, this.variableManager);
-                    break;
 
                 // Backend Services
                 case 'BROWSER_SCRAPE':
@@ -947,11 +954,9 @@ export class WorkflowEngine {
                     output = await executeCronCreate(node.config as any, this.variableManager);
                     break;
                 case 'CRON_DELETE':
-                    const { executeCronDelete } = require('./nodes/backend');
                     output = await executeCronDelete(node.config as any, this.variableManager);
                     break;
                 case 'CRON_LIST':
-                    const { executeCronList } = require('./nodes/backend');
                     output = await executeCronList(node.config as any, this.variableManager);
                     break;
 
@@ -1073,6 +1078,11 @@ export class WorkflowEngine {
         this.variableManager.set('_loopIndex', iteration);
         if (currentItem !== undefined) {
             this.variableManager.set('_loopItem', currentItem);
+            // Set custom variable name if specified (e.g., "aktifBorclu")
+            const varName = (config as any).variableName;
+            if (varName) {
+                this.variableManager.set(varName, currentItem);
+            }
         }
 
         return { continue: true, iteration, currentItem };
@@ -1220,13 +1230,7 @@ export class WorkflowEngine {
                     result = await executeOpenUrl({ url }, this.variableManager);
                     break;
                 case 'WHATSAPP_SEND':
-                    // Implement WhatsApp send using Linking
-                    // We don't have a separate executeWhatsAppSend yet, so we'll inline it or reuse OPEN_URL/Linking
-                    // Actually, let's use a dynamic import or assuming an executor exists (we will create one or use Linking here)
-                    const { Linking } = require('react-native');
-                    const whatsappUrl = `whatsapp://send?phone=${args.phoneNumber}&text=${encodeURIComponent(args.message || '')}`;
-                    await Linking.openURL(whatsappUrl);
-                    result = { success: true, sent: true };
+                    result = await executeWhatsAppSend(args, this.variableManager);
                     break;
                 case 'VIEW_UDF':
                     result = await executeViewUdf(args, this.variableManager);
@@ -1252,9 +1256,7 @@ export class WorkflowEngine {
                 case 'CLEAR_MEMORY':
                     result = await executeClearMemory(args, this.variableManager);
                     break;
-                case 'REMEMBER_INFO':
-                    result = await executeRememberInfo(args, this.variableManager);
-                    break;
+
 
                 // --- OUTPUT / DISPLAY ---
                 case 'SPEAK_TEXT':
@@ -1442,10 +1444,10 @@ export class WorkflowEngine {
 
                 // --- CONTACTS ---
                 case 'CONTACTS_READ':
-                    result = await executeContactsRead({ config: args } as any, this.variableManager);
+                    result = await executeContactsRead(args as any, this.variableManager);
                     break;
                 case 'CONTACTS_WRITE':
-                    result = await executeContactsWrite({ config: args } as any, this.variableManager);
+                    result = await executeContactsWrite(args as any, this.variableManager);
                     break;
 
                 // --- AUDIO / RECORDING ---

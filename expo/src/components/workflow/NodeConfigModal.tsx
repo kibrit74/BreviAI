@@ -106,6 +106,7 @@ const getFileVariables = (nodes: WorkflowNode[]): string[] => {
 interface ConfigFieldsProps {
     config: any;
     updateConfig: (key: string, value: any) => void;
+    isAdvanced?: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1063,24 +1064,31 @@ const VariableFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =
 const LoopFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Döngü Tipi</Text>
+            <Text style={styles.fieldLabel}>🔄 Döngü Tipi</Text>
             <View style={styles.buttonRow}>
-                {['count', 'while', 'forEach'].map(type => (
+                {[
+                    { value: 'count', label: '🔢 Sayaç' },
+                    { value: 'forEach', label: '📋 Her Biri' },
+                    { value: 'list', label: '📜 Liste' },
+                    { value: 'while', label: '🔁 Koşul' },
+                ].map(opt => (
                     <TouchableOpacity
-                        key={type}
-                        style={[styles.unitButton, config.type === type && styles.unitButtonSelected]}
-                        onPress={() => updateConfig('type', type)}
+                        key={opt.value}
+                        style={[styles.unitButton, (config.type || 'count') === opt.value && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('type', opt.value)}
                     >
-                        <Text style={[styles.unitButtonText, config.type === type && styles.unitButtonTextSelected]}>
-                            {type === 'count' ? 'Sayaç' : type === 'while' ? 'Koşul' : 'Her biri'}
+                        <Text style={[styles.unitButtonText, (config.type || 'count') === opt.value && styles.unitButtonTextSelected]}>
+                            {opt.label}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
         </View>
+
+        {/* Sayaç modu */}
         {config.type === 'count' && (
             <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Tekrar Sayısı</Text>
+                <Text style={styles.fieldLabel}>🔢 Tekrar Sayısı</Text>
                 <TextInput
                     style={styles.input}
                     value={String(config.count || 1)}
@@ -1091,9 +1099,11 @@ const LoopFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
                 />
             </View>
         )}
+
+        {/* forEach modu */}
         {config.type === 'forEach' && (
             <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Liste Değişkeni (Array)</Text>
+                <Text style={styles.fieldLabel}>📋 Liste Değişkeni (Array)</Text>
                 <ExpandableTextInput
                     value={config.items || ''}
                     onChangeText={(v) => updateConfig('items', v)}
@@ -1104,11 +1114,45 @@ const LoopFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
                 />
             </View>
         )}
-        {config.type === 'while' && (
+
+        {/* list modu (en çok kullanılan) */}
+        {(config.type === 'list' || (!config.type && config.list)) && (
             <View style={styles.field}>
-                <Text>While koşulu IF_ELSE benzeri yapılandırılmalı (Henüz desteklenmiyor)</Text>
+                <Text style={styles.fieldLabel}>📜 Liste Kaynağı</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.list || ''}
+                    onChangeText={(v) => updateConfig('list', v)}
+                    placeholder="{{borcluListesi}} veya {{sonuclar}}"
+                    placeholderTextColor="#666"
+                />
+                <Text style={styles.fieldHint}>Önceki adımdan gelen bir liste değişkeni seçin, örn: {'{{borcluListesi}}'}</Text>
             </View>
         )}
+
+        {/* while modu */}
+        {config.type === 'while' && (
+            <View style={styles.field}>
+                <Text style={{ color: '#FFA500', fontSize: 13, fontStyle: 'italic' }}>
+                    ⚠️ While koşulu IF_ELSE benzeri yapılandırılmalıdır (Gelişmiş)
+                </Text>
+            </View>
+        )}
+
+        {/* Değişken İsmi (tüm modlar için) */}
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>🏷️ Her Eleman İçin Değişken Adı</Text>
+            <TextInput
+                style={styles.input}
+                value={(config as any).variableName || ''}
+                onChangeText={(v) => updateConfig('variableName', v)}
+                placeholder="aktifBorclu"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>
+                Döngüdeki her eleman bu isimle erişilebilir olur. Örn: {'{{aktifBorclu.name}}'} veya {'{{aktifBorclu.phone}}'}
+            </Text>
+        </View>
     </>
 );
 
@@ -1453,114 +1497,132 @@ const FlashlightFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig })
 
 // New Node Field Components
 
-const CalendarReadFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Dönem</Text>
-            <View style={styles.buttonRow}>
-                {['next', 'today', 'week'].map(type => (
-                    <TouchableOpacity
-                        key={type}
-                        style={[styles.unitButton, config.type === type && styles.unitButtonSelected]}
-                        onPress={() => updateConfig('type', type)}
-                    >
-                        <Text style={[styles.unitButtonText, config.type === type && styles.unitButtonTextSelected]}>
-                            {type === 'next' ? 'Sonraki' : type === 'today' ? 'Bugün' : 'Bu Hafta'}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+const CalendarReadFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Dönem</Text>
+                <View style={styles.buttonRow}>
+                    {['next', 'today', 'week'].map(type => (
+                        <TouchableOpacity
+                            key={type}
+                            style={[styles.unitButton, config.type === type && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('type', type)}
+                        >
+                            <Text style={[styles.unitButtonText, config.type === type && styles.unitButtonTextSelected]}>
+                                {type === 'next' ? 'Sonraki' : type === 'today' ? 'Bugün' : 'Bu Hafta'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Maksimum Etkinlik Sayısı</Text>
-            <TextInput
-                style={styles.input}
-                value={String(config.maxEvents || 5)}
-                onChangeText={(t) => updateConfig('maxEvents', parseInt(t) || 5)}
-                keyboardType="numeric"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Takvim Adı (Opsiyonel)</Text>
-            <CalendarPickerField
-                value={config.calendarName}
-                onSelect={(name, source) => {
-                    updateConfig('calendarName', name);
-                    updateConfig('calendarSource', source);
-                }}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="events"
-                placeholderTextColor="#666"
-            />
-        </View>
-    </>
-);
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.variableName}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="events"
+                    placeholderTextColor="#666"
+                />
+            </View>
 
-const CalendarCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Başlık</Text>
-            <ExpandableTextInput
-                value={config.title}
-                onChangeText={(t) => updateConfig('title', t)}
-                placeholder="Toplantı başlığı"
-                label="Başlık"
-                minHeight={60}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Notlar</Text>
-            <ExpandableTextInput
-                value={config.notes}
-                onChangeText={(t) => updateConfig('notes', t)}
-                placeholder="Detaylar..."
-                label="Notlar"
-                minHeight={100}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Konum</Text>
-            <ExpandableTextInput
-                value={config.location}
-                onChangeText={(t) => updateConfig('location', t)}
-                placeholder="Ofis / Online"
-                label="Konum"
-                minHeight={60}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Takvim Adı (Opsiyonel)</Text>
-            <CalendarPickerField
-                value={config.calendarName}
-                onSelect={(name, source) => {
-                    updateConfig('calendarName', name);
-                    updateConfig('calendarSource', source);
-                }}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Hesap/Kaynak (Opsiyonel)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.calendarSource}
-                onChangeText={(t) => updateConfig('calendarSource', t)}
-                placeholder="Örn: Google, iCloud, Exchange"
-                placeholderTextColor="#666"
-            />
-        </View>
-    </>
-);
+            {showAdvanced ? (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Maksimum Etkinlik Sayısı</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={String(config.maxEvents || 5)}
+                            onChangeText={(t) => updateConfig('maxEvents', parseInt(t) || 5)}
+                            keyboardType="numeric"
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Takvim Adı (Opsiyonel)</Text>
+                        <CalendarPickerField
+                            value={config.calendarName}
+                            onSelect={(name, source) => {
+                                updateConfig('calendarName', name);
+                                updateConfig('calendarSource', source);
+                            }}
+                        />
+                    </View>
+                </>
+            ) : (
+                <Text style={styles.fieldHint}>Takvim filtreleri ve limit için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
 
-// ═══════════════════════════════════════════════════════════════
-// CALENDAR UPDATE FIELDS
-// ═══════════════════════════════════════════════════════════════
+const CalendarCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Başlık</Text>
+                <ExpandableTextInput
+                    value={config.title}
+                    onChangeText={(t) => updateConfig('title', t)}
+                    placeholder="Toplantı başlığı"
+                    label="Başlık"
+                    minHeight={60}
+                />
+            </View>
+
+            {showAdvanced ? (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Notlar</Text>
+                        <ExpandableTextInput
+                            value={config.notes}
+                            onChangeText={(t) => updateConfig('notes', t)}
+                            placeholder="Detaylar..."
+                            label="Notlar"
+                            minHeight={100}
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Konum</Text>
+                        <ExpandableTextInput
+                            value={config.location}
+                            onChangeText={(t) => updateConfig('location', t)}
+                            placeholder="Ofis / Online"
+                            label="Konum"
+                            minHeight={60}
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Takvim Adı (Opsiyonel)</Text>
+                        <CalendarPickerField
+                            value={config.calendarName}
+                            onSelect={(name, source) => {
+                                updateConfig('calendarName', name);
+                                updateConfig('calendarSource', source);
+                            }}
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Hesap/Kaynak (Opsiyonel)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.calendarSource}
+                            onChangeText={(t) => updateConfig('calendarSource', t)}
+                            placeholder="Örn: Google, iCloud, Exchange"
+                            placeholderTextColor="#666"
+                        />
+                    </View>
+                </>
+            ) : (
+                <Text style={styles.fieldHint}>Not, konum ve takvim seçimi için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
 
 const CalendarUpdateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
@@ -1807,109 +1869,189 @@ const SmsSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
     </>
 );
 
-const EmailSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Alıcı (E-posta)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.to || ''}
-                onChangeText={(t) => updateConfig('to', t)}
-                placeholder="ornek@email.com"
-                placeholderTextColor="#666"
-                keyboardType="email-address"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Konu</Text>
-            <TextInput
-                style={styles.input}
-                value={config.subject || ''}
-                onChangeText={(t) => updateConfig('subject', t)}
-                placeholder="E-posta konusu"
-                placeholderTextColor="#666"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>CC</Text>
-            <TextInput
-                style={styles.input}
-                value={config.cc || ''}
-                onChangeText={(t) => updateConfig('cc', t)}
-                placeholder="cc@email.com"
-                placeholderTextColor="#666"
-                keyboardType="email-address"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>İçerik</Text>
-            <ExpandableTextInput
-                value={config.body || ''}
-                onChangeText={(t) => updateConfig('body', t)}
-                placeholder="E-posta içeriği..."
-                label="E-posta İçeriği"
-                minHeight={150}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Dosya Ekleri (Değişken Adı)</Text>
-            <TextInput
-                style={styles.input}
-                value={Array.isArray(config.attachments) ? config.attachments[0] : (config.attachments || '')}
-                onChangeText={(t) => updateConfig('attachments', t ? [t] : undefined)}
-                placeholder="audioFile"
-                placeholderTextColor="#666"
-            />
-            <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
-                Dosya URI'si içeren bir değişken adı girin (Örn: audioFile)
-            </Text>
-        </View>
-        <View style={styles.rowField}>
-            <Text style={styles.fieldLabel}>Otomatik Gönder (Arka Plan)</Text>
-            <Switch
-                value={config.isAuto || false}
-                onValueChange={(v) => updateConfig('isAuto', v)}
-                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
-                thumbColor="#FFF"
-            />
-        </View>
-    </>
-);
+const EmailSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
 
-const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <ApiDocLink
-            title="Slack Webhook Kurulumu"
-            url="https://api.slack.com/messaging/webhooks"
-            brief="Slack'e mesaj göndermek için gelen webhook URL'si gereklidir."
-        />
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Webhook URL</Text>
-            <TextInput
-                style={styles.input}
-                value={config.webhookUrl || ''}
-                onChangeText={(t) => updateConfig('webhookUrl', t)}
-                placeholder="https://hooks.slack.com/services/..."
-                placeholderTextColor="#666"
-                keyboardType="url"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Mesaj</Text>
-            <ExpandableTextInput
-                value={config.message || ''}
-                onChangeText={(t) => updateConfig('message', t)}
-                placeholder="Slack'e gönderilecek mesaj..."
-                label="Mesaj İçeriği"
-                minHeight={100}
-            />
-        </View>
-    </>
-);
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Alıcı (E-posta)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.to || ''}
+                    onChangeText={(t) => updateConfig('to', t)}
+                    placeholder="ornek@email.com"
+                    placeholderTextColor="#666"
+                    keyboardType="email-address"
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Konu</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.subject || ''}
+                    onChangeText={(t) => updateConfig('subject', t)}
+                    placeholder="E-posta konusu"
+                    placeholderTextColor="#666"
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>İçerik</Text>
+                <ExpandableTextInput
+                    value={config.body || ''}
+                    onChangeText={(t) => updateConfig('body', t)}
+                    placeholder="E-posta içeriği..."
+                    label="E-posta İçeriği"
+                    minHeight={150}
+                />
+            </View>
 
-const HttpRequestFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
+            {showAdvanced ? (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>CC</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.cc || ''}
+                            onChangeText={(t) => updateConfig('cc', t)}
+                            placeholder="cc@email.com"
+                            placeholderTextColor="#666"
+                            keyboardType="email-address"
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Dosya Ekleri (Değişken Adı)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={Array.isArray(config.attachments) ? config.attachments[0] : (config.attachments || '')}
+                            onChangeText={(t) => updateConfig('attachments', t ? [t] : undefined)}
+                            placeholder="audioFile"
+                            placeholderTextColor="#666"
+                        />
+                        <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+                            Dosya URI'si içeren bir değişken adı girin (Örn: audioFile)
+                        </Text>
+                    </View>
+                    <View style={styles.rowField}>
+                        <Text style={styles.fieldLabel}>Otomatik Gönder (Arka Plan)</Text>
+                        <Switch
+                            value={config.isAuto || false}
+                            onValueChange={(v) => updateConfig('isAuto', v)}
+                            trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                            thumbColor="#FFF"
+                        />
+                    </View>
+                </>
+            ) : (
+                <Text style={styles.fieldHint}>CC, ekler ve otomatik gönderim için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
+
+const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <ApiDocLink
+                title="Slack Entegrasyonu"
+                url="https://api.slack.com/messaging/webhooks"
+                brief="Slack'e mesaj göndermek için Webhook URL'si veya Bot Token kullanabilirsiniz."
+            />
+
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Gönderim Modu</Text>
+                    <View style={styles.buttonRow}>
+                        {['webhook', 'bot'].map(m => (
+                            <TouchableOpacity
+                                key={m}
+                                style={[styles.unitButton, (config.mode || 'webhook') === m && styles.unitButtonSelected]}
+                                onPress={() => updateConfig('mode', m)}
+                            >
+                                <Text style={[styles.unitButtonText, (config.mode || 'webhook') === m && styles.unitButtonTextSelected]}>
+                                    {m === 'webhook' ? 'Webhook' : 'Bot Token'}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            )}
+
+            {(config.mode || 'webhook') === 'webhook' || !showAdvanced ? (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Webhook URL</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.webhookUrl || ''}
+                        onChangeText={(t) => updateConfig('webhookUrl', t)}
+                        placeholder="https://hooks.slack.com/services/..."
+                        placeholderTextColor="#666"
+                        keyboardType="url"
+                    />
+                    {!showAdvanced && (
+                        <Text style={styles.fieldHint}>Bot Token kullanmak için Gelişmiş moda geçin.</Text>
+                    )}
+                </View>
+            ) : (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Bot Token (xoxb-...)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.botToken || ''}
+                            onChangeText={(t) => updateConfig('botToken', t)}
+                            placeholder="xoxb-1234..."
+                            placeholderTextColor="#666"
+                            secureTextEntry
+                        />
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Kanal ID veya Adı</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.channel || ''}
+                            onChangeText={(t) => updateConfig('channel', t)}
+                            placeholder="#general veya C012345"
+                            placeholderTextColor="#666"
+                        />
+                    </View>
+                </>
+            )}
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Mesaj (Opsiyonel)</Text>
+                <ExpandableTextInput
+                    value={config.message || ''}
+                    onChangeText={(t) => updateConfig('message', t)}
+                    placeholder="Slack'e gönderilecek mesaj..."
+                    label="Mesaj İçeriği"
+                    minHeight={80}
+                />
+            </View>
+
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Blocks JSON (Zengin Mesaj - Opsiyonel)</Text>
+                    <ExpandableTextInput
+                        value={config.blocks || ''}
+                        onChangeText={(t) => updateConfig('blocks', t)}
+                        placeholder='[{"type": "section", "text": {"type": "mrkdwn", "text": "Hello"}}]'
+                        label="Block Kit JSON"
+                        minHeight={120}
+                        hint="Slack Block Kit Builder ile oluşturulan JSON dizisi."
+                    />
+                </View>
+            )}
+        </>
+    );
+};
+
+const HttpRequestFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
     const [modalVisible, setModalVisible] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const showAdvanced = !!isAdvanced;
 
     const filteredApis = FREE_APIS.filter(api =>
         api.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1946,32 +2088,34 @@ const HttpRequestFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }
                     keyboardType="url"
                 />
             </View>
-            <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Sorgu Parametreleri (Her satırda key=value)</Text>
-                <TextInput
-                    style={[styles.input, { height: 80 }]}
-                    value={
-                        config.queryParameters
-                            ? Object.entries(config.queryParameters).map(([k, v]) => `${k}=${v}`).join('\n')
-                            : ''
-                    }
-                    onChangeText={(text) => {
-                        const params: Record<string, string> = {};
-                        text.split('\n').forEach(line => {
-                            const parts = line.split('=');
-                            if (parts.length >= 2) {
-                                const key = parts[0].trim();
-                                const value = parts.slice(1).join('=').trim();
-                                if (key) params[key] = value;
-                            }
-                        });
-                        updateConfig('queryParameters', params);
-                    }}
-                    placeholder="api_key=123&#10;limit=10"
-                    placeholderTextColor="#666"
-                    multiline
-                />
-            </View>
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Sorgu Parametreleri (Her satırda key=value)</Text>
+                    <TextInput
+                        style={[styles.input, { height: 80 }]}
+                        value={
+                            config.queryParameters
+                                ? Object.entries(config.queryParameters).map(([k, v]) => `${k}=${v}`).join('\n')
+                                : ''
+                        }
+                        onChangeText={(text) => {
+                            const params: Record<string, string> = {};
+                            text.split('\n').forEach(line => {
+                                const parts = line.split('=');
+                                if (parts.length >= 2) {
+                                    const key = parts[0].trim();
+                                    const value = parts.slice(1).join('=').trim();
+                                    if (key) params[key] = value;
+                                }
+                            });
+                            updateConfig('queryParameters', params);
+                        }}
+                        placeholder="api_key=123&#10;limit=10"
+                        placeholderTextColor="#666"
+                        multiline
+                    />
+                </View>
+            )}
             <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Metot</Text>
                 <View style={styles.buttonRow}>
@@ -1988,101 +2132,105 @@ const HttpRequestFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }
                     ))}
                 </View>
             </View>
-            <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Headers (JSON)</Text>
-                <ExpandableTextInput
-                    value={config.headers || ''}
-                    onChangeText={(t) => updateConfig('headers', t)}
-                    placeholder='{"Authorization": "..."}'
-                    label="Headers (JSON)"
-                    hint={'JSON formatında başlıklar: {"Key": "Value"}'}
-                    minHeight={60}
-                />
-            </View>
-            <View style={styles.rowField}>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldLabel}>User-Agent (Opsiyonel)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={config.userAgent || ''}
-                        onChangeText={(t) => updateConfig('userAgent', t)}
-                        placeholder="Varsayılan (Android)"
-                        placeholderTextColor="#666"
-                    />
-                </View>
-                <View style={{ width: 10 }} />
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.fieldLabel}>Timeout (ms)</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={String(config.timeout || 30000)}
-                        onChangeText={(t) => updateConfig('timeout', parseInt(t) || 30000)}
-                        keyboardType="numeric"
-                    />
-                </View>
-            </View>
-            <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Kimlik Doğrulama</Text>
-                <View style={styles.buttonRow}>
-                    {['none', 'basic', 'bearer'].map(type => (
-                        <TouchableOpacity
-                            key={type}
-                            style={[styles.unitButton, config.authentication?.type === type && styles.unitButtonSelected]}
-                            onPress={() => updateConfig('authentication', { ...config.authentication, type })}
-                        >
-                            <Text style={[styles.unitButtonText, config.authentication?.type === type && styles.unitButtonTextSelected]}>
-                                {type === 'none' ? 'Yok' : type === 'basic' ? 'Basic' : 'Bearer'}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            </View>
-            {config.authentication?.type === 'basic' && (
-                <View style={styles.rowField}>
-                    <View style={{ flex: 1 }}>
-                        <TextInput
-                            style={styles.input}
-                            value={config.authentication?.username || ''}
-                            onChangeText={(t) => updateConfig('authentication', { ...config.authentication, username: t })}
-                            placeholder="Kullanıcı Adı"
-                            placeholderTextColor="#666"
+            {showAdvanced && (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Headers (JSON)</Text>
+                        <ExpandableTextInput
+                            value={config.headers || ''}
+                            onChangeText={(t) => updateConfig('headers', t)}
+                            placeholder='{"Authorization": "..."}'
+                            label="Headers (JSON)"
+                            hint={'JSON formatında başlıklar: {"Key": "Value"}'}
+                            minHeight={60}
                         />
                     </View>
-                    <View style={{ width: 10 }} />
-                    <View style={{ flex: 1 }}>
-                        <TextInput
-                            style={styles.input}
-                            value={config.authentication?.password || ''}
-                            onChangeText={(t) => updateConfig('authentication', { ...config.authentication, password: t })}
-                            placeholder="Şifre"
-                            placeholderTextColor="#666"
-                            secureTextEntry
+                    <View style={styles.rowField}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>User-Agent (Opsiyonel)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={config.userAgent || ''}
+                                onChangeText={(t) => updateConfig('userAgent', t)}
+                                placeholder="Varsayılan (Android)"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+                        <View style={{ width: 10 }} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Timeout (ms)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={String(config.timeout || 30000)}
+                                onChangeText={(t) => updateConfig('timeout', parseInt(t) || 30000)}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                    </View>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Kimlik Doğrulama</Text>
+                        <View style={styles.buttonRow}>
+                            {['none', 'basic', 'bearer'].map(type => (
+                                <TouchableOpacity
+                                    key={type}
+                                    style={[styles.unitButton, config.authentication?.type === type && styles.unitButtonSelected]}
+                                    onPress={() => updateConfig('authentication', { ...config.authentication, type })}
+                                >
+                                    <Text style={[styles.unitButtonText, config.authentication?.type === type && styles.unitButtonTextSelected]}>
+                                        {type === 'none' ? 'Yok' : type === 'basic' ? 'Basic' : 'Bearer'}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </View>
+                    {config.authentication?.type === 'basic' && (
+                        <View style={styles.rowField}>
+                            <View style={{ flex: 1 }}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.authentication?.username || ''}
+                                    onChangeText={(t) => updateConfig('authentication', { ...config.authentication, username: t })}
+                                    placeholder="Kullanıcı Adı"
+                                    placeholderTextColor="#666"
+                                />
+                            </View>
+                            <View style={{ width: 10 }} />
+                            <View style={{ flex: 1 }}>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.authentication?.password || ''}
+                                    onChangeText={(t) => updateConfig('authentication', { ...config.authentication, password: t })}
+                                    placeholder="Şifre"
+                                    placeholderTextColor="#666"
+                                    secureTextEntry
+                                />
+                            </View>
+                        </View>
+                    )}
+                    {config.authentication?.type === 'bearer' && (
+                        <View style={styles.field}>
+                            <TextInput
+                                style={styles.input}
+                                value={config.authentication?.token || ''}
+                                onChangeText={(t) => updateConfig('authentication', { ...config.authentication, token: t })}
+                                placeholder="Token"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+                    )}
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>Body (JSON)</Text>
+                        <ExpandableTextInput
+                            value={config.body || ''}
+                            onChangeText={(t) => updateConfig('body', t)}
+                            placeholder='{"key": "value"}'
+                            label="Body (JSON)"
+                            hint={'İstek gövdesi (JSON formatında)'}
+                            minHeight={120}
                         />
                     </View>
-                </View>
+                </>
             )}
-            {config.authentication?.type === 'bearer' && (
-                <View style={styles.field}>
-                    <TextInput
-                        style={styles.input}
-                        value={config.authentication?.token || ''}
-                        onChangeText={(t) => updateConfig('authentication', { ...config.authentication, token: t })}
-                        placeholder="Token"
-                        placeholderTextColor="#666"
-                    />
-                </View>
-            )}
-            <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Body (JSON)</Text>
-                <ExpandableTextInput
-                    value={config.body || ''}
-                    onChangeText={(t) => updateConfig('body', t)}
-                    placeholder='{"key": "value"}'
-                    label="Body (JSON)"
-                    hint={'İstek gövdesi (JSON formatında)'}
-                    minHeight={120}
-                />
-            </View>
             <View style={styles.field}>
                 <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
                 <TextInput
@@ -2299,6 +2447,41 @@ const PdfCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) 
             <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
                 Metin, HTML veya Resim Listesi içeren değişken
             </Text>
+        </View>
+        <View style={styles.rowField}>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Kağıt Boyutu</Text>
+                <View style={styles.buttonRow}>
+                    {['a4', 'letter'].map(s => (
+                        <TouchableOpacity
+                            key={s}
+                            style={[styles.unitButton, (config.pageSize || 'a4') === s && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('pageSize', s)}
+                        >
+                            <Text style={[styles.unitButtonText, (config.pageSize || 'a4') === s && styles.unitButtonTextSelected]}>
+                                {s.toUpperCase()}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+            <View style={{ width: 10 }} />
+            <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Yönlendirme</Text>
+                <View style={styles.buttonRow}>
+                    {['portrait', 'landscape'].map(o => (
+                        <TouchableOpacity
+                            key={o}
+                            style={[styles.unitButton, (config.orientation || 'portrait') === o && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('orientation', o)}
+                        >
+                            <Text style={[styles.unitButtonText, (config.orientation || 'portrait') === o && styles.unitButtonTextSelected]}>
+                                {o === 'portrait' ? 'Dikey' : 'Yatay'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
         </View>
         <View style={styles.field}>
             <Text style={styles.fieldLabel}>Dosya Adı (Opsiyonel)</Text>
@@ -2545,44 +2728,11 @@ const OpenUrlFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
     </View>
 );
 
-const SpeechToTextFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Dil Kodu (Örn: tr-TR)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.language || 'tr-TR'}
-                onChangeText={(t) => updateConfig('language', t)}
-                placeholder="tr-TR"
-                placeholderTextColor="#666"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="transcription"
-                placeholderTextColor="#666"
-            />
-        </View>
-        <View style={styles.rowField}>
-            <Text style={styles.fieldLabel}>Sürekli Dinleme (Uzun)</Text>
-            <Switch
-                value={config.continuous || false}
-                onValueChange={(v) => updateConfig('continuous', v)}
-                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
-                thumbColor="#FFF"
-            />
-        </View>
-    </>
-);
-
 const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
+        {/* Prompt */}
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Prompt ({'{'} {'{'} degisken {'}'} {'}'} kullanılabilir)</Text>
+            <Text style={styles.fieldLabel}>🧠 Prompt {'({{değişken}} kullanılabilir)'}</Text>
             <ExpandableTextInput
                 value={config.prompt}
                 onChangeText={(t) => updateConfig('prompt', t)}
@@ -2592,8 +2742,23 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                 minHeight={150}
             />
         </View>
+
+        {/* System Prompt (Opsiyonel) */}
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Provider</Text>
+            <Text style={styles.fieldLabel}>⚙️ Sistem Promptu (Opsiyonel)</Text>
+            <ExpandableTextInput
+                value={config.systemPrompt || ''}
+                onChangeText={(t) => updateConfig('systemPrompt', t)}
+                placeholder="Örn: Sen bir Türkçe asistansın, kısa ve net cevaplar ver."
+                label="Sistem Promptu"
+                hint="AI'ın davranışını belirler. Boş bırakılırsa varsayılan kullanılır."
+                minHeight={80}
+            />
+        </View>
+
+        {/* Provider */}
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>🤖 Provider</Text>
             <View style={styles.buttonRow}>
                 {['gemini', 'openai', 'claude'].map(p => (
                     <TouchableOpacity
@@ -2602,14 +2767,16 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                         onPress={() => updateConfig('provider', p)}
                     >
                         <Text style={[styles.unitButtonText, config.provider === p && styles.unitButtonTextSelected]}>
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                            {p === 'gemini' ? '🟦 Gemini' : p === 'openai' ? '🟩 OpenAI' : '🟧 Claude'}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
         </View>
+
+        {/* API Key */}
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>API Key</Text>
+            <Text style={styles.fieldLabel}>🔑 API Key</Text>
             <TextInput
                 style={styles.input}
                 value={config.apiKey}
@@ -2633,9 +2800,11 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                 </TouchableOpacity>
             </View>
         </View>
+
+        {/* Model + Sıcaklık */}
         <View style={styles.rowField}>
             <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Model (Opsiyonel)</Text>
+                <Text style={styles.fieldLabel}>📦 Model (Opsiyonel)</Text>
                 <TextInput
                     style={styles.input}
                     value={config.model}
@@ -2646,7 +2815,7 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
             </View>
             <View style={{ width: 16 }} />
             <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Sıcaklık (0-1)</Text>
+                <Text style={styles.fieldLabel}>🌡️ Sıcaklık (0-1)</Text>
                 <TextInput
                     style={styles.input}
                     value={String(config.temperature ?? 0.7)}
@@ -2655,8 +2824,54 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                 />
             </View>
         </View>
+
+        {/* Çıkış Formatı */}
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+            <Text style={styles.fieldLabel}>📋 Çıkış Formatı</Text>
+            <View style={styles.buttonRow}>
+                {[
+                    { value: 'text', label: '📝 Metin' },
+                    { value: 'json', label: '🗂️ JSON' },
+                    { value: 'json_array', label: '📊 JSON Dizi' },
+                ].map(opt => (
+                    <TouchableOpacity
+                        key={opt.value}
+                        style={[styles.unitButton, (config.outputFormat || 'text') === opt.value && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('outputFormat', opt.value)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.outputFormat || 'text') === opt.value && styles.unitButtonTextSelected]}>
+                            {opt.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+            <Text style={styles.fieldHint}>
+                {(config.outputFormat || 'text') === 'text'
+                    ? 'AI serbest metin döndürür.'
+                    : (config.outputFormat || 'text') === 'json'
+                        ? 'AI tek bir JSON nesnesi döndürür (örn: {"ad": "Ali", "borç": 1500})'
+                        : 'AI bir JSON dizisi döndürür (örn: [{"ad": "Ali"}, {"ad": "Veli"}])'}
+            </Text>
+        </View>
+
+        {/* Araçlar (Tools) */}
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>🛠️ Araçlar (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.tools || ''}
+                onChangeText={(t) => updateConfig('tools', t)}
+                placeholder="search_memory, send_whatsapp, read_calendar"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>
+                AI'ın kullanabileceği araçları virgülle ayırarak yazın. Boş bırakılırsa tüm araçlar aktiftir.
+            </Text>
+        </View>
+
+        {/* Sonuç Değişkeni */}
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>📦 Sonuç Değişkeni</Text>
             <TextInput
                 style={styles.input}
                 value={config.variableName}
@@ -2664,7 +2879,10 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                 placeholder="aiResponse"
                 placeholderTextColor="#666"
             />
+            <Text style={styles.fieldHint}>AI yanıtını bu değişkene kaydeder</Text>
         </View>
+
+        {/* Ek Resimler */}
         <View style={styles.field}>
             <Text style={styles.fieldLabel}>📎 Ek Resimler (Değişken Adı)</Text>
             <TextInput
@@ -2674,7 +2892,7 @@ const AgentAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) =>
                 placeholder="resimDegiskeni"
                 placeholderTextColor="#666"
             />
-            <Text style={{ color: '#666', fontSize: 11, marginTop: 4 }}>
+            <Text style={styles.fieldHint}>
                 Resim içeren değişken adı. AI resmi görerek analiz eder.
             </Text>
         </View>
@@ -2921,6 +3139,70 @@ const SettingsOpenFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
 // ═══════════════════════════════════════════════════════════════
 
 // Database write fields moved to end of file
+
+const SpeechToTextFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Dil (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.language || ''}
+                onChangeText={(t) => updateConfig('language', t)}
+                placeholder="tr-TR (Varsayılan: Cihaz Dili)"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.rowField}>
+            <Text style={styles.fieldLabel}>Sürekli Dinleme (Continuous)</Text>
+            <Switch
+                value={config.continuous || false}
+                onValueChange={(v) => updateConfig('continuous', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+        </View>
+        <View style={styles.rowField}>
+            <Text style={styles.fieldLabel}>Cihaz Üzerinde İşleme (On-Device)</Text>
+            <Switch
+                value={config.requiresOnDeviceRecognition || false}
+                onValueChange={(v) => updateConfig('requiresOnDeviceRecognition', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+        </View>
+        <View style={styles.rowField}>
+            <Text style={styles.fieldLabel}>Otomatik Noktalama</Text>
+            <Switch
+                value={config.autoPunctuation || false}
+                onValueChange={(v) => updateConfig('autoPunctuation', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sessizlik Zaman Aşımı (ms)</Text>
+            <TextInput
+                style={styles.input}
+                value={String(config.silenceTimeout || '2000')}
+                onChangeText={(t) => updateConfig('silenceTimeout', parseInt(t) || 2000)}
+                placeholder="2000"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+            />
+            <Text style={styles.fieldHint}>Konuşma durduktan ne kadar sonra bitirilsin?</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="spokenText"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
 
 const ContactsReadFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
@@ -3516,8 +3798,9 @@ const OneDriveListFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
 // TELEGRAM SEND FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
+const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
     const operation = config.operation || 'sendMessage';
+    const showAdvanced = !!isAdvanced;
 
     return (
         <>
@@ -3550,33 +3833,34 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
                 <Text style={styles.fieldHint}>Kullanıcı ID'nizi öğrenmek için @userinfobot kullanabilirsiniz.</Text>
             </View>
 
-            {/* Operation Selection */}
-            <View style={styles.field}>
-                <Text style={styles.fieldLabel}>İşlem Tipi</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.buttonRow}>
-                        {[
-                            { id: 'sendMessage', label: 'Mesaj' },
-                            { id: 'sendPhoto', label: 'Fotoğraf' },
-                            { id: 'sendDocument', label: 'Dosya' },
-                            { id: 'sendLocation', label: 'Konum' }
-                        ].map(op => (
-                            <TouchableOpacity
-                                key={op.id}
-                                style={[styles.unitButton, operation === op.id && styles.unitButtonSelected]}
-                                onPress={() => updateConfig('operation', op.id)}
-                            >
-                                <Text style={[styles.unitButtonText, operation === op.id && styles.unitButtonTextSelected]}>
-                                    {op.label}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </ScrollView>
-            </View>
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>İşlem Tipi</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        <View style={styles.buttonRow}>
+                            {[
+                                { id: 'sendMessage', label: 'Mesaj' },
+                                { id: 'sendPhoto', label: 'Fotoğraf' },
+                                { id: 'sendDocument', label: 'Dosya' },
+                                { id: 'sendLocation', label: 'Konum' }
+                            ].map(op => (
+                                <TouchableOpacity
+                                    key={op.id}
+                                    style={[styles.unitButton, operation === op.id && styles.unitButtonSelected]}
+                                    onPress={() => updateConfig('operation', op.id)}
+                                >
+                                    <Text style={[styles.unitButtonText, operation === op.id && styles.unitButtonTextSelected]}>
+                                        {op.label}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    </ScrollView>
+                </View>
+            )}
 
             {/* File Path for Photo/Document */}
-            {(operation === 'sendPhoto' || operation === 'sendDocument') && (
+            {showAdvanced && (operation === 'sendPhoto' || operation === 'sendDocument') && (
                 <View style={styles.field}>
                     <Text style={styles.fieldLabel}>Dosya Yolu / Değişken</Text>
                     <TextInput
@@ -3591,7 +3875,7 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
             )}
 
             {/* Location Fields */}
-            {operation === 'sendLocation' && (
+            {showAdvanced && operation === 'sendLocation' && (
                 <View style={[styles.field, { flexDirection: 'row', gap: 10 }]}>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.fieldLabel}>Enlem (Lat)</Text>
@@ -3635,7 +3919,7 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
             )}
 
             {/* Parse Mode */}
-            {operation !== 'sendLocation' && (
+            {showAdvanced && operation !== 'sendLocation' && (
                 <View style={styles.field}>
                     <Text style={styles.fieldLabel}>Format</Text>
                     <View style={styles.buttonRow}>
@@ -3653,6 +3937,10 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
                     </View>
                 </View>
             )}
+
+            {!showAdvanced && operation !== 'sendMessage' && (
+                <Text style={styles.fieldHint}>Fotoğraf/dosya/konum göndermek için Gelişmiş moda geçin.</Text>
+            )}
         </>
     );
 };
@@ -3661,121 +3949,269 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig 
 // WHATSAPP SEND FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const WhatsAppSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Telefon Numarası</Text>
-            <TextInput
-                style={styles.input}
-                value={config.phoneNumber || ''}
-                onChangeText={(t) => updateConfig('phoneNumber', t)}
-                placeholder="+90 5XX XXX XX XX"
-                placeholderTextColor="#666"
-                keyboardType="phone-pad"
-            />
-            <Text style={styles.fieldHint}>Uluslararası formatta girin (örn: +90...)</Text>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Mesaj</Text>
-            <ExpandableTextInput
-                value={config.message || ''}
-                onChangeText={(t) => updateConfig('message', t)}
-                placeholder="WhatsApp mesajınız..."
-                label="Mesaj"
-                minHeight={100}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Medya Dosyası (Değişken Adı)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.mediaPath || ''}
-                onChangeText={(t) => updateConfig('mediaPath', t)}
-                placeholder="selectedFile, audioUri vb."
-                placeholderTextColor="#666"
-            />
-            <Text style={styles.fieldHint}>Gönderilecek resim/video dosyasının yolu (Uri)</Text>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="whatsappStatus"
-                placeholderTextColor="#666"
-            />
-        </View>
-    </>
-);
+const WhatsAppSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            {showAdvanced && (
+                <>
+                    {/* Gönderim Modu */}
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>📤 Gönderim Modu</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View style={styles.buttonRow}>
+                                {[
+                                    { value: 'direct', label: '📱 Cihaz' },
+                                    { value: 'backend', label: '🖥️ Sunucu' },
+                                    { value: 'cloud_api', label: '☁️ Cloud API' },
+                                ].map(opt => (
+                                    <TouchableOpacity
+                                        key={opt.value}
+                                        style={[styles.unitButton, (config.mode || 'direct') === opt.value && styles.unitButtonSelected]}
+                                        onPress={() => updateConfig('mode', opt.value)}
+                                    >
+                                        <Text style={[styles.unitButtonText, (config.mode || 'direct') === opt.value && styles.unitButtonTextSelected]}>
+                                            {opt.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
+                        <Text style={styles.fieldHint}>
+                            {(config.mode || 'direct') === 'backend'
+                                ? 'Mesaj sunucu üzerinden gönderilir (WhatsApp Web bağlantısı gerekir).'
+                                : (config.mode || 'direct') === 'cloud_api'
+                                    ? 'Meta WhatsApp Cloud API ile gönderilir (resmi, tamamen otomatik).'
+                                    : 'Mesaj cihazdan doğrudan gönderilir (WhatsApp uygulaması açılır).'}
+                        </Text>
+                    </View>
+
+                    {/* Backend Ayarları */}
+                    {config.mode === 'backend' && (
+                        <>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>🔗 Sunucu Adresi (Backend URL)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.backendUrl || ''}
+                                    onChangeText={(t) => updateConfig('backendUrl', t)}
+                                    placeholder="http://sunucu-ip:3001/whatsapp"
+                                    placeholderTextColor="#666"
+                                    autoCapitalize="none"
+                                />
+                                <Text style={styles.fieldHint}>WhatsApp servisinin çalıştığı adres</Text>
+                            </View>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>🔑 Güvenlik Anahtarı</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.backendAuthKey || ''}
+                                    onChangeText={(t) => updateConfig('backendAuthKey', t)}
+                                    placeholder="breviai-secret-password"
+                                    placeholderTextColor="#666"
+                                    secureTextEntry
+                                />
+                            </View>
+                        </>
+                    )}
+
+                    {/* Cloud API Ayarları */}
+                    {config.mode === 'cloud_api' && (
+                        <>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>🔑 Cloud API Token</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.cloudApiToken || ''}
+                                    onChangeText={(t) => updateConfig('cloudApiToken', t)}
+                                    placeholder="Meta Developer hesabından alınan token"
+                                    placeholderTextColor="#666"
+                                    secureTextEntry
+                                />
+                                <TouchableOpacity onPress={() => Linking.openURL('https://developers.facebook.com/apps/')}>
+                                    <Text style={styles.apiKeyLink}>🔗 Meta Developer Dashboard</Text>
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>📱 Phone Number ID</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.phoneNumberId || ''}
+                                    onChangeText={(t) => updateConfig('phoneNumberId', t)}
+                                    placeholder="WhatsApp Business API Phone Number ID"
+                                    placeholderTextColor="#666"
+                                />
+                                <Text style={styles.fieldHint}>Meta Dashboard → WhatsApp → API Setup</Text>
+                            </View>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>📄 Template Adı (Opsiyonel)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.templateName || ''}
+                                    onChangeText={(t) => updateConfig('templateName', t)}
+                                    placeholder="Boş bırakırsanız serbest metin gönderilir"
+                                    placeholderTextColor="#666"
+                                />
+                                <Text style={styles.fieldHint}>Template kullanmak için Meta onaylı template adı girin</Text>
+                            </View>
+                            {config.templateName ? (
+                                <View style={styles.field}>
+                                    <Text style={styles.fieldLabel}>🌐 Template Dili</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={config.templateLanguage || 'tr'}
+                                        onChangeText={(t) => updateConfig('templateLanguage', t)}
+                                        placeholder="tr"
+                                        placeholderTextColor="#666"
+                                    />
+                                </View>
+                            ) : null}
+                        </>
+                    )}
+                </>
+            )}
+
+            {/* Telefon Numarası */}
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>📞 Telefon Numarası</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.phoneNumber || ''}
+                    onChangeText={(t) => updateConfig('phoneNumber', t)}
+                    placeholder="+905XXXXXXXXX veya {{degisken.phone}}"
+                    placeholderTextColor="#666"
+                    keyboardType="default"
+                />
+                <Text style={styles.fieldHint}>Sabit numara veya değişken kullanın: {'{{aktifBorclu.phone}}'}</Text>
+            </View>
+
+            {/* Mesaj */}
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>💬 Mesaj</Text>
+                <ExpandableTextInput
+                    value={config.message || ''}
+                    onChangeText={(t) => updateConfig('message', t)}
+                    placeholder="Merhaba! veya {{degisken.message}}"
+                    label="Mesaj"
+                    hint="Sabit metin veya {{değişken}} kullanın"
+                    minHeight={100}
+                />
+            </View>
+
+            {showAdvanced ? (
+                <>
+                    {/* Medya (Opsiyonel) */}
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>🖼️ Medya Dosyası (Opsiyonel)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.mediaPath || ''}
+                            onChangeText={(t) => updateConfig('mediaPath', t)}
+                            placeholder="selectedFile, audioUri vb."
+                            placeholderTextColor="#666"
+                        />
+                        <Text style={styles.fieldHint}>Resim/video göndermek istiyorsanız dosya yolunu girin</Text>
+                    </View>
+
+                    {/* Sonuç Değişkeni */}
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>📦 Sonuç Değişkeni</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={config.variableName || ''}
+                            onChangeText={(t) => updateConfig('variableName', t)}
+                            placeholder="whatsappStatus"
+                            placeholderTextColor="#666"
+                        />
+                        <Text style={styles.fieldHint}>Gönderim sonucunu bu değişkene kaydeder</Text>
+                    </View>
+                </>
+            ) : (
+                <Text style={styles.fieldHint}>Medya, sonuç değişkeni ve gönderim modu için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
 
 // ═══════════════════════════════════════════════════════════════
 // GOOGLE TRANSLATE FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const GoogleTranslateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Çevrilecek Metin</Text>
-            <ExpandableTextInput
-                value={config.text || ''}
-                onChangeText={(t) => updateConfig('text', t)}
-                placeholder="{{variable}} veya metin"
-                label="Metin"
-                minHeight={100}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>API Key (Opsiyonel)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.apiKey || ''}
-                onChangeText={(t) => updateConfig('apiKey', t)}
-                placeholder="Google Cloud Translation API Key"
-                placeholderTextColor="#666"
-                secureTextEntry
-            />
-            <Text style={styles.fieldHint}>Boş bırakılırsa ücretsiz (sınırlı) servis kullanılır.</Text>
-        </View>
-        <View style={styles.rowField}>
-            <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Hedef Dil (tr, en, de)</Text>
-                <TextInput
-                    style={styles.input}
-                    value={config.targetLanguage || 'tr'}
-                    onChangeText={(t) => updateConfig('targetLanguage', t)}
-                    placeholder="tr"
-                    placeholderTextColor="#666"
-                    maxLength={5}
-                />
-            </View>
-            <View style={{ width: 10 }} />
-            <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Kaynak Dil</Text>
-                <TextInput
-                    style={styles.input}
-                    value={config.sourceLanguage || 'auto'}
-                    onChangeText={(t) => updateConfig('sourceLanguage', t)}
-                    placeholder="auto"
-                    placeholderTextColor="#666"
-                    maxLength={5}
-                />
-            </View>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="translatedText"
-                placeholderTextColor="#666"
-            />
-        </View>
-    </>
-);
+const GoogleTranslateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
 
-// ═══════════════════════════════════════════════════════════════
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Çevrilecek Metin</Text>
+                <ExpandableTextInput
+                    value={config.text || ''}
+                    onChangeText={(t) => updateConfig('text', t)}
+                    placeholder="{{variable}} veya metin"
+                    label="Metin"
+                    minHeight={100}
+                />
+            </View>
+            <View style={styles.rowField}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Hedef Dil (tr, en, de)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.targetLanguage || 'tr'}
+                        onChangeText={(t) => updateConfig('targetLanguage', t)}
+                        placeholder="tr"
+                        placeholderTextColor="#666"
+                        maxLength={5}
+                    />
+                </View>
+                {showAdvanced && (
+                    <>
+                        <View style={{ width: 10 }} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Kaynak Dil</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={config.sourceLanguage || 'auto'}
+                                onChangeText={(t) => updateConfig('sourceLanguage', t)}
+                                placeholder="auto"
+                                placeholderTextColor="#666"
+                                maxLength={5}
+                            />
+                        </View>
+                    </>
+                )}
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.variableName}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="translatedText"
+                    placeholderTextColor="#666"
+                />
+            </View>
+
+            {showAdvanced ? (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>API Key (Opsiyonel)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.apiKey || ''}
+                        onChangeText={(t) => updateConfig('apiKey', t)}
+                        placeholder="Google Cloud Translation API Key"
+                        placeholderTextColor="#666"
+                        secureTextEntry
+                    />
+                    <Text style={styles.fieldHint}>Boş bırakılırsa ücretsiz (sınırlı) servis kullanılır.</Text>
+                </View>
+            ) : (
+                <Text style={styles.fieldHint}>Kaynak dil ve API key ayarları için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
 
 const GmailSendFields: React.FC<ConfigFieldsProps & { fileVariables?: string[] }> = ({ config, updateConfig, fileVariables }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -4422,6 +4858,18 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         fontStyle: 'italic',
     },
+    modeToggleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 10,
+        marginBottom: 12,
+    },
+    modeToggleLabel: {
+        color: '#A5B4FC',
+        fontSize: 12,
+        fontWeight: '600',
+    },
     switchRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -4922,65 +5370,83 @@ const ImageEditFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) 
 // WEB AUTOMATION FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>URL</Text>
-            <TextInput
-                style={styles.input}
-                value={config.url || ''}
-                onChangeText={(t) => updateConfig('url', t)}
-                placeholder="https://example.com"
-                placeholderTextColor="#666"
-                autoCapitalize="none"
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>İşlemler (JSON)</Text>
-            <ExpandableTextInput
-                value={typeof config.actions === 'string' ? config.actions : JSON.stringify(config.actions || [], null, 2)}
-                onChangeText={(t) => {
-                    try {
-                        // Try to parse if valid JSON, otherwise keep as string until valid
-                        const parsed = JSON.parse(t);
-                        updateConfig('actions', parsed);
-                    } catch (e) {
-                        // If not valid JSON yet, maybe store as temporary string or handle differently.
-                        // For this simple implementation, we might need a better way to handle raw text input for JSON.
-                        // But WorkflowEngine expects object.
-                        // Let's assume user pastes valid JSON or we provide a UI builder later.
-                        // For now, let's keep it simple: just text input, but we need to ensure it saves as object if possible.
-                        // Actually, let's use a helper or just let it be text and parse on execution?
-                        // No, type definition says properties.
-                        // Let's just update a "actionsString" property if we want, but let's try to parse.
-                    }
-                }}
-                placeholder='[{"type": "click", "selector": "#btn"}, {"type": "wait", "value": "2000"}]'
-                label="Actions JSON"
-                minHeight={150}
-                hint="Örnek: [{'type': 'click', 'selector': 'button.submit'}, {'type': 'scrape', 'selector': 'h1', 'variableName': 'title'}]"
-            />
-            <Text style={styles.fieldHint}>Tıklama, Yazma, Bekleme ve Veri Çekme işlemleri.</Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-            <Text style={{ ...styles.fieldLabel, marginBottom: 0, marginRight: 10 }}>Arka Planda Çalıştır (Headless)</Text>
-            <Switch
-                value={config.headless || false}
-                onValueChange={(v) => updateConfig('headless', v)}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName || ''}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="automationResult"
-                placeholderTextColor="#666"
-            />
-        </View>
-    </>
-);
+const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>URL</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.url || ''}
+                    onChangeText={(t) => updateConfig('url', t)}
+                    placeholder="https://example.com"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                />
+            </View>
+
+            {!showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Hedef (Ne yapılacak?)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.smartGoal || ''}
+                        onChangeText={(t) => {
+                            updateConfig('smartGoal', t);
+                            updateConfig('mode', 'smart');
+                        }}
+                        placeholder="Örn: Sayfadaki fiyatı bul ve kaydet"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            )}
+
+            {showAdvanced && (
+                <>
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>İşlemler (JSON)</Text>
+                        <ExpandableTextInput
+                            value={typeof config.actions === 'string' ? config.actions : JSON.stringify(config.actions || [], null, 2)}
+                            onChangeText={(t) => {
+                                try {
+                                    const parsed = JSON.parse(t);
+                                    updateConfig('actions', parsed);
+                                } catch (e) {
+                                    // ignore until valid JSON
+                                }
+                            }}
+                            placeholder='[{"type": "click", "selector": "#btn"}, {"type": "wait", "value": "2000"}]'
+                            label="Actions JSON"
+                            minHeight={150}
+                            hint="Örnek: [{'type': 'click', 'selector': 'button.submit'}, {'type': 'scrape', 'selector': 'h1', 'variableName': 'title'}]"
+                        />
+                        <Text style={styles.fieldHint}>Tıklama, Yazma, Bekleme ve Veri Çekme işlemleri.</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                        <Text style={{ ...styles.fieldLabel, marginBottom: 0, marginRight: 10 }}>Arka Planda Çalıştır (Headless)</Text>
+                        <Switch
+                            value={config.headless || false}
+                            onValueChange={(v) => updateConfig('headless', v)}
+                        />
+                    </View>
+                </>
+            )}
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.variableName || ''}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="automationResult"
+                    placeholderTextColor="#666"
+                />
+            </View>
+        </>
+    );
+};
 
 
 
@@ -5264,49 +5730,63 @@ const CronCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig })
             <Text style={styles.fieldLabel}>Görev Adı</Text>
             <TextInput
                 style={styles.input}
-                value={config.name || ''}
+                value={config.name}
                 onChangeText={(t) => updateConfig('name', t)}
-                placeholder="Otomatik Kontrol"
+                placeholder="Rapor Gönder"
                 placeholderTextColor="#666"
             />
         </View>
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Zamanlama (Cron İfadesi)</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={styles.fieldLabel}>Zamanlama (Cron)</Text>
+                <View style={{ flexDirection: 'row', gap: 5 }}>
+                    <TouchableOpacity
+                        onPress={() => updateConfig('schedule', '0 * * * *')}
+                        style={{ padding: 4, backgroundColor: '#333', borderRadius: 4 }}
+                    >
+                        <Text style={{ color: '#DDD', fontSize: 10 }}>Saatlik</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => updateConfig('schedule', '0 9 * * *')}
+                        style={{ padding: 4, backgroundColor: '#333', borderRadius: 4 }}
+                    >
+                        <Text style={{ color: '#DDD', fontSize: 10 }}>Günlük(09:00)</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
             <TextInput
                 style={styles.input}
-                value={config.schedule || ''}
+                value={config.schedule}
                 onChangeText={(t) => updateConfig('schedule', t)}
-                placeholder="*/5 * * * *"
+                placeholder="* * * * *"
                 placeholderTextColor="#666"
-                autoCapitalize="none"
             />
-            <Text style={styles.fieldHint}>Cron formatı: dakika saat gün ay haftanın_günü{"\n"}Örnek: "*/5 * * * *" = Her 5 dakikada bir{"\n"}"0 8 * * *" = Her gün saat 08:00{"\n"}"0 0 * * 1" = Her Pazartesi gece yarısı</Text>
+            <Text style={styles.fieldHint}>Örn: */5 * * * * (Her 5 dakikada)</Text>
         </View>
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Aksiyon Türü</Text>
+            <Text style={styles.fieldLabel}>İşlem Tipi</Text>
             <View style={styles.buttonRow}>
-                {['log', 'http', 'notification'].map(action => (
+                {['log', 'webhook', 'workflow'].map(t => (
                     <TouchableOpacity
-                        key={action}
-                        style={[styles.unitButton, (config.actionType || 'log') === action && styles.unitButtonSelected]}
-                        onPress={() => updateConfig('actionType', action)}
+                        key={t}
+                        style={[styles.unitButton, config.actionType === t && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('actionType', t)}
                     >
-                        <Text style={[styles.unitButtonText, (config.actionType || 'log') === action && styles.unitButtonTextSelected]}>
-                            {action === 'log' ? '📝 Log' : action === 'http' ? '🌐 HTTP' : '🔔 Bildirim'}
+                        <Text style={[styles.unitButtonText, config.actionType === t && styles.unitButtonTextSelected]}>
+                            {t.toUpperCase()}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
         </View>
         <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Aksiyon Verisi (JSON)</Text>
+            <Text style={styles.fieldLabel}>Payload (JSON)</Text>
             <ExpandableTextInput
-                value={config.actionPayload || ''}
+                value={config.actionPayload}
                 onChangeText={(t) => updateConfig('actionPayload', t)}
-                placeholder='{"message": "Görev çalıştı!"}'
-                label="Aksiyon Verisi"
+                placeholder='{"message": "Hello"}'
+                label="Payload"
                 minHeight={100}
-                hint="Aksiyona gönderilecek JSON formatında veri."
             />
         </View>
     </>
@@ -5342,6 +5822,525 @@ const CodeExecutionFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
     </>
 );
 
+// ═══════════════════════════════════════════════════════════════
+// MEMORY NODE FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const BulkAddToMemoryFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Veri Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.data || ''}
+                onChangeText={(t) => updateConfig('data', t)}
+                placeholder="sheet_data"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>Sheets veya başka bir kaynaktan gelen veriyi içeren değişken adı.</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Depolama Tipi</Text>
+            <View style={styles.buttonRow}>
+                {['auto', 'local', 'backend'].map(st => (
+                    <TouchableOpacity
+                        key={st}
+                        style={[styles.unitButton, (config.storageType || 'auto') === st && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('storageType', st)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.storageType || 'auto') === st && styles.unitButtonTextSelected]}>
+                            {st === 'auto' ? 'Otomatik' : st === 'local' ? 'Yerel' : 'Backend'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName || ''}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="bulk_result"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={{ backgroundColor: 'rgba(0,150,255,0.1)', padding: 12, borderRadius: 8, marginTop: 8 }}>
+            <Text style={{ color: '#AAA', fontSize: 12, lineHeight: 18 }}>
+                💡 İlk satır başlık olarak kullanılır. Tüm sütunlar otomatik olarak algılanır ve hafızaya eklenir.
+            </Text>
+        </View>
+    </>
+);
+
+const AddToMemoryFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Metin İçeriği</Text>
+            <ExpandableTextInput
+                value={config.text || ''}
+                onChangeText={(t) => updateConfig('text', t)}
+                placeholder="Hafızaya eklenecek metin..."
+                label="Metin İçeriği"
+                hint="{{değişken}} syntax desteklenir."
+                minHeight={80}
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Metadata (JSON, Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.metadata || ''}
+                onChangeText={(t) => updateConfig('metadata', t)}
+                placeholder='{"type": "note", "category": "work"}'
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Depolama Tipi</Text>
+            <View style={styles.buttonRow}>
+                {['auto', 'local', 'backend'].map(st => (
+                    <TouchableOpacity
+                        key={st}
+                        style={[styles.unitButton, (config.storageType || 'auto') === st && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('storageType', st)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.storageType || 'auto') === st && styles.unitButtonTextSelected]}>
+                            {st === 'auto' ? 'Otomatik' : st === 'local' ? 'Yerel' : 'Backend'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName || ''}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="memoryId"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
+
+const SearchMemoryFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Arama Sorgusu</Text>
+            <ExpandableTextInput
+                value={config.query || ''}
+                onChangeText={(t) => updateConfig('query', t)}
+                placeholder="Aranacak metin..."
+                label="Arama Sorgusu"
+                hint="{{değişken}} syntax desteklenir."
+                minHeight={60}
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Eşik Değeri (0.0 - 1.0)</Text>
+            <TextInput
+                style={styles.input}
+                value={String(config.threshold !== undefined ? config.threshold : 0.7)}
+                onChangeText={(t) => updateConfig('threshold', parseFloat(t) || 0.7)}
+                keyboardType="numeric"
+                placeholder="0.7"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>Düşük değer = daha fazla sonuç, Yüksek değer = daha kesin sonuç.</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Depolama Tipi</Text>
+            <View style={styles.buttonRow}>
+                {['auto', 'local', 'backend'].map(st => (
+                    <TouchableOpacity
+                        key={st}
+                        style={[styles.unitButton, (config.storageType || 'auto') === st && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('storageType', st)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.storageType || 'auto') === st && styles.unitButtonTextSelected]}>
+                            {st === 'auto' ? 'Otomatik' : st === 'local' ? 'Yerel' : 'Backend'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName || ''}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="searchResults"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
+
+const ClearMemoryFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Depolama Tipi</Text>
+            <View style={styles.buttonRow}>
+                {['auto', 'local', 'backend'].map(st => (
+                    <TouchableOpacity
+                        key={st}
+                        style={[styles.unitButton, (config.storageType || 'auto') === st && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('storageType', st)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.storageType || 'auto') === st && styles.unitButtonTextSelected]}>
+                            {st === 'auto' ? 'Otomatik' : st === 'local' ? 'Yerel' : 'Backend'}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={{ backgroundColor: 'rgba(255,100,100,0.1)', padding: 12, borderRadius: 8, marginTop: 8 }}>
+            <Text style={{ color: '#FF6B6B', fontSize: 12, lineHeight: 18 }}>
+                ⚠️ Bu işlem tüm hafıza verilerini siler. Geri alınamaz!
+            </Text>
+        </View>
+    </>
+);
+
+// ═══════════════════════════════════════════════════════════════
+// REALTIME AI FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const RealtimeAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sistem Mesajı (Persona)</Text>
+            <ExpandableTextInput
+                value={config.systemPrompt || ''}
+                onChangeText={(t) => updateConfig('systemPrompt', t)}
+                placeholder="Sen yardımsever bir asistansın..."
+                label="Sistem Mesajı"
+                minHeight={100}
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Ses (Voice)</Text>
+            <View style={styles.buttonRow}>
+                {['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede'].map(v => (
+                    <TouchableOpacity
+                        key={v}
+                        style={[styles.unitButton, (config.voice || 'Kore') === v && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('voice', v)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.voice || 'Kore') === v && styles.unitButtonTextSelected]}>
+                            {v}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+        <View style={styles.rowField}>
+            <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Model</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.model || 'gemini-2.0-flash-live-001'}
+                    onChangeText={(t) => updateConfig('model', t)}
+                    placeholder="gemini-2.0-flash-live-001"
+                    placeholderTextColor="#666"
+                />
+            </View>
+            <View style={{ width: 10 }} />
+            <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Süre (Sn)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={String(config.maxDuration || 300)}
+                    onChangeText={(t) => updateConfig('maxDuration', parseInt(t) || 300)}
+                    keyboardType="numeric"
+                />
+            </View>
+        </View>
+        <View style={styles.switchRow}>
+            <Text style={styles.fieldLabel}>Araçları Kullan (Tools)</Text>
+            <Switch
+                value={config.tools !== false}
+                onValueChange={(v) => updateConfig('tools', v)}
+                trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                thumbColor={config.tools !== false ? '#FFF' : '#999'}
+            />
+        </View>
+        <Text style={styles.fieldHint}>Hava durumu, borsa vb. araçlara erişim izni verir.</Text>
+
+        <View style={[styles.switchRow, { marginTop: 15 }]}>
+            <Text style={styles.fieldLabel}>Hoparlör Modu</Text>
+            <Switch
+                value={config.speakerMode || false}
+                onValueChange={(v) => updateConfig('speakerMode', v)}
+                trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                thumbColor={config.speakerMode ? '#FFF' : '#999'}
+            />
+        </View>
+
+        <View style={[styles.field, { marginTop: 20 }]}>
+            <Text style={styles.fieldLabel}>API Key (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.apiKey || ''}
+                onChangeText={(t) => updateConfig('apiKey', t)}
+                placeholder="Varsayılan anahtarı kullan"
+                placeholderTextColor="#666"
+                secureTextEntry
+            />
+        </View>
+    </>
+);
+
+// ═══════════════════════════════════════════════════════════════
+// DISCORD SEND FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const DiscordSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <ApiDocLink title="Discord Webhooks" url="https://discord.com/developers/docs/resources/webhook" brief="Kanal ayarlarından Webhook URL kopyalayın." />
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Webhook URL</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.webhookUrl || ''}
+                    onChangeText={(t) => updateConfig('webhookUrl', t)}
+                    placeholder="https://discord.com/api/webhooks/..."
+                    placeholderTextColor="#666"
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Mesaj</Text>
+                <ExpandableTextInput
+                    value={config.message || ''}
+                    onChangeText={(t) => updateConfig('message', t)}
+                    placeholder="Discord'a selam!"
+                    label="Mesaj"
+                    minHeight={100}
+                />
+            </View>
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Kullanıcı Adı (Opsiyonel)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.username || ''}
+                        onChangeText={(t) => updateConfig('username', t)}
+                        placeholder="BreviBot"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            )}
+        </>
+    );
+};
+
+// ═══════════════════════════════════════════════════════════════
+// NOTION FIELDS
+// ═══════════════════════════════════════════════════════════════
+
+const NotionCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <ApiDocLink title="Notion API" url="https://developers.notion.com/" brief="Integration oluşturun ve sayfayı o integrasyonla paylaşın." />
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>API Key (Internal Integration Token)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.apiKey || ''}
+                    onChangeText={(t) => updateConfig('apiKey', t)}
+                    placeholder="secret_..."
+                    placeholderTextColor="#666"
+                    secureTextEntry
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Database ID</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.databaseId || ''}
+                    onChangeText={(t) => updateConfig('databaseId', t)}
+                    placeholder="Database ID (URL'den alın)"
+                    placeholderTextColor="#666"
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Özellikler (Properties JSON)</Text>
+                <ExpandableTextInput
+                    value={config.properties || ''}
+                    onChangeText={(t) => updateConfig('properties', t)}
+                    placeholder='{ "Name": { "title": [{ "text": { "content": "Başlık" } }] } }'
+                    label="Properties JSON"
+                    minHeight={150}
+                    hint="Notion API formatında JSON girin."
+                />
+            </View>
+
+            {showAdvanced ? (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.variableName}
+                        onChangeText={(t) => updateConfig('variableName', t)}
+                        placeholder="notionPage"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            ) : (
+                <Text style={styles.fieldHint}>Sonuc degisken adini degistirmek için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
+
+const NotionReadFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>API Key</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.apiKey || ''}
+                    onChangeText={(t) => updateConfig('apiKey', t)}
+                    placeholder="secret_..."
+                    placeholderTextColor="#666"
+                    secureTextEntry
+                />
+            </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Database ID</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.databaseId || ''}
+                    onChangeText={(t) => updateConfig('databaseId', t)}
+                    placeholder="Database ID"
+                    placeholderTextColor="#666"
+                />
+            </View>
+
+            {showAdvanced ? (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.variableName}
+                        onChangeText={(t) => updateConfig('variableName', t)}
+                        placeholder="notionData"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            ) : (
+                <Text style={styles.fieldHint}>Sonuc degisken adini degistirmek için Gelişmiş moda geçin.</Text>
+            )}
+        </>
+    );
+};
+
+const WebhookTriggerFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Webhook Yolu (Path)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.path || ''}
+                onChangeText={(t) => updateConfig('path', t)}
+                placeholder="my-webhook"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+            />
+            <Text style={styles.fieldHint}>Sunucu URL: https://api.breviai.com/webhook/{config.path}</Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Metod</Text>
+            <View style={styles.buttonRow}>
+                {['GET', 'POST'].map(m => (
+                    <TouchableOpacity
+                        key={m}
+                        style={[styles.unitButton, (config.method || 'POST') === m && styles.unitButtonSelected]}
+                        onPress={() => updateConfig('method', m)}
+                    >
+                        <Text style={[styles.unitButtonText, (config.method || 'POST') === m && styles.unitButtonTextSelected]}>
+                            {m}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+    </>
+);
+
+const FacebookLoginFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>İzinler (Permissions)</Text>
+            <Text style={styles.fieldHint}>Virgülle ayırarak girin: public_profile, email</Text>
+            <TextInput
+                style={styles.input}
+                value={config.permissions ? config.permissions.join(', ') : 'public_profile, email'}
+                onChangeText={(t) => updateConfig('permissions', t.split(',').map(s => s.trim()))}
+                placeholder="public_profile, email"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuç Değişkeni (Token)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName}
+                onChangeText={(t) => updateConfig('variableName', t)}
+                placeholder="fb_token"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
+
+const InstagramPostFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Resim (URL veya Dosya)</Text>
+            <ExpandableTextInput
+                value={config.imageUrl || ''}
+                onChangeText={(t) => updateConfig('imageUrl', t)}
+                placeholder="{{generatedImage}}"
+                label="Resim Kaynağı"
+                minHeight={60}
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Açıklama (Caption)</Text>
+            <ExpandableTextInput
+                value={config.caption || ''}
+                onChangeText={(t) => updateConfig('caption', t)}
+                placeholder="Resim açıklaması..."
+                label="Açıklama"
+                minHeight={100}
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Access Token Değişkeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.accessTokenVariable || ''}
+                onChangeText={(t) => updateConfig('accessTokenVariable', t)}
+                placeholder="fb_token"
+                placeholderTextColor="#666"
+            />
+            <Text style={styles.fieldHint}>Facebook Login node'undan gelen token değişkeni.</Text>
+        </View>
+    </>
+);
+
 export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
     visible,
     node,
@@ -5353,6 +6352,7 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
     const fileVariables = allNodes ? getFileVariables(allNodes) : [];
     const [config, setConfig] = useState<NodeConfig>({});
     const [label, setLabel] = useState('');
+    const [isAdvanced, setIsAdvanced] = useState(false);
 
     // Track previous node ID to prevent overwriting local state on re-renders
     const [lastNodeId, setLastNodeId] = useState<string | null>(null);
@@ -5362,6 +6362,7 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
             // Only reset config if we switched to a DIFFERENT node
             setConfig(node.config || {});
             setLabel(node.label);
+            setIsAdvanced(false);
             setLastNodeId(node.id);
         }
         // If node.id is the same, we IGNORE the prop update to preserve local state
@@ -5401,6 +6402,8 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <SmsTriggerFields config={config} updateConfig={updateConfig} />;
             case 'WHATSAPP_TRIGGER':
                 return <WhatsAppTriggerFields config={config} updateConfig={updateConfig} />;
+            case 'WEB_HOOK_TRIGGER':
+                return <WebhookTriggerFields config={config} updateConfig={updateConfig} />;
             case 'DELAY':
                 return <DelayFields config={config} updateConfig={updateConfig} />;
             case 'IF_ELSE':
@@ -5438,9 +6441,9 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <OpenUrlFields config={config} updateConfig={updateConfig} />;
             // New Nodes
             case 'CALENDAR_READ':
-                return <CalendarReadFields config={config} updateConfig={updateConfig} />;
+                return <CalendarReadFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'CALENDAR_CREATE':
-                return <CalendarCreateFields config={config} updateConfig={updateConfig} />;
+                return <CalendarCreateFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'CALENDAR_UPDATE':
                 return <CalendarUpdateFields config={config} updateConfig={updateConfig} />;
             case 'CALENDAR_DELETE':
@@ -5480,13 +6483,13 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
             case 'SMS_SEND':
                 return <SmsSendFields config={config} updateConfig={updateConfig} />;
             case 'EMAIL_SEND':
-                return <EmailSendFields config={config} updateConfig={updateConfig} />;
+                return <EmailSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'WHATSAPP_SEND':
-                return <WhatsAppSendFields config={config} updateConfig={updateConfig} />;
+                return <WhatsAppSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'SLACK_SEND':
-                return <SlackSendFields config={config} updateConfig={updateConfig} />;
+                return <SlackSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'HTTP_REQUEST':
-                return <HttpRequestFields config={config} updateConfig={updateConfig} />;
+                return <HttpRequestFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'FILE_WRITE':
                 return <FileWriteFields config={config} updateConfig={updateConfig} />;
             case 'FILE_READ':
@@ -5545,11 +6548,11 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
             case 'ONEDRIVE_LIST':
                 return <OneDriveListFields config={config} updateConfig={updateConfig} />;
             case 'TELEGRAM_SEND':
-                return <TelegramSendFields config={config} updateConfig={updateConfig} />;
+                return <TelegramSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'GOOGLE_TRANSLATE':
-                return <GoogleTranslateFields config={config} updateConfig={updateConfig} />;
+                return <GoogleTranslateFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'WEB_AUTOMATION':
-                return <WebAutomationFields config={config} updateConfig={updateConfig} />;
+                return <WebAutomationFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'BROWSER_SCRAPE':
                 return <BrowserScrapeFields config={config} updateConfig={updateConfig} />;
             case 'CRON_CREATE':
@@ -5566,6 +6569,29 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <CameraCaptureFields config={config} updateConfig={updateConfig} />;
             case 'OVERLAY_INPUT':
                 return <OverlayInputFields config={config} updateConfig={updateConfig} />;
+            case 'CODE_EXECUTION':
+                return <CodeExecutionFields config={config} updateConfig={updateConfig} />;
+            // Memory Nodes
+            case 'BULK_ADD_TO_MEMORY':
+                return <BulkAddToMemoryFields config={config} updateConfig={updateConfig} />;
+            case 'ADD_TO_MEMORY':
+                return <AddToMemoryFields config={config} updateConfig={updateConfig} />;
+            case 'SEARCH_MEMORY':
+                return <SearchMemoryFields config={config} updateConfig={updateConfig} />;
+            case 'CLEAR_MEMORY':
+                return <ClearMemoryFields config={config} updateConfig={updateConfig} />;
+            case 'REALTIME_AI':
+                return <RealtimeAIFields config={config} updateConfig={updateConfig} />;
+            case 'DISCORD_SEND':
+                return <DiscordSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
+            case 'NOTION_CREATE':
+                return <NotionCreateFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
+            case 'NOTION_READ':
+                return <NotionReadFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
+            case 'FACEBOOK_LOGIN':
+                return <FacebookLoginFields config={config} updateConfig={updateConfig} />;
+            case 'INSTAGRAM_POST':
+                return <InstagramPostFields config={config} updateConfig={updateConfig} />;
             default:
                 return <Text style={styles.noConfig}>Bu node için ayar gerekmez</Text>;
         }
@@ -5612,6 +6638,15 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                             />
                         </View>
 
+                        <View style={styles.modeToggleRow}>
+                            <Text style={styles.modeToggleLabel}>Basit</Text>
+                            <Switch
+                                value={isAdvanced}
+                                onValueChange={setIsAdvanced}
+                            />
+                            <Text style={styles.modeToggleLabel}>Gelişmiş</Text>
+                        </View>
+
                         {/* Type-specific fields */}
                         {renderConfigFields()}
                     </ScrollView>
@@ -5637,4 +6672,5 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
 };
 
 export default NodeConfigModal;
+
 

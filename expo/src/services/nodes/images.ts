@@ -25,7 +25,7 @@ export async function executeImageGenerator(
             };
         }
 
-        const model = config.model || 'gemini-2.5-flash-image';
+        const model = config.model || 'imagen-3.0-generate-001';
         // Note: User mentioned 'gemini-2.5-flash-image' but standard public beta often uses 2.0-flash or pro for these features.
         // We will use the config model if set, else compatible fallback.
 

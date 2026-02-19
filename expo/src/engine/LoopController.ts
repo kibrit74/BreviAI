@@ -18,18 +18,40 @@ export class LoopController {
 
     initLoop(nodeId: string, config: LoopConfig, variableManager: VariableManager): void {
         let maxIterations = 1;
-        let items: any[] | undefined;
+        let items: any; // Use 'any' to allow string intermediary before parsing
 
         if (config.type === 'count' && config.count) {
             maxIterations = config.count;
         } else if (config.type === 'forEach' && config.items) {
             items = variableManager.resolveValue(config.items);
+            // Auto-parse JSON string if needed
+            if (typeof items === 'string') {
+                const trimmed = items.trim();
+                if (trimmed.startsWith('[')) {
+                    try { items = JSON.parse(trimmed); } catch (e) {
+                        console.warn('[LoopController] forEach: Failed to parse items string:', e);
+                    }
+                }
+            }
+            maxIterations = Array.isArray(items) ? items.length : 0;
+        } else if ((config.type as string) === 'list' && (config as any).list) {
+            // Support 'list' type used by the workflow frontend
+            items = variableManager.resolveValue((config as any).list);
+            // Auto-parse JSON string if needed
+            if (typeof items === 'string') {
+                const trimmed = items.trim();
+                if (trimmed.startsWith('[')) {
+                    try { items = JSON.parse(trimmed); } catch (e) {
+                        console.warn('[LoopController] list: Failed to parse list string:', e);
+                    }
+                }
+            }
             maxIterations = Array.isArray(items) ? items.length : 0;
         } else if (config.type === 'while') {
             maxIterations = 1000; // Safety limit
         }
 
-        this.loopStates.set(nodeId, { iteration: 0, maxIterations, items });
+        this.loopStates.set(nodeId, { iteration: 0, maxIterations, items: Array.isArray(items) ? items : undefined });
     }
 
     shouldContinue(nodeId: string, config: LoopConfig, conditionEvaluator: ConditionEvaluator): boolean {

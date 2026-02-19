@@ -1,6 +1,5 @@
 import * as Contacts from 'expo-contacts';
 import {
-    WorkflowNode,
     NodeExecutionResult,
     ContactsReadConfig,
     ContactsWriteConfig
@@ -12,11 +11,15 @@ import { VariableManager } from '../VariableManager';
  * Searches for contacts by name or fetches all.
  */
 export const executeContactsRead = async (
-    node: WorkflowNode,
+    config: ContactsReadConfig,
     variableManager: VariableManager
 ): Promise<NodeExecutionResult['output']> => {
-    const config = node.config as ContactsReadConfig;
-    const query = variableManager.resolveString(config.query || '');
+    const safeConfig = (config || {}) as ContactsReadConfig;
+    // Beginner-friendly fallback: if query is omitted, search with previous node output.
+    const queryTemplate = safeConfig.query && safeConfig.query.trim().length > 0
+        ? safeConfig.query
+        : '{{previous_output}}';
+    const query = variableManager.resolveString(queryTemplate);
 
     const { status } = await Contacts.requestPermissionsAsync();
     if (status !== 'granted') {
@@ -25,7 +28,7 @@ export const executeContactsRead = async (
 
     let contacts: Contacts.Contact[] = [];
 
-    if (config.fetchAll) {
+    if (safeConfig.fetchAll) {
         const { data } = await Contacts.getContactsAsync({
             fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
         });
@@ -49,11 +52,11 @@ export const executeContactsRead = async (
         emails: c.emails?.map(e => e.email) || [],
     }));
 
-    if (config.variableName) {
-        variableManager.set(config.variableName, result);
+    if (safeConfig.variableName) {
+        variableManager.set(safeConfig.variableName, result);
     }
 
-    return { [config.variableName || 'contacts']: result };
+    return { [safeConfig.variableName || 'contacts']: result };
 };
 
 /**
@@ -61,20 +64,20 @@ export const executeContactsRead = async (
  * Creates a new contact.
  */
 export const executeContactsWrite = async (
-    node: WorkflowNode,
+    config: ContactsWriteConfig,
     variableManager: VariableManager
 ): Promise<NodeExecutionResult['output']> => {
-    const config = (node.config || {}) as ContactsWriteConfig;
+    const safeConfig = (config || {}) as ContactsWriteConfig;
 
-    if (!config.firstName) {
+    if (!safeConfig.firstName) {
         throw new Error('İsim (firstName) alanı zorunludur');
     }
 
-    const firstName = variableManager.resolveString(config.firstName);
-    const lastName = variableManager.resolveString(config.lastName || '');
-    const phoneNumber = variableManager.resolveString(config.phoneNumber || '');
-    const email = variableManager.resolveString(config.email || '');
-    const company = variableManager.resolveString(config.company || '');
+    const firstName = variableManager.resolveString(safeConfig.firstName);
+    const lastName = variableManager.resolveString(safeConfig.lastName || '');
+    const phoneNumber = variableManager.resolveString(safeConfig.phoneNumber || '');
+    const email = variableManager.resolveString(safeConfig.email || '');
+    const company = variableManager.resolveString(safeConfig.company || '');
 
     const { status } = await Contacts.requestPermissionsAsync();
     if (status !== 'granted') {
@@ -101,8 +104,8 @@ export const executeContactsWrite = async (
 
     const contactId = await Contacts.addContactAsync(contact);
 
-    if (config.variableName) {
-        variableManager.set(config.variableName, contactId);
+    if (safeConfig.variableName) {
+        variableManager.set(safeConfig.variableName, contactId);
     }
 
     return { success: true, contactId };

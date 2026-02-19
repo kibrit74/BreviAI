@@ -3,7 +3,7 @@
  * Manual Trigger, Time Trigger
  */
 
-import { WorkflowNode, ManualTriggerConfig, TimeTriggerConfig, NotificationTriggerConfig, CallTriggerConfig, EmailTriggerConfig, TelegramTriggerConfig, DeepLinkTriggerConfig, SMSTriggerConfig, WhatsAppTriggerConfig } from '../../types/workflow-types';
+import { WorkflowNode, ManualTriggerConfig, TimeTriggerConfig, NotificationTriggerConfig, CallTriggerConfig, EmailTriggerConfig, TelegramTriggerConfig, DeepLinkTriggerConfig, SMSTriggerConfig, WhatsAppTriggerConfig, WebhookTriggerConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 
 export async function executeTriggerNode(
@@ -39,6 +39,8 @@ export async function executeTriggerNode(
             return executeSMSTrigger(node.config as SMSTriggerConfig, variableManager);
         case 'WHATSAPP_TRIGGER':
             return executeWhatsAppTrigger(node.config as WhatsAppTriggerConfig, variableManager);
+        case 'WEB_HOOK_TRIGGER':
+            return executeWebhookTrigger(node.config as WebhookTriggerConfig, variableManager);
         case 'GEOFENCE_TRIGGER':
         case 'GEOFENCE_ENTER_TRIGGER':
         case 'GEOFENCE_EXIT_TRIGGER':
@@ -597,6 +599,60 @@ export async function executeChatInputTrigger(
         prompt: config.prompt || 'Ne yapmamı istersiniz?',
         requiresInput: true,
         timestamp: Date.now()
+    };
+}
+
+/**
+ * Webhook Trigger Executor
+ * Triggered by external HTTP request to backend
+ */
+export async function executeWebhookTrigger(
+    config: WebhookTriggerConfig,
+    variableManager: VariableManager
+): Promise<any> {
+    const triggerType = variableManager.get('_triggerType');
+    if (triggerType && triggerType !== 'webhook') {
+        return { triggered: false };
+    }
+
+    const injectedPath = variableManager.get('_webhookPath');
+    // Check if path matches (if injected)
+    // If running manually, injectedPath is undefined, so we show instructions
+    if (injectedPath && injectedPath === config.path) {
+        const body = variableManager.get('_webhookBody');
+        const query = variableManager.get('_webhookQuery');
+
+        const now = new Date();
+        variableManager.set('_triggerTime', now.toISOString());
+        variableManager.set('_triggerType', 'webhook');
+        variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
+        variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
+
+        if (config.variableName) {
+            variableManager.set(config.variableName, {
+                body,
+                query,
+                method: variableManager.get('_webhookMethod'),
+                headers: variableManager.get('_webhookHeaders')
+            });
+        }
+
+        console.log(`[WEB_HOOK_TRIGGER] Triggered by webhook: ${config.path}`);
+        return {
+            triggered: true,
+            type: 'webhook',
+            timestamp: Date.now(),
+            data: { body, query }
+        };
+    }
+
+    // Manual execution or mismatch
+    console.warn(`[WEB_HOOK_TRIGGER] Manual execution or path mismatch. Config: ${config.path}, Injected: ${injectedPath}`);
+    return {
+        success: false,
+        triggered: false,
+        type: 'webhook',
+        error: `Bu workflow Webhook dinleyici modunda çalışıyor.\n\n🔗 URL: https://api.breviai.com/webhook/${config.path}\n\nKullanım:\n1. Workflow'u AKTİF edin\n2. URL'e POST/GET isteği atın`
     };
 }
 // End of file

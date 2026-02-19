@@ -54,30 +54,32 @@ export class VariableManager {
 
     // Resolve variable references in a string
     // e.g., "Hello {{name}}" -> "Hello John"
+    // Supports: {{var}}, {{var.prop}}, {{var["key"]}}, {{var['key']}}
     resolveString(template: string): string {
         // Guard against undefined/null template
         if (template === undefined || template === null) {
             return '';
         }
-        return String(template).replace(/\{\{([\w\.]+)\}\}/g, (match, varPath) => {
+        return String(template).replace(/\{\{([^}]+)\}\}/g, (match, varPath) => {
+            const trimmed = varPath.trim();
             // Built-in system variables (resolved dynamically)
-            if (varPath === '_date') {
+            if (trimmed === '_date') {
                 const now = new Date();
                 return `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth() + 1).toString().padStart(2, '0')}.${now.getFullYear()}`;
             }
-            if (varPath === '_time') {
+            if (trimmed === '_time') {
                 const now = new Date();
                 return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             }
-            if (varPath === '_datetime') {
+            if (trimmed === '_datetime') {
                 const now = new Date();
                 return `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth() + 1).toString().padStart(2, '0')}.${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             }
-            if (varPath === '_timestamp') {
+            if (trimmed === '_timestamp') {
                 return Date.now().toString();
             }
 
-            const value = this.resolveValue(match); // Use resolveValue to handle dot notation
+            const value = this.resolveValue(match); // Use resolveValue to handle dot/bracket notation
             if (value === undefined) {
                 return match; // Keep original if not found
             }
@@ -94,63 +96,87 @@ export class VariableManager {
         return typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}');
     }
 
-    // Get variable name from reference (supports nested properties like {{obj.prop}})
+    // Parse a variable path into segments
+    // e.g., 'obj.prop' -> ['obj', 'prop']
+    // e.g., 'obj["key with space"]' -> ['obj', 'key with space']
+    // e.g., 'obj["key"].sub' -> ['obj', 'key', 'sub']
+    // e.g., 'list[0].name' -> ['list', '0', 'name']
+    private parsePath(path: string): string[] {
+        const segments: string[] = [];
+        let current = '';
+        let i = 0;
+        while (i < path.length) {
+            const ch = path[i];
+            if (ch === '.') {
+                if (current) { segments.push(current); current = ''; }
+                i++;
+            } else if (ch === '[') {
+                if (current) { segments.push(current); current = ''; }
+                // Find closing bracket
+                const closeIdx = path.indexOf(']', i);
+                if (closeIdx === -1) { current += path.substring(i); break; }
+                let key = path.substring(i + 1, closeIdx);
+                // Remove surrounding quotes
+                if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+                    key = key.slice(1, -1);
+                }
+                // key is now either a string key or a numeric index (both stored as string)
+                segments.push(key);
+                i = closeIdx + 1;
+                // Skip dot after bracket if present
+                if (i < path.length && path[i] === '.') i++;
+            } else {
+                current += ch;
+                i++;
+            }
+        }
+        if (current) segments.push(current);
+        return segments;
+    }
+
+    // Get variable name from reference (supports nested properties like {{obj.prop}} and
+    // bracket notation like {{obj["key"]}})
     getVariableName(ref: string): string | null {
-        const match = ref.match(/^\{\{([\w\.]+)\}\}$/);
-        return match ? match[1] : null;
+        const match = ref.match(/^\{\{([^}]+)\}\}$/);
+        return match ? match[1].trim() : null;
     }
 
     // Resolve a value (could be literal or variable reference)
     resolveValue(value: any): any {
         if (typeof value === 'string' && this.isVariableRef(value)) {
-            const varName = this.getVariableName(value);
-            if (varName) {
-                // Check if it's a nested property access (e.g. "battery.level")
-                if (varName.includes('.')) {
-                    const [root, ...path] = varName.split('.');
-                    const rootValue = this.variables.get(root);
-                    if (rootValue && typeof rootValue === 'object') {
-                        // Simple nested lookup
-                        return path.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : undefined, rootValue);
-                    }
-                    return undefined;
-                }
-                return this.variables.get(varName);
+            const varPath = this.getVariableName(value);
+            if (varPath) {
+                const segments = this.parsePath(varPath);
+                if (segments.length === 0) return undefined;
+
+                const rootValue = this.variables.get(segments[0]);
+                if (rootValue === undefined) return undefined;
+                if (segments.length === 1) return rootValue;
+
+                // Walk nested path
+                return segments.slice(1).reduce(
+                    (obj, key) => (obj && typeof obj === 'object' && obj[key] !== undefined) ? obj[key] : undefined,
+                    rootValue
+                );
             }
         } else if (typeof value === 'string') {
-            // Also support direct string references without {{}} if they match a known variable logic?
-            // Existing logic seemed to rely on isVariableRef ({{...}}).
-            // However, config.left usually comes as "batteryLevel" (no braces) in ConditionEvaluator?
-            // Let's check ConditionEvaluator again.
-            // ConditionEvaluator calls resolveValue(config.left).
-            // If config.left is "batteryLevel", isVariableRef returns false.
-            // So it returns "batteryLevel" string literal?
-            // WAIT. ConditionEvaluator line 60: `this.variableManager.resolveValue(config.left)`.
-            // If VariableManager.resolveValue returns `value` as is when it's not {{...}}, then `evaluate` is comparing "batteryLevel" < 20.
-            // "batteryLevel" < 20 is false (NaN).
-            // ConditionEvaluator DOES NOT seem to resolve plain strings as variable names automatically unless VariableManager handles it.
-            // Let's look at `VariableManager` behavior again.
-            // It only resolves if `isVariableRef` matches `{{...}}`.
-            // BUT `prompt-templates.ts` says: `left: "batteryLevel", operator: "<", right: "20"`.
-            // It does NOT say `left: "{{batteryLevel}}"`.
-            // THIS IS A HUGE BUG. Either Prompt must change to `{{batteryLevel}}` OR `ConditionEvaluator` must try to resolve raw strings as variables.
-
-            // I will update ConditionEvaluator to try resolving string as variable if it exists.
-            // OR update VariableManager.resolveValue to check if string exists as key.
+            // Support raw string variable names (without {{}})
             if (this.variables.has(value)) {
                 return this.variables.get(value);
             }
-            // Support dot notation for raw strings too
-            if (value.includes('.')) {
-                const [root, ...path] = value.split('.');
-                if (this.variables.has(root)) {
-                    const rootValue = this.variables.get(root);
-                    if (rootValue && typeof rootValue === 'object') {
-                        return path.reduce((obj, key) => (obj && obj[key] !== undefined) ? obj[key] : undefined, rootValue);
-                    }
+            // Support dot/bracket notation for raw strings too
+            const segments = this.parsePath(value);
+            if (segments.length > 1 && this.variables.has(segments[0])) {
+                const rootValue = this.variables.get(segments[0]);
+                if (rootValue && typeof rootValue === 'object') {
+                    return segments.slice(1).reduce(
+                        (obj, key) => (obj && typeof obj === 'object' && obj[key] !== undefined) ? obj[key] : undefined,
+                        rootValue
+                    );
                 }
             }
         }
         return value;
     }
 }
+

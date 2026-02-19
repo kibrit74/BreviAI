@@ -1,4 +1,4 @@
-import { CodeExecutionConfig, SetValuesConfig } from '../../types/workflow-types';
+import { CodeExecutionConfig, SetValuesConfig, DynamicExecutorConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 import { debugLog } from '../DebugLogger';
 
@@ -138,6 +138,47 @@ export const executeSetValues = async (
 
     } catch (error) {
         debugLog('error', 'Set Values Failed', { error });
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+};
+
+/**
+ * Execute Dynamic Executor
+ * Processes AI output or arbitrary input into a structured value.
+ */
+export const executeDynamicExecutor = async (
+    config: DynamicExecutorConfig,
+    variableManager: VariableManager
+): Promise<any> => {
+    try {
+        const rawInput = config.input ?? (variableManager.get('previous_output') ?? '');
+        const resolvedInput = typeof rawInput === 'string'
+            ? variableManager.resolveString(rawInput)
+            : rawInput;
+
+        let output: any = resolvedInput;
+        const parseMode = config.parse || 'auto';
+
+        if (typeof resolvedInput === 'string') {
+            const trimmed = resolvedInput.trim();
+
+            if (parseMode === 'json' || (parseMode === 'auto' && (trimmed.startsWith('{') || trimmed.startsWith('[')))) {
+                try {
+                    output = JSON.parse(trimmed);
+                } catch (e) {
+                    debugLog('warning', 'Dynamic Executor JSON parse failed, returning text', { error: e });
+                    output = resolvedInput;
+                }
+            }
+        }
+
+        if (config.variableName) {
+            variableManager.set(config.variableName, output);
+        }
+
+        return output;
+    } catch (error) {
+        debugLog('error', 'Dynamic Executor Failed', { error });
         return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 };
