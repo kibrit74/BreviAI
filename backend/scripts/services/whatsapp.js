@@ -3,6 +3,7 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const webhookService = require('./webhook');
 
 const router = express.Router();
@@ -12,6 +13,14 @@ const MAX_SESSIONS = Number(process.env.WA_MAX_SESSIONS || 25);
 const REQUIRE_SESSION_ID = String(process.env.WA_REQUIRE_SESSION_ID || 'true').toLowerCase() !== 'false';
 const DEFAULT_SESSION_ID = String(process.env.WA_DEFAULT_SESSION_ID || 'default').trim() || 'default';
 const SESSION_ID_HELP = "Her cihaz için benzersiz bir sessionId gönderin (x-session-id header veya sessionId query).";
+const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
+const CONNECT_TOKEN_SECRET = process.env.WA_CONNECT_TOKEN_SECRET || AUTH_KEY;
+const CONNECT_TOKEN_TTL_MINUTES = Number(process.env.WA_CONNECT_TOKEN_TTL_MINUTES || 15);
+const DATA_DIR = path.join(__dirname, '../../.data');
+const USER_SESSIONS_FILE = path.join(DATA_DIR, 'wa-user-sessions.json');
+
+const userToSession = new Map();
+const sessionToUser = new Map();
 
 const possibleChromePaths = [
     '/usr/bin/google-chrome-stable',
@@ -21,6 +30,177 @@ const possibleChromePaths = [
     process.env.CHROME_PATH || ''
 ].filter(Boolean);
 const chromePath = possibleChromePaths.find(p => fs.existsSync(p));
+
+function ensureDataDir() {
+    if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+}
+
+function sanitizeUserId(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const safe = value.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 96);
+    return safe || '';
+}
+
+function loadUserSessionMap() {
+    try {
+        ensureDataDir();
+        if (!fs.existsSync(USER_SESSIONS_FILE)) {
+            fs.writeFileSync(USER_SESSIONS_FILE, JSON.stringify({ users: {} }, null, 2));
+            return;
+        }
+
+        const parsed = JSON.parse(fs.readFileSync(USER_SESSIONS_FILE, 'utf8'));
+        const users = parsed?.users && typeof parsed.users === 'object' ? parsed.users : {};
+        for (const [rawUserId, rawSessionId] of Object.entries(users)) {
+            const userId = sanitizeUserId(rawUserId);
+            const sessionId = sanitizeSessionId(rawSessionId);
+            if (!userId || !sessionId) continue;
+            userToSession.set(userId, sessionId);
+            sessionToUser.set(sessionId, userId);
+        }
+    } catch (err) {
+        console.error('[WhatsApp] Failed to load user-session map:', err.message);
+    }
+}
+
+function saveUserSessionMap() {
+    ensureDataDir();
+    const users = {};
+    for (const [userId, sessionId] of userToSession.entries()) {
+        users[userId] = sessionId;
+    }
+    fs.writeFileSync(USER_SESSIONS_FILE, JSON.stringify({ users }, null, 2));
+}
+
+function mapUserToSession(userId, sessionId) {
+    const safeUserId = sanitizeUserId(userId);
+    const safeSessionId = sanitizeSessionId(sessionId);
+    if (!safeUserId || !safeSessionId) {
+        throw new Error('Invalid userId/sessionId mapping');
+    }
+    userToSession.set(safeUserId, safeSessionId);
+    sessionToUser.set(safeSessionId, safeUserId);
+    saveUserSessionMap();
+}
+
+function getSessionIdForUser(userId) {
+    const safeUserId = sanitizeUserId(userId);
+    if (!safeUserId) return '';
+    return userToSession.get(safeUserId) || '';
+}
+
+function createSessionIdForUser(userId) {
+    const safeUserId = sanitizeUserId(userId);
+    if (!safeUserId) return '';
+    const digest = crypto.createHash('sha256').update(safeUserId).digest('hex').slice(0, 24);
+    return sanitizeSessionId(`usr_${digest}`);
+}
+
+function getOrCreateSessionIdForUser(userId) {
+    const safeUserId = sanitizeUserId(userId);
+    if (!safeUserId) throw new Error('userId required');
+
+    const existing = getSessionIdForUser(safeUserId);
+    if (existing) return existing;
+
+    const newSessionId = createSessionIdForUser(safeUserId);
+    if (!newSessionId) throw new Error('Failed to create sessionId for user');
+    mapUserToSession(safeUserId, newSessionId);
+    return newSessionId;
+}
+
+function toBase64Url(input) {
+    return Buffer.from(input)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+}
+
+function fromBase64Url(input) {
+    const normalized = String(input).replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return Buffer.from(padded, 'base64').toString('utf8');
+}
+
+function signTokenPayload(payload64) {
+    return crypto.createHmac('sha256', CONNECT_TOKEN_SECRET).update(payload64).digest('hex');
+}
+
+function createConnectToken(data, ttlMinutes = CONNECT_TOKEN_TTL_MINUTES) {
+    const now = Date.now();
+    const ttlMs = Math.max(1, Number(ttlMinutes || CONNECT_TOKEN_TTL_MINUTES)) * 60 * 1000;
+    const payload = {
+        purpose: 'whatsapp_connect',
+        userId: sanitizeUserId(data.userId),
+        sessionId: sanitizeSessionId(data.sessionId),
+        iat: now,
+        exp: now + ttlMs,
+        nonce: crypto.randomBytes(8).toString('hex')
+    };
+    const payload64 = toBase64Url(JSON.stringify(payload));
+    const signature = signTokenPayload(payload64);
+    return `${payload64}.${signature}`;
+}
+
+function verifyConnectToken(token) {
+    const raw = String(token || '').trim();
+    const [payload64, signature] = raw.split('.');
+    if (!payload64 || !signature) throw new Error('Invalid token format');
+
+    const expected = signTokenPayload(payload64);
+    const sigA = Buffer.from(signature, 'utf8');
+    const sigB = Buffer.from(expected, 'utf8');
+    if (sigA.length !== sigB.length || !crypto.timingSafeEqual(sigA, sigB)) {
+        throw new Error('Invalid token signature');
+    }
+
+    let payload;
+    try {
+        payload = JSON.parse(fromBase64Url(payload64));
+    } catch {
+        throw new Error('Invalid token payload');
+    }
+
+    if (payload.purpose !== 'whatsapp_connect') throw new Error('Invalid token purpose');
+    if (!payload.exp || Number(payload.exp) < Date.now()) throw new Error('Token expired');
+
+    const sessionId = sanitizeSessionId(payload.sessionId);
+    const userId = sanitizeUserId(payload.userId);
+    if (!sessionId || !userId) throw new Error('Invalid token claims');
+
+    return { sessionId, userId, exp: Number(payload.exp), iat: Number(payload.iat || 0) };
+}
+
+function getPublicBaseUrl(req) {
+    const configured = String(process.env.WA_PUBLIC_URL || '').trim().replace(/\/$/, '');
+    if (configured) return configured;
+
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+    const proto = forwardedProto || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    return `${proto}://${host}`;
+}
+
+function getTokenFromRequest(req) {
+    return req.query.token || req.headers['x-connect-token'] || req.body?.token || '';
+}
+
+function resolveSessionFromToken(req) {
+    const token = getTokenFromRequest(req);
+    if (!token) return null;
+    return verifyConnectToken(token);
+}
+
+function hasInternalAuth(req) {
+    const key = req.headers['x-auth-key'] || req.query.key;
+    return key === AUTH_KEY;
+}
+
+loadUserSessionMap();
 
 function sanitizeSessionId(raw) {
     const value = String(raw || '').trim();
@@ -279,6 +459,7 @@ router.get('/sessions', (req, res) => {
     for (const session of sessions.values()) {
         items.push({
             sessionId: session.sessionId,
+            userId: sessionToUser.get(session.sessionId) || null,
             status: session.status,
             ready: session.ready,
             user: session.ready ? session.user : null,
@@ -293,9 +474,100 @@ router.get('/sessions', (req, res) => {
     res.json({
         requireSessionId: REQUIRE_SESSION_ID,
         defaultSessionId: DEFAULT_SESSION_ID,
+        totalMappedUsers: userToSession.size,
         total: items.length,
         sessions: items,
     });
+});
+
+router.post('/connect/start', (req, res) => {
+    try {
+        const rawUserId = req.body?.userId || req.query.userId || req.headers['x-user-id'];
+        const userId = sanitizeUserId(rawUserId);
+        if (!userId) {
+            return res.status(400).json({ error: 'userId required' });
+        }
+
+        const sessionId = getOrCreateSessionIdForUser(userId);
+        const session = getOrCreateSession(sessionId);
+        const token = createConnectToken({ userId, sessionId });
+        const baseUrl = getPublicBaseUrl(req);
+
+        res.json({
+            success: true,
+            userId,
+            sessionId,
+            status: session.status,
+            ready: session.ready,
+            connectUrl: `${baseUrl}/whatsapp/qr?token=${encodeURIComponent(token)}`,
+            statusUrl: `${baseUrl}/whatsapp/connect/status?token=${encodeURIComponent(token)}`,
+            expiresInSeconds: Math.max(60, CONNECT_TOKEN_TTL_MINUTES * 60),
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/connect/status', (req, res) => {
+    try {
+        let userId = '';
+        let sessionId = '';
+        let tokenValidated = false;
+
+        const tokenInfo = resolveSessionFromToken(req);
+        if (tokenInfo) {
+            tokenValidated = true;
+            userId = tokenInfo.userId;
+            sessionId = tokenInfo.sessionId;
+        } else {
+            userId = sanitizeUserId(req.query.userId || req.headers['x-user-id'] || '');
+            if (!userId) {
+                return res.status(400).json({ error: 'token or userId required' });
+            }
+            if (!hasInternalAuth(req)) {
+                return res.status(401).json({ error: 'Unauthorized access' });
+            }
+            sessionId = getSessionIdForUser(userId);
+            if (!sessionId) {
+                return res.json({
+                    success: true,
+                    userId,
+                    connected: false,
+                    status: 'not_started',
+                    ready: false,
+                    sessionId: null
+                });
+            }
+        }
+
+        if (!getSessionIdForUser(userId)) {
+            mapUserToSession(userId, sessionId);
+        }
+
+        const session = getOrCreateSession(sessionId);
+        const baseUrl = getPublicBaseUrl(req);
+        const refreshToken = createConnectToken({ userId, sessionId });
+
+        res.json({
+            success: true,
+            tokenValidated,
+            userId,
+            sessionId,
+            connected: session.ready,
+            status: session.status,
+            ready: session.ready,
+            qrCode: session.qrCode,
+            user: session.ready ? session.user : null,
+            lastError: session.lastError,
+            messagesSent: session.messagesSent,
+            updatedAt: session.updatedAt,
+            connectUrl: `${baseUrl}/whatsapp/qr?token=${encodeURIComponent(refreshToken)}`,
+            statusUrl: `${baseUrl}/whatsapp/connect/status?token=${encodeURIComponent(refreshToken)}`,
+            expiresInSeconds: Math.max(60, CONNECT_TOKEN_TTL_MINUTES * 60),
+        });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 });
 
 router.get('/status', (req, res) => {
@@ -320,7 +592,14 @@ router.get('/status', (req, res) => {
 
 router.get('/qr', (req, res) => {
     try {
-        const sessionId = resolveSessionId(req, true);
+        const tokenInfo = resolveSessionFromToken(req);
+        if (!tokenInfo && !hasInternalAuth(req)) {
+            return res.status(401).send(htmlPage(`<div class="card"><h1>Unauthorized</h1><p>Use token or x-auth-key.</p></div>`));
+        }
+        const sessionId = tokenInfo?.sessionId || resolveSessionId(req, true);
+        if (tokenInfo?.userId && !getSessionIdForUser(tokenInfo.userId)) {
+            mapUserToSession(tokenInfo.userId, sessionId);
+        }
         const session = getOrCreateSession(sessionId);
 
         if (session.ready) {
@@ -328,6 +607,7 @@ router.get('/qr', (req, res) => {
                 <div class="card">
                     <h1>Baglanti Hazir</h1>
                     <p><strong>Session:</strong> ${session.sessionId}</p>
+                    <p><strong>User:</strong> ${tokenInfo?.userId || sessionToUser.get(session.sessionId) || '-'}</p>
                     <p><strong>Hesap:</strong> ${session.user?.name || 'Kullanici'} (+${session.user?.number || '-'})</p>
                     <p class="meta">Bu session'a bagli mesajlar sadece bu hesapla gonderilir.</p>
                 </div>
@@ -339,6 +619,7 @@ router.get('/qr', (req, res) => {
                 <div class="card">
                     <h1>WhatsApp QR</h1>
                     <p><strong>Session:</strong> ${session.sessionId}</p>
+                    <p><strong>User:</strong> ${tokenInfo?.userId || sessionToUser.get(session.sessionId) || '-'}</p>
                     <img class="qr" src="${session.qrCode}" alt="QR Code" />
                     <p class="meta">Telefonunuzdan Bagli Cihazlar > Cihaz Bagla ile taratin.</p>
                     <p class="meta">Sayfa 10 saniyede bir yenileniyor.</p>
@@ -351,6 +632,7 @@ router.get('/qr', (req, res) => {
             <div class="card">
                 <h1>Hazirlaniyor...</h1>
                 <p><strong>Session:</strong> ${session.sessionId}</p>
+                <p><strong>User:</strong> ${tokenInfo?.userId || sessionToUser.get(session.sessionId) || '-'}</p>
                 <p class="meta">Durum: ${session.status}</p>
                 <script>setTimeout(()=>location.reload(),2500)</script>
             </div>
@@ -407,3 +689,4 @@ module.exports = {
         return session.client;
     }
 };
+

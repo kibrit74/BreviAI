@@ -12,6 +12,8 @@ import { backgroundService } from '../services/BackgroundService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
+const WHATSAPP_CONNECT_USER_STORAGE_KEY = 'whatsapp_connect_user_id';
+const WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY = 'whatsapp_connect_status_url';
 const WHATSAPP_AUTH_KEY = 'breviai-secret-password';
 
 function generateWhatsAppSessionId(): string {
@@ -23,6 +25,14 @@ async function getOrCreateWhatsAppSessionId(): Promise<string> {
     if (existing) return existing;
     const created = generateWhatsAppSessionId();
     await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, created);
+    return created;
+}
+
+async function getOrCreateWhatsAppConnectUserId(): Promise<string> {
+    const existing = (await AsyncStorage.getItem(WHATSAPP_CONNECT_USER_STORAGE_KEY))?.trim();
+    if (existing) return existing;
+    const created = `usr_${generateWhatsAppSessionId()}`;
+    await AsyncStorage.setItem(WHATSAPP_CONNECT_USER_STORAGE_KEY, created);
     return created;
 }
 
@@ -116,6 +126,8 @@ export default function SettingsScreen({ navigation }: any) {
     const [isWaLoading, setIsWaLoading] = React.useState(false);
     const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.109.124.154:3001');
     const [waSessionId, setWaSessionId] = React.useState('');
+    const [waConnectUrl, setWaConnectUrl] = React.useState('');
+    const [waStatusUrl, setWaStatusUrl] = React.useState('');
 
     // Cron Job Management State
     const [cronJobs, setCronJobs] = React.useState<any[]>([]);
@@ -137,13 +149,15 @@ export default function SettingsScreen({ navigation }: any) {
         const loadWaUrl = async () => {
             try {
                 const defaultCloudShell = 'http://136.109.124.154:3001';
-
-                // NUCLEAR OPTION: Force reset to this URL every time for now
-                console.log('[Settings] FORCING URL:', defaultCloudShell);
-                setWaBackendUrl(defaultCloudShell);
-                await AsyncStorage.setItem('whatsapp_backend_url', defaultCloudShell);
+                const savedUrl = (await AsyncStorage.getItem('whatsapp_backend_url'))?.trim();
+                const nextUrl = (savedUrl || defaultCloudShell).replace(/\/$/, '');
+                setWaBackendUrl(nextUrl);
+                await AsyncStorage.setItem('whatsapp_backend_url', nextUrl);
                 const sessionId = await getOrCreateWhatsAppSessionId();
                 setWaSessionId(sessionId);
+                await getOrCreateWhatsAppConnectUserId();
+                const savedStatusUrl = (await AsyncStorage.getItem(WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY))?.trim();
+                if (savedStatusUrl) setWaStatusUrl(savedStatusUrl);
 
             } catch (e) {
                 console.log('Failed to load WA URL');
@@ -165,27 +179,77 @@ export default function SettingsScreen({ navigation }: any) {
         return () => clearTimeout(timer);
     }, [waBackendUrl]);
 
+    const normalizeWaBaseUrl = React.useCallback((input?: string) => {
+        let url = (input || waBackendUrl || '').trim();
+        if (!url) url = 'http://136.109.124.154:3001';
+        if (url.endsWith('/')) url = url.slice(0, -1);
+        if (url.endsWith('/whatsapp/qr')) url = url.replace(/\/whatsapp\/qr$/, '');
+        if (url.endsWith('/whatsapp')) url = url.replace(/\/whatsapp$/, '');
+        return url;
+    }, [waBackendUrl]);
+
+    const ensureWhatsAppConnect = React.useCallback(async (baseUrlInput?: string) => {
+        const baseUrl = normalizeWaBaseUrl(baseUrlInput);
+        const userId = await getOrCreateWhatsAppConnectUserId();
+
+        const response = await fetch(`${baseUrl}/whatsapp/connect/start`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-key': WHATSAPP_AUTH_KEY,
+                'Bypass-Tunnel-Reminder': 'true',
+                'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({ userId })
+        });
+
+        const text = await response.text();
+        if (text.trim().startsWith('<!doctype html') || text.includes('accounts.google.com')) {
+            throw new Error('CLOUD_SHELL_AUTH_WALL');
+        }
+
+        let data: any;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(`Invalid JSON from connect/start: ${text.substring(0, 120)}`);
+        }
+
+        if (!response.ok || data?.error) {
+            throw new Error(data?.error || `HTTP ${response.status}`);
+        }
+
+        const nextSessionId = String(data?.sessionId || '').trim();
+        if (nextSessionId) {
+            await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, nextSessionId);
+            if (waSessionId !== nextSessionId) setWaSessionId(nextSessionId);
+        }
+
+        const nextStatusUrl = String(data?.statusUrl || '').trim();
+        if (nextStatusUrl) {
+            setWaStatusUrl(nextStatusUrl);
+            await AsyncStorage.setItem(WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY, nextStatusUrl);
+        }
+
+        const nextConnectUrl = String(data?.connectUrl || '').trim();
+        if (nextConnectUrl) setWaConnectUrl(nextConnectUrl);
+
+        return data;
+    }, [normalizeWaBaseUrl, waSessionId]);
+
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
         try {
-            const sessionId = waSessionId || await getOrCreateWhatsAppSessionId();
-            if (!waSessionId) setWaSessionId(sessionId);
-
-            // Check if user has a custom override
-            let url = waBackendUrl.trim();
-
-            // Clean up common URL mistakes
-            if (url.endsWith('/')) url = url.slice(0, -1);
-            if (url.endsWith('/whatsapp/qr')) url = url.replace(/\/whatsapp\/qr$/, '');
-            if (url.endsWith('/whatsapp')) url = url.replace(/\/whatsapp$/, '');
+            const url = normalizeWaBaseUrl();
+            const startData = await ensureWhatsAppConnect(url);
+            const statusTarget = String(startData?.statusUrl || waStatusUrl || '').trim();
+            if (!statusTarget) throw new Error('Status URL alinamadi');
 
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
-            const response = await fetch(`${url}/whatsapp/status`, {
+            const response = await fetch(statusTarget, {
                 headers: {
-                    'x-auth-key': WHATSAPP_AUTH_KEY,
-                    'x-session-id': sessionId,
                     'Bypass-Tunnel-Reminder': 'true', // Skip localtunnel warning page
                     'ngrok-skip-browser-warning': 'true' // Skip ngrok warning page
                 },
@@ -208,6 +272,18 @@ export default function SettingsScreen({ navigation }: any) {
 
             try {
                 const data = JSON.parse(text);
+                const nextSessionId = String(data?.sessionId || '').trim();
+                if (nextSessionId) {
+                    await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, nextSessionId);
+                    if (waSessionId !== nextSessionId) setWaSessionId(nextSessionId);
+                }
+                const nextConnectUrl = String(data?.connectUrl || '').trim();
+                if (nextConnectUrl) setWaConnectUrl(nextConnectUrl);
+                const nextStatusUrl = String(data?.statusUrl || '').trim();
+                if (nextStatusUrl) {
+                    setWaStatusUrl(nextStatusUrl);
+                    await AsyncStorage.setItem(WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY, nextStatusUrl);
+                }
                 setWaStatus(data);
             } catch (jsonError) {
                 console.warn('WA Status JSON Error:', text.substring(0, 100)); // Log first 100 chars
@@ -215,6 +291,13 @@ export default function SettingsScreen({ navigation }: any) {
             }
         } catch (error) {
             console.warn('WA Status Fetch Error:', error);
+            const errMessage = error instanceof Error ? error.message : String(error);
+            if (errMessage.includes('CLOUD_SHELL_AUTH_WALL')) {
+                Alert.alert(
+                    'Baglanti Hatasi: Cloud Shell Korumasi',
+                    'Cloud Shell onizleme korumasi aktif. Port 3001 icin dis erisim ayarini kontrol edin veya sabit sunucu URL kullanin.'
+                );
+            }
             setWaStatus({ status: 'error', ready: false });
         } finally {
             setIsWaLoading(false);
@@ -785,11 +868,14 @@ export default function SettingsScreen({ navigation }: any) {
                                     <TouchableOpacity
                                         style={{ backgroundColor: activeColors.card, padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: activeColors.border }}
                                         onPress={async () => {
-                                            const sessionId = waSessionId || await getOrCreateWhatsAppSessionId();
-                                            if (!waSessionId) setWaSessionId(sessionId);
-                                            const safeUrl = waBackendUrl.trim().replace(/\/$/, '');
-                                            const qrUrl = `${safeUrl}/whatsapp/qr?key=${encodeURIComponent(WHATSAPP_AUTH_KEY)}&sessionId=${encodeURIComponent(sessionId)}`;
-                                            Linking.openURL(qrUrl);
+                                            try {
+                                                const startData = await ensureWhatsAppConnect();
+                                                const qrUrl = String(startData?.connectUrl || waConnectUrl || '').trim();
+                                                if (!qrUrl) throw new Error('QR baglanti linki olusturulamadi');
+                                                Linking.openURL(qrUrl);
+                                            } catch (err: any) {
+                                                Alert.alert('Hata', err?.message || 'QR linki acilamadi');
+                                            }
                                         }}
                                     >
                                         <Text style={{ color: activeColors.primary, fontWeight: '600' }}>Tarayıcıda Aç</Text>
@@ -1548,3 +1634,4 @@ const createStyles = (colors: any) => StyleSheet.create({
         fontWeight: '600',
     },
 });
+
