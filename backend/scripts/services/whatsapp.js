@@ -7,18 +7,12 @@ const webhookService = require('./webhook');
 
 const router = express.Router();
 
-// ═══════════════════════════════════════════════════
-// WhatsApp Service Logic
-// ═══════════════════════════════════════════════════
+const sessions = new Map();
+const MAX_SESSIONS = Number(process.env.WA_MAX_SESSIONS || 25);
+const REQUIRE_SESSION_ID = String(process.env.WA_REQUIRE_SESSION_ID || 'true').toLowerCase() !== 'false';
+const DEFAULT_SESSION_ID = String(process.env.WA_DEFAULT_SESSION_ID || 'default').trim() || 'default';
+const SESSION_ID_HELP = "Her cihaz için benzersiz bir sessionId gönderin (x-session-id header veya sessionId query).";
 
-let client;
-let clientReady = false;
-let currentQR = null;
-let connectionStatus = 'initializing';
-let messagesSent = 0;
-let lastError = null;
-
-// Auto-detect Chrome
 const possibleChromePaths = [
     '/usr/bin/google-chrome-stable',
     '/usr/bin/google-chrome',
@@ -26,16 +20,77 @@ const possibleChromePaths = [
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     process.env.CHROME_PATH || ''
 ].filter(Boolean);
-
 const chromePath = possibleChromePaths.find(p => fs.existsSync(p));
 
-function initClient() {
-    console.log('[WhatsApp] Initializing client...');
-    if (chromePath) console.log('[WhatsApp] Using Chrome:', chromePath);
+function sanitizeSessionId(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const safe = value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+    return safe || '';
+}
 
-    client = new Client({
+function resolveSessionId(req, allowDefault = true) {
+    const raw = req.headers['x-session-id'] || req.query.sessionId || req.query.session || req.body?.sessionId;
+    if (!raw) {
+        if (allowDefault && !REQUIRE_SESSION_ID) return DEFAULT_SESSION_ID;
+        throw new Error(`sessionId required. ${SESSION_ID_HELP}`);
+    }
+    const sessionId = sanitizeSessionId(raw);
+    if (!sessionId) throw new Error(`Invalid sessionId. ${SESSION_ID_HELP}`);
+    return sessionId;
+}
+
+function getAuthPathForSession(sessionId) {
+    const id = sanitizeSessionId(sessionId);
+    if (!id) throw new Error(`Invalid sessionId. ${SESSION_ID_HELP}`);
+    return path.resolve('./.wwebjs_auth/', `session-breviai-${id}`);
+}
+
+function getOrCreateSession(sessionId) {
+    const id = sanitizeSessionId(sessionId);
+    if (!id) {
+        throw new Error(`Invalid sessionId. ${SESSION_ID_HELP}`);
+    }
+    if (sessions.has(id)) return sessions.get(id);
+
+    if (sessions.size >= MAX_SESSIONS) {
+        throw new Error(`Max session limit reached (${MAX_SESSIONS})`);
+    }
+
+    const session = {
+        sessionId: id,
+        client: null,
+        ready: false,
+        qrCode: null,
+        status: 'initializing',
+        messagesSent: 0,
+        lastError: null,
+        user: null,
+        initializing: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+    };
+
+    sessions.set(id, session);
+    initSessionClient(session);
+    return session;
+}
+
+function initSessionClient(session) {
+    if (session.initializing) return;
+    session.initializing = true;
+    session.status = 'initializing';
+    session.ready = false;
+    session.qrCode = null;
+    session.lastError = null;
+    session.updatedAt = Date.now();
+
+    console.log(`[WhatsApp][${session.sessionId}] Initializing client...`);
+    if (chromePath) console.log(`[WhatsApp][${session.sessionId}] Using Chrome:`, chromePath);
+
+    const client = new Client({
         authStrategy: new LocalAuth({
-            clientId: 'breviai-bot',
+            clientId: `breviai-${session.sessionId}`,
             dataPath: './.wwebjs_auth/'
         }),
         puppeteer: {
@@ -52,328 +107,303 @@ function initClient() {
         }
     });
 
-    setupEvents();
-    client.initialize().catch(err => {
-        console.error('[WhatsApp] Initialization failed:', err);
-        lastError = err.message;
-        connectionStatus = 'error';
-    });
-}
+    session.client = client;
 
-function setupEvents() {
     client.on('qr', async (qr) => {
-        console.log('[WhatsApp] QR Code received');
         try {
-            currentQR = await qrcode.toDataURL(qr);
-            connectionStatus = 'qr_pending';
+            session.qrCode = await qrcode.toDataURL(qr);
+            session.status = 'qr_pending';
+            session.updatedAt = Date.now();
+            console.log(`[WhatsApp][${session.sessionId}] QR code generated`);
         } catch (err) {
-            console.error('[WhatsApp] QR generation error:', err);
+            session.lastError = err.message;
+            session.status = 'error';
         }
     });
 
     client.on('authenticated', () => {
-        console.log('[WhatsApp] ✅ Authenticated successfully!');
-        connectionStatus = 'authenticated';
-        currentQR = null;
+        session.status = 'authenticated';
+        session.qrCode = null;
+        session.updatedAt = Date.now();
+        console.log(`[WhatsApp][${session.sessionId}] Authenticated`);
     });
 
     client.on('auth_failure', (msg) => {
-        console.error('[WhatsApp] ❌ Auth FAILED:', msg);
-        clientReady = false;
-        connectionStatus = 'auth_failed';
-        lastError = 'Auth failed: ' + msg;
-        currentQR = null;
+        session.ready = false;
+        session.status = 'auth_failed';
+        session.lastError = `Auth failed: ${msg}`;
+        session.qrCode = null;
+        session.updatedAt = Date.now();
+        session.initializing = false;
+        console.error(`[WhatsApp][${session.sessionId}] Auth failed:`, msg);
     });
 
     client.on('loading_screen', (percent, message) => {
-        console.log(`[WhatsApp] Loading: ${percent}% - ${message}`);
-        connectionStatus = 'loading';
+        session.status = 'loading';
+        session.updatedAt = Date.now();
+        console.log(`[WhatsApp][${session.sessionId}] Loading ${percent}% - ${message}`);
     });
 
     client.on('ready', () => {
-        console.log('[WhatsApp] 🟢 Ready! Client is fully connected.');
-        clientReady = true;
-        connectionStatus = 'ready';
-        currentQR = null;
-        try {
-            console.log('[WhatsApp] User:', client.info?.pushname, '| Number:', client.info?.wid?.user);
-        } catch (e) { }
+        session.ready = true;
+        session.status = 'ready';
+        session.qrCode = null;
+        session.user = {
+            name: client.info?.pushname,
+            number: client.info?.wid?.user
+        };
+        session.initializing = false;
+        session.updatedAt = Date.now();
+        console.log(`[WhatsApp][${session.sessionId}] Ready (${session.user?.number || 'unknown'})`);
     });
 
     client.on('disconnected', (reason) => {
-        console.log('[WhatsApp] 🔴 Disconnected:', reason);
-        clientReady = false;
-        connectionStatus = 'disconnected';
-        lastError = reason;
-        // Auto re-init after disconnect
-        console.log('[WhatsApp] Will attempt to re-initialize in 5 seconds...');
+        session.ready = false;
+        session.status = 'disconnected';
+        session.lastError = String(reason || 'disconnected');
+        session.updatedAt = Date.now();
+        session.initializing = false;
+        console.log(`[WhatsApp][${session.sessionId}] Disconnected:`, reason);
+
         setTimeout(() => {
-            console.log('[WhatsApp] Re-initializing after disconnect...');
-            initClient();
+            try {
+                initSessionClient(session);
+            } catch (e) {
+                session.lastError = e.message;
+                session.status = 'error';
+            }
         }, 5000);
     });
 
     client.on('message', async (msg) => {
-        console.log(`[WhatsApp] Message from ${msg.from}`);
         try {
-            await webhookService.sendWhatsAppMessage(msg);
+            await webhookService.sendWhatsAppMessage(msg, session.sessionId);
         } catch (e) {
-            console.error('[WhatsApp] Webhook error:', e.message);
+            console.error(`[WhatsApp][${session.sessionId}] Webhook error:`, e.message);
         }
+    });
+
+    client.initialize().catch(err => {
+        session.lastError = err.message;
+        session.status = 'error';
+        session.initializing = false;
+        session.updatedAt = Date.now();
+        console.error(`[WhatsApp][${session.sessionId}] Initialization failed:`, err.message);
     });
 }
 
-// Initialize on load
-initClient();
-
-// ═══════════════════════════════════════════════════
-// Helper Methods
-// ═══════════════════════════════════════════════════
-
-async function sendMessage(phone, message) {
-    console.log(`[WhatsApp] sendMessage called for phone: ${phone}`);
-    if (!clientReady) throw new Error('Client not ready');
-
-    // Format phone number
-    let chatId = phone.replace(/[^\d]/g, '');
-    console.log(`[WhatsApp] Parsed chatId: ${chatId}`);
-
-    if (chatId.length < 5) {
-        throw new Error(`Invalid phone number: ${phone} (parsed: ${chatId})`);
+async function sendMessage(phone, message, sessionId) {
+    const id = sanitizeSessionId(sessionId);
+    if (!id) {
+        throw new Error(`sessionId required. ${SESSION_ID_HELP}`);
     }
 
+    const session = getOrCreateSession(id);
+    if (!session.ready || !session.client) {
+        throw new Error(`Session '${session.sessionId}' not ready (status: ${session.status})`);
+    }
+
+    let chatId = String(phone || '').replace(/[^\d]/g, '');
+    if (chatId.length < 5) {
+        throw new Error(`Invalid phone number: ${phone}`);
+    }
     if (!chatId.endsWith('@c.us')) {
         chatId += '@c.us';
     }
 
-    const response = await client.sendMessage(chatId, message);
-    messagesSent++;
-    return response;
+    const response = await session.client.sendMessage(chatId, message);
+    session.messagesSent += 1;
+    session.updatedAt = Date.now();
+
+    return {
+        messageId: response?.id?._serialized || null,
+        to: chatId,
+        sessionId: session.sessionId
+    };
 }
 
-// ═══════════════════════════════════════════════════
-// Routes
-// ═══════════════════════════════════════════════════
+async function restartSession(sessionId) {
+    const id = sanitizeSessionId(sessionId);
+    if (!id) {
+        throw new Error(`sessionId required. ${SESSION_ID_HELP}`);
+    }
+    const session = getOrCreateSession(id);
+    session.ready = false;
+    session.status = 'initializing';
+    session.qrCode = null;
+    session.lastError = null;
+    session.updatedAt = Date.now();
+    session.initializing = false;
 
-router.get('/status', (req, res) => {
+    try {
+        if (session.client) {
+            await session.client.destroy();
+        }
+    } catch (e) {
+        console.log(`[WhatsApp][${session.sessionId}] destroy warning:`, e.message);
+    }
+    session.client = null;
+    initSessionClient(session);
+}
+
+async function clearSession(sessionId) {
+    const id = sanitizeSessionId(sessionId);
+    if (!id) {
+        throw new Error(`sessionId required. ${SESSION_ID_HELP}`);
+    }
+    const session = sessions.get(id);
+
+    if (session?.client) {
+        try {
+            await session.client.destroy();
+        } catch (e) {
+            console.log(`[WhatsApp][${id}] destroy warning:`, e.message);
+        }
+    }
+
+    const authPath = getAuthPathForSession(id);
+    if (fs.existsSync(authPath)) {
+        fs.rmSync(authPath, { recursive: true, force: true });
+    }
+
+    sessions.delete(id);
+    getOrCreateSession(id);
+}
+
+function htmlPage(body) {
+    return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>WhatsApp Session</title><style>body{font-family:Segoe UI,Arial,sans-serif;background:#f6f7f8;margin:0;padding:24px}.card{max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,.08)}h1{margin:0 0 12px 0;font-size:22px}p{margin:8px 0;color:#334155}.meta{font-size:13px;color:#64748b}.qr{max-width:280px;border-radius:8px;border:1px solid #e2e8f0}</style></head><body>${body}</body></html>`;
+}
+
+router.get('/sessions', (req, res) => {
+    const items = [];
+    for (const session of sessions.values()) {
+        items.push({
+            sessionId: session.sessionId,
+            status: session.status,
+            ready: session.ready,
+            user: session.ready ? session.user : null,
+            messagesSent: session.messagesSent,
+            updatedAt: session.updatedAt,
+            createdAt: session.createdAt,
+            hasQr: Boolean(session.qrCode),
+            hasError: Boolean(session.lastError),
+        });
+    }
+
     res.json({
-        status: connectionStatus,
-        ready: clientReady,
-        qrCode: currentQR,
-        messagesSent,
-        user: clientReady ? {
-            name: client.info?.pushname,
-            number: client.info?.wid?.user
-        } : null,
-        lastError,
-        uptime: process.uptime()
+        requireSessionId: REQUIRE_SESSION_ID,
+        defaultSessionId: DEFAULT_SESSION_ID,
+        total: items.length,
+        sessions: items,
     });
 });
 
+router.get('/status', (req, res) => {
+    try {
+        const sessionId = resolveSessionId(req, true);
+        const session = getOrCreateSession(sessionId);
+        res.json({
+            sessionId: session.sessionId,
+            status: session.status,
+            ready: session.ready,
+            qrCode: session.qrCode,
+            user: session.ready ? session.user : null,
+            messagesSent: session.messagesSent,
+            lastError: session.lastError,
+            uptime: process.uptime(),
+            updatedAt: session.updatedAt,
+        });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 router.get('/qr', (req, res) => {
-    // 1. WhatsApp Bağlıysa
-    if (clientReady) {
-        const userName = client.info?.pushname || 'Kullanıcı';
-        const userPhone = client.info?.wid?.user || 'Bilinmiyor';
+    try {
+        const sessionId = resolveSessionId(req, true);
+        const session = getOrCreateSession(sessionId);
 
-        return res.send(`
-            <html>
-                <head>
-                    <title>WhatsApp Bağlandı</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <style>
-                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #e5ddd5; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                        .card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 90%; }
-                        h1 { color: #075e54; margin-bottom: 0.5rem; font-size: 1.8rem; }
-                        .icon { font-size: 5rem; display: block; margin-bottom: 1.5rem; color: #25D366; }
-                        .user-info { background: #f0f2f5; padding: 1rem; border-radius: 8px; margin: 1.5rem 0; text-align: left; }
-                        .user-info p { margin: 0.5rem 0; color: #333; font-size: 1.1rem; }
-                        .label { font-weight: bold; color: #555; display: inline-block; width: 80px; }
-                        .status { display: inline-block; padding: 0.25rem 0.75rem; background: #dcf8c6; color: #075e54; border-radius: 15px; font-weight: bold; font-size: 0.9rem; }
-                    </style>
-                </head>
-                <body>
-                    <div class="card">
-                        <span class="icon">✅</span>
-                        <h1>Bağlantı Başarılı!</h1>
-                        <div class="user-info">
-                            <p><span class="label">İsim:</span> ${userName}</p>
-                            <p><span class="label">Numara:</span> +${userPhone}</p>
-                            <p><span class="label">Durum:</span> <span class="status">Aktif</span></p>
-                        </div>
-                        <p style="color: #666;">BreviAI servisi şu anda bu hesaba bağlı ve mesaj göndermeye hazırdır.</p>
-                    </div>
-                </body>
-            </html>
-        `);
-    }
-
-    // 2. QR Kod Mevcutsa
-    if (currentQR) {
-        return res.send(`
-            <html>
-                <head>
-                    <title>WhatsApp Bağla</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <meta http-equiv="refresh" content="15"> <!-- Auto refresh every 15s -->
-                    <style>
-                        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-                        .container { background: white; padding: 0; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 90%; max-width: 850px; display: flex; flex-wrap: wrap; overflow: hidden; }
-                        .info-section { flex: 1; padding: 3rem; min-width: 300px; display: flex; flex-direction: column; justify-content: center; background: #fff; }
-                        .qr-section { flex: 0 0 350px; background: #fff; padding: 3rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-left: 1px solid #f0f0f0; }
-                        
-                        h1 { color: #41525d; margin: 0 0 1.5rem 0; font-size: 1.8rem; font-weight: 300; }
-                        .steps { list-style: none; padding: 0; margin: 0; }
-                        .steps li { margin-bottom: 20px; display: flex; align-items: center; font-size: 1.1rem; color: #3b4a54; line-height: 1.5; }
-                        .step-num { font-weight: bold; color: #00a884; margin-right: 12px; font-size: 1.1rem; }
-                        
-                        .qr-wrapper { position: relative; padding: 10px; border: 1px solid #e9edef; border-radius: 8px; }
-                        .qr-img { width: 264px; height: 264px; display: block; }
-                        .logo-area { text-align: left; margin-bottom: 2rem; }
-                        .logo-img { height: 40px; width: auto; }
-                        
-                        .refresh-hint { color: #8696a0; font-size: 0.9rem; margin-top: 1.5rem; display: flex; align-items: center; gap: 6px; }
-                        
-                        @media (max-width: 750px) {
-                            .container { flex-direction: column-reverse; max-width: 400px; }
-                            .qr-section { border-left: none; border-bottom: 1px solid #f0f0f0; padding: 2rem; flex: 0 0 auto; }
-                            .info-section { padding: 2rem; }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="info-section">
-                            <div class="logo-area">
-                                <img src="/public/logo.png" alt="BreviAI" class="logo-img" />
-                            </div>
-                            <h1>WhatsApp'ı Bağlayın</h1>
-                            <ol class="steps">
-                                <li><span class="step-num">1.</span> Telefonunuzda WhatsApp'ı açın</li>
-                                <li><span class="step-num">2.</span> <strong>Ayarlar</strong> (iPhone) veya <strong>Menü</strong> (Android) simgesine dokunun</li>
-                                <li><span class="step-num">3.</span> <strong>Bağlı Cihazlar</strong> seçeneğine girin</li>
-                                <li><span class="step-num">4.</span> <strong>Cihaz Bağla</strong> butonuna dokunun</li>
-                                <li><span class="step-num">5.</span> Telefonunuzun kamerasını yandaki ekrana doğrultarak QR kodu tarayın</li>
-                            </ol>
-                        </div>
-                        <div class="qr-section">
-                            <div class="qr-wrapper">
-                                <img src="${currentQR}" class="qr-img" alt="WhatsApp QR Code" />
-                            </div>
-                            <div class="refresh-hint">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                                Kod otomatik güncelleniyor
-                            </div>
-                        </div>
-                    </div>
-                </body>
-            </html>
-        `);
-    }
-
-    // 3. Yükleniyor
-    res.send(`
-        <html>
-            <head>
-                <title>Yükleniyor...</title>
-                <meta http-equiv="refresh" content="2">
-                <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #e5ddd5; margin: 0; }
-                    .loader { text-align: center; background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #00a884; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 1.5rem auto; }
-                    h2 { color: #41525d; font-weight: 300; margin: 0 0 0.5rem 0; }
-                    p { color: #8696a0; margin: 0; }
-                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                </style>
-            </head>
-            <body>
-                <div class="loader">
-                    <div class="spinner"></div>
-                    <h2>Hazırlanıyor...</h2>
-                    <p>Bağlantı kontrol ediliyor</p>
+        if (session.ready) {
+            return res.send(htmlPage(`
+                <div class="card">
+                    <h1>Baglanti Hazir</h1>
+                    <p><strong>Session:</strong> ${session.sessionId}</p>
+                    <p><strong>Hesap:</strong> ${session.user?.name || 'Kullanici'} (+${session.user?.number || '-'})</p>
+                    <p class="meta">Bu session'a bagli mesajlar sadece bu hesapla gonderilir.</p>
                 </div>
-            </body>
-        </html>
-    `);
+            `));
+        }
+
+        if (session.qrCode) {
+            return res.send(htmlPage(`
+                <div class="card">
+                    <h1>WhatsApp QR</h1>
+                    <p><strong>Session:</strong> ${session.sessionId}</p>
+                    <img class="qr" src="${session.qrCode}" alt="QR Code" />
+                    <p class="meta">Telefonunuzdan Bagli Cihazlar > Cihaz Bagla ile taratin.</p>
+                    <p class="meta">Sayfa 10 saniyede bir yenileniyor.</p>
+                    <script>setTimeout(()=>location.reload(),10000)</script>
+                </div>
+            `));
+        }
+
+        return res.send(htmlPage(`
+            <div class="card">
+                <h1>Hazirlaniyor...</h1>
+                <p><strong>Session:</strong> ${session.sessionId}</p>
+                <p class="meta">Durum: ${session.status}</p>
+                <script>setTimeout(()=>location.reload(),2500)</script>
+            </div>
+        `));
+    } catch (err) {
+        res.status(400).send(htmlPage(`<div class="card"><h1>Hata</h1><p>${err.message}</p></div>`));
+    }
 });
 
 router.post('/send', async (req, res) => {
-    const { phone, message } = req.body;
-    console.log('[WhatsApp] /send request:', { phone, message });
-
+    const { phone, message } = req.body || {};
     if (!phone || !message) {
         return res.status(400).json({ error: 'phone and message required' });
     }
 
     try {
-        await sendMessage(phone, message);
-        res.json({ success: true, to: phone });
+        const sessionId = resolveSessionId(req, true);
+        const result = await sendMessage(phone, message, sessionId);
+        res.json({ success: true, ...result });
     } catch (err) {
-        console.error('[WhatsApp] Send error details:', err);
-        const errorMessage = (err && err.message) ? err.message : String(err);
-        res.status(500).json({ error: errorMessage, stack: err.stack });
-    }
-});
-
-// POST /restart — Restart the WhatsApp client (useful when stuck)
-router.post('/restart', async (req, res) => {
-    console.log('[WhatsApp] 🔄 Restart requested...');
-    try {
-        clientReady = false;
-        connectionStatus = 'initializing';
-        currentQR = null;
-        lastError = null;
-
-        try {
-            if (client) await client.destroy();
-        } catch (e) {
-            console.log('[WhatsApp] Destroy warning (safe to ignore):', e.message);
-        }
-
-        // Small delay then re-init
-        setTimeout(() => initClient(), 2000);
-
-        res.json({ success: true, message: 'Client restarting. Check /status in a few seconds.' });
-    } catch (err) {
-        console.error('[WhatsApp] Restart error:', err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// POST /clear-session — Clear auth data and restart (nuclear option)
-router.post('/clear-session', async (req, res) => {
-    console.log('[WhatsApp] 🗑️ Clear session requested...');
+router.post('/restart', async (req, res) => {
     try {
-        clientReady = false;
-        connectionStatus = 'initializing';
-        currentQR = null;
-        lastError = null;
-
-        try {
-            if (client) await client.destroy();
-        } catch (e) {
-            console.log('[WhatsApp] Destroy warning:', e.message);
-        }
-
-        // Remove auth data
-        const authPath = path.resolve('./.wwebjs_auth/');
-        if (fs.existsSync(authPath)) {
-            fs.rmSync(authPath, { recursive: true, force: true });
-            console.log('[WhatsApp] Auth data cleared:', authPath);
-        }
-
-        // Re-init after cleanup
-        setTimeout(() => initClient(), 3000);
-
-        res.json({ success: true, message: 'Session cleared and client restarting. A new QR will appear.' });
+        const sessionId = resolveSessionId(req, true);
+        await restartSession(sessionId);
+        res.json({ success: true, sessionId, message: 'Session restarting' });
     } catch (err) {
-        console.error('[WhatsApp] Clear session error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post('/clear-session', async (req, res) => {
+    try {
+        const sessionId = resolveSessionId(req, true);
+        await clearSession(sessionId);
+        res.json({ success: true, sessionId, message: 'Session cleared' });
+    } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 module.exports = {
     router,
-    sendMessage, // Export for use by other services (Cron, Browser)
-    getClient: () => client
+    sendMessage,
+    getClient: (sessionId) => {
+        const id = sanitizeSessionId(sessionId);
+        if (!id) {
+            throw new Error(`sessionId required. ${SESSION_ID_HELP}`);
+        }
+        const session = getOrCreateSession(id);
+        return session.client;
+    }
 };

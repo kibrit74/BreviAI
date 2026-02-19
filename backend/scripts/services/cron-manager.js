@@ -92,11 +92,19 @@ class CronManager {
 
     async executeAction(action) {
         if (!action) throw new Error('No action defined');
+        const resolvedSessionId = action.sessionId || process.env.WA_DEFAULT_SESSION_ID;
 
         switch (action.type) {
             case 'whatsapp_send':
-                // { type: 'whatsapp_send', phone: 'number', message: 'text' }
-                return await whatsappService.sendMessage(action.phone, action.message);
+                // { type: 'whatsapp_send', phone: 'number', message: 'text', sessionId?: '...' }
+                if (!resolvedSessionId) {
+                    throw new Error("sessionId required for whatsapp_send action");
+                }
+                return await whatsappService.sendMessage(
+                    action.phone,
+                    action.message,
+                    resolvedSessionId
+                );
 
             case 'browser_scrape':
                 return await browserService.scrape(action.url, action.selector);
@@ -113,6 +121,9 @@ class CronManager {
             case 'scrape_and_whatsapp':
                 // { type: 'scrape_and_whatsapp', url: '...', selector: '...', phone: '...', message: '...' }
                 try {
+                    if (!resolvedSessionId) {
+                        throw new Error("sessionId required for scrape_and_whatsapp action");
+                    }
                     console.log(`[Cron] Scrape & Send: ${action.url} -> ${action.phone}`);
                     const scrapeResult = await browserService.scrape(action.url, action.selector);
 
@@ -127,7 +138,11 @@ class CronManager {
                     msg = msg.replace(/\{\{_date\}\}/g, now.toLocaleDateString('tr-TR'));
                     msg = msg.replace(/\{\{_time\}\}/g, now.toLocaleTimeString('tr-TR'));
 
-                    return await whatsappService.sendMessage(action.phone, msg);
+                    return await whatsappService.sendMessage(
+                        action.phone,
+                        msg,
+                        resolvedSessionId
+                    );
                 } catch (err) {
                     console.error('[Cron] Scrape & Send failed:', err);
                     throw err;
