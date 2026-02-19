@@ -11,6 +11,21 @@ import { microsoftService, MicrosoftAuthState } from '../services/MicrosoftServi
 import { backgroundService } from '../services/BackgroundService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
+const WHATSAPP_AUTH_KEY = 'breviai-secret-password';
+
+function generateWhatsAppSessionId(): string {
+    return `device_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function getOrCreateWhatsAppSessionId(): Promise<string> {
+    const existing = (await AsyncStorage.getItem(WHATSAPP_SESSION_STORAGE_KEY))?.trim();
+    if (existing) return existing;
+    const created = generateWhatsAppSessionId();
+    await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, created);
+    return created;
+}
+
 // Safe import for native module
 let BreviSettings: any = null;
 try {
@@ -100,6 +115,7 @@ export default function SettingsScreen({ navigation }: any) {
     const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
     const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.109.124.154:3001');
+    const [waSessionId, setWaSessionId] = React.useState('');
 
     // Cron Job Management State
     const [cronJobs, setCronJobs] = React.useState<any[]>([]);
@@ -126,6 +142,8 @@ export default function SettingsScreen({ navigation }: any) {
                 console.log('[Settings] FORCING URL:', defaultCloudShell);
                 setWaBackendUrl(defaultCloudShell);
                 await AsyncStorage.setItem('whatsapp_backend_url', defaultCloudShell);
+                const sessionId = await getOrCreateWhatsAppSessionId();
+                setWaSessionId(sessionId);
 
             } catch (e) {
                 console.log('Failed to load WA URL');
@@ -150,6 +168,9 @@ export default function SettingsScreen({ navigation }: any) {
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
         try {
+            const sessionId = waSessionId || await getOrCreateWhatsAppSessionId();
+            if (!waSessionId) setWaSessionId(sessionId);
+
             // Check if user has a custom override
             let url = waBackendUrl.trim();
 
@@ -163,7 +184,8 @@ export default function SettingsScreen({ navigation }: any) {
 
             const response = await fetch(`${url}/whatsapp/status`, {
                 headers: {
-                    'x-auth-key': 'breviai-secret-password',
+                    'x-auth-key': WHATSAPP_AUTH_KEY,
+                    'x-session-id': sessionId,
                     'Bypass-Tunnel-Reminder': 'true', // Skip localtunnel warning page
                     'ngrok-skip-browser-warning': 'true' // Skip ngrok warning page
                 },
@@ -503,7 +525,7 @@ export default function SettingsScreen({ navigation }: any) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000);
             const response = await fetch(`${url}/cron/list`, {
-                headers: { 'x-auth-key': 'breviai-secret-password' },
+                headers: { 'x-auth-key': WHATSAPP_AUTH_KEY },
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -526,7 +548,7 @@ export default function SettingsScreen({ navigation }: any) {
                         const url = waBackendUrl.trim().replace(/\/$/, '');
                         await fetch(`${url}/cron/delete/${encodeURIComponent(jobId)}`, {
                             method: 'DELETE',
-                            headers: { 'x-auth-key': 'breviai-secret-password' },
+                            headers: { 'x-auth-key': WHATSAPP_AUTH_KEY },
                         });
                         fetchCronJobs();
                     } catch (error) {
@@ -547,7 +569,7 @@ export default function SettingsScreen({ navigation }: any) {
                         for (const job of cronJobs) {
                             await fetch(`${url}/cron/delete/${encodeURIComponent(job.id)}`, {
                                 method: 'DELETE',
-                                headers: { 'x-auth-key': 'breviai-secret-password' },
+                                headers: { 'x-auth-key': WHATSAPP_AUTH_KEY },
                             });
                         }
                         fetchCronJobs();
@@ -731,6 +753,9 @@ export default function SettingsScreen({ navigation }: any) {
                                         <Text style={{ fontSize: 10, color: activeColors.textSecondary, marginTop: 2 }}>
                                             Cloud Shell veya Sunucu URL'sini girin (Sonunda '/' olmasın)
                                         </Text>
+                                        <Text style={{ fontSize: 10, color: activeColors.textSecondary, marginTop: 2 }}>
+                                            Session: {waSessionId || 'hazirlaniyor...'}
+                                        </Text>
                                     </View>
                                 </View>
                                 <TouchableOpacity
@@ -759,8 +784,12 @@ export default function SettingsScreen({ navigation }: any) {
                                     </Text>
                                     <TouchableOpacity
                                         style={{ backgroundColor: activeColors.card, padding: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: activeColors.border }}
-                                        onPress={() => {
-                                            Linking.openURL(waBackendUrl + '/whatsapp/qr');
+                                        onPress={async () => {
+                                            const sessionId = waSessionId || await getOrCreateWhatsAppSessionId();
+                                            if (!waSessionId) setWaSessionId(sessionId);
+                                            const safeUrl = waBackendUrl.trim().replace(/\/$/, '');
+                                            const qrUrl = `${safeUrl}/whatsapp/qr?key=${encodeURIComponent(WHATSAPP_AUTH_KEY)}&sessionId=${encodeURIComponent(sessionId)}`;
+                                            Linking.openURL(qrUrl);
                                         }}
                                     >
                                         <Text style={{ color: activeColors.primary, fontWeight: '600' }}>Tarayıcıda Aç</Text>
@@ -785,11 +814,15 @@ export default function SettingsScreen({ navigation }: any) {
 
                                     <TouchableOpacity
                                         style={{ backgroundColor: '#25D366', padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, shadowColor: "#25D366", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 }}
-                                        onPress={() => {
+                                        onPress={async () => {
+                                            const sessionId = waSessionId || await getOrCreateWhatsAppSessionId();
+                                            if (!waSessionId) setWaSessionId(sessionId);
+
                                             const safeUrl = (waBackendUrl || 'http://0.0.0.0:3001');
                                             console.log('[WA Debug] Sending test message...');
                                             console.log('[WA Debug] URL:', safeUrl);
                                             console.log('[WA Debug] User:', waStatus?.user);
+                                            console.log('[WA Debug] Session:', sessionId);
 
                                             if (!safeUrl) {
                                                 Alert.alert('Hata', 'WhatsApp URL tanımlı değil.');
@@ -804,11 +837,13 @@ export default function SettingsScreen({ navigation }: any) {
                                                     method: 'POST',
                                                     headers: {
                                                         'Content-Type': 'application/json',
-                                                        'x-auth-key': 'breviai-secret-password'
+                                                        'x-auth-key': WHATSAPP_AUTH_KEY,
+                                                        'x-session-id': sessionId,
                                                     },
                                                     body: JSON.stringify({
                                                         phone: targetPhone,
-                                                        message: '🔔 BreviAI Test Mesajı\n\nBu mesaj bağlantının çalıştığını doğrulamak için gönderildi.'
+                                                        message: '🔔 BreviAI Test Mesajı\n\nBu mesaj bağlantının çalıştığını doğrulamak için gönderildi.',
+                                                        sessionId,
                                                     })
                                                 })
                                                     .then(async r => {

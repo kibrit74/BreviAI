@@ -267,22 +267,35 @@ export async function executeWhatsAppTrigger(
     }
 
     const injectedMessage = variableManager.get('_whatsappMessage');
+    const injectedSender = variableManager.get('_whatsappSender');
+    const injectedGroup = variableManager.get('_whatsappGroup');
+    const injectedSenderPhone = variableManager.get('_whatsappSenderPhone');
 
-    if (injectedMessage) {
+    if (injectedMessage || injectedSender) {
         const now = new Date();
         variableManager.set('_triggerTime', now.toISOString());
         // ...
         variableManager.set('_triggerType', 'whatsapp');
         variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
         variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
-        variableManager.set('triggerMessage', injectedMessage);
+        variableManager.set('triggerMessage', injectedMessage || injectedSender || '');
 
         if (config.variableName) {
-            const whatsappInfo = variableManager.get('_whatsappInfo') || { sender: 'Unknown', message: injectedMessage, group: '' };
+            const existingInfo = variableManager.get('_whatsappInfo');
+            const whatsappInfo = {
+                sender: existingInfo?.sender || injectedSender || 'Unknown',
+                senderPhone: existingInfo?.senderPhone || injectedSenderPhone || '',
+                message: existingInfo?.message || injectedMessage || '',
+                group: existingInfo?.group || injectedGroup || '',
+            };
+            variableManager.set('_whatsappInfo', whatsappInfo);
             variableManager.set(config.variableName, whatsappInfo);
         }
 
-        console.log('[WHATSAPP_TRIGGER] Triggered by notification. Message:', injectedMessage);
+        console.log('[WHATSAPP_TRIGGER] Triggered by notification.', {
+            sender: injectedSender,
+            message: injectedMessage,
+        });
         return {
             triggered: true,
             type: 'whatsapp',

@@ -35,8 +35,9 @@ class WebhookService {
     }
 
     // Specialized method for WhatsApp messages
-    async sendWhatsAppMessage(msg) {
+    async sendWhatsAppMessage(msg, sessionId) {
         return this.send('whatsapp_message', {
+            sessionId: sessionId || 'default',
             from: msg.from,
             body: msg.body,
             timestamp: msg.timestamp,

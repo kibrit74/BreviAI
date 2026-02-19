@@ -12,8 +12,69 @@ import {
 import { VariableManager } from '../VariableManager';
 import * as SMS from 'expo-sms';
 import * as MailComposer from 'expo-mail-composer';
+import * as Contacts from 'expo-contacts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../ApiService';
 import { interactionService } from '../InteractionService';
+
+const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
+
+function generateSessionId(): string {
+    return `device_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function getOrCreateWhatsAppSessionId(explicitSessionId?: string): Promise<string> {
+    const explicit = (explicitSessionId || '').trim();
+    if (explicit) return explicit;
+
+    try {
+        const existing = (await AsyncStorage.getItem(WHATSAPP_SESSION_STORAGE_KEY))?.trim();
+        if (existing) return existing;
+    } catch {
+        // continue with generation
+    }
+
+    const created = generateSessionId();
+    try {
+        await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, created);
+    } catch {
+        // best effort
+    }
+    return created;
+}
+
+async function resolvePhoneFromContactsByName(rawName: string): Promise<string | null> {
+    const name = (rawName || '').trim();
+    if (!name) return null;
+
+    try {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== 'granted') return null;
+
+        const { data } = await Contacts.getContactsAsync({
+            name,
+            fields: [Contacts.Fields.PhoneNumbers],
+        });
+
+        for (const contact of data || []) {
+            const firstNumber = contact.phoneNumbers?.[0]?.number || '';
+            if (!firstNumber) continue;
+
+            let digits = firstNumber.replace(/[^\d]/g, '');
+            if (digits.startsWith('0') && digits.length === 11) {
+                digits = '90' + digits.substring(1);
+            }
+            if (digits.length === 10 && digits.startsWith('5')) {
+                digits = '90' + digits;
+            }
+            if (digits.length >= 10) return digits;
+        }
+    } catch (e) {
+        console.warn('[WHATSAPP Backend] Contact phone resolve failed:', e);
+    }
+
+    return null;
+}
 
 export async function executeSmsSend(
     config: SmsSendConfig,
@@ -262,6 +323,8 @@ export async function executeWhatsAppSend(
             }
             backendUrl = variableManager.resolveString(backendUrl);
             authKey = variableManager.resolveString(authKey);
+            const explicitSessionId = variableManager.resolveString(config.backendSessionId || '');
+            const sessionId = await getOrCreateWhatsAppSessionId(explicitSessionId);
 
             // Format phone number: remove ALL non-digit characters (handles ÷, +, spaces, etc.)
             let cleanPhone = phoneNumber.replace(/[^\d]/g, '');
@@ -275,7 +338,16 @@ export async function executeWhatsAppSend(
                 cleanPhone = '90' + cleanPhone;
             }
 
-            console.log('[WHATSAPP Backend] Sending via:', backendUrl, 'to:', cleanPhone);
+            // Fallback: WhatsApp notification title can be a contact name (not number).
+            if (!cleanPhone || cleanPhone.length < 10) {
+                const resolvedFromContacts = await resolvePhoneFromContactsByName(phoneNumber);
+                if (resolvedFromContacts) {
+                    cleanPhone = resolvedFromContacts;
+                    console.log('[WHATSAPP Backend] Resolved phone from contacts:', cleanPhone);
+                }
+            }
+
+            console.log('[WHATSAPP Backend] Sending via:', backendUrl, 'to:', cleanPhone, '| session:', sessionId);
 
             // Validate phone number is not empty
             if (!cleanPhone || cleanPhone.length < 10) {
@@ -292,11 +364,13 @@ export async function executeWhatsAppSend(
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'x-auth-key': authKey
+                    'x-auth-key': authKey,
+                    'x-session-id': sessionId,
                 },
                 body: JSON.stringify({
                     phone: cleanPhone,
-                    message: message
+                    message: message,
+                    sessionId,
                 })
             });
 
@@ -319,7 +393,8 @@ export async function executeWhatsAppSend(
                 mode: 'backend',
                 messageId: data.messageId,
                 to: data.to,
-                totalSent: data.totalSent
+                totalSent: data.totalSent,
+                sessionId: data.sessionId || sessionId,
             };
 
             if (config.variableName) {

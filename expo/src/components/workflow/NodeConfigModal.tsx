@@ -4013,6 +4013,18 @@ const WhatsAppSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig,
                                     secureTextEntry
                                 />
                             </View>
+                            <View style={styles.field}>
+                                <Text style={styles.fieldLabel}>Session ID (Opsiyonel)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={config.backendSessionId || ''}
+                                    onChangeText={(t) => updateConfig('backendSessionId', t)}
+                                    placeholder="Cihaza ozel bir kimlik (bos ise otomatik)"
+                                    placeholderTextColor="#666"
+                                    autoCapitalize="none"
+                                />
+                                <Text style={styles.fieldHint}>Bos birakirsan cihaz icin otomatik bir session ID uretilir.</Text>
+                            </View>
                         </>
                     )}
 

@@ -26,8 +26,8 @@ app.use('/public', express.static(path.join(__dirname, 'public')));
 // Auth Middleware
 function authMiddleware(req, res, next) {
     const key = req.headers['x-auth-key'] || req.query.key;
-    // Allow public access to QR page or root
-    if (req.path === '/' || req.path === '/whatsapp/qr') return next();
+    // Allow public access only to root
+    if (req.path === '/') return next();
 
     if (key !== AUTH_KEY) {
         return res.status(401).json({ error: 'Unauthorized access' });

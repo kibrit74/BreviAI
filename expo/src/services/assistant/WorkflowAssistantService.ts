@@ -23,6 +23,21 @@ const ALLOWED_CHANGE_TYPES = new Set([
 ]);
 
 class WorkflowAssistantService {
+    private normalizeGeminiModel(model: string): string {
+        const raw = String(model || '').trim();
+        const fallback = 'gemini-2.5-pro';
+
+        if (!raw) return `models/${fallback}`;
+
+        // Support accidental Vertex-style references by extracting the final model id.
+        const fromVertex = raw.includes('/models/')
+            ? raw.split('/models/').pop() || ''
+            : raw;
+
+        const clean = fromVertex.replace(/^models\//, '').trim();
+        return `models/${clean || fallback}`;
+    }
+
     private normalizeSuggestion(item: any): AssistantFixSuggestion | null {
         if (!item || typeof item !== 'object') return null;
         const title = String(item.title || '').trim();
@@ -65,7 +80,7 @@ class WorkflowAssistantService {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 45000);
         try {
-            const modelName = model.startsWith('models/') ? model : `models/${model}`;
+            const modelName = this.normalizeGeminiModel(model);
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 signal: controller.signal,
@@ -73,7 +88,13 @@ class WorkflowAssistantService {
                 body: JSON.stringify({
                     systemInstruction: { parts: [{ text: systemPrompt }] },
                     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-                    generationConfig: { temperature: 0.2 },
+                    generationConfig: {
+                        temperature: 0.4,
+                        topP: 0.9,
+                        topK: 40,
+                        maxOutputTokens: 7000,
+                        responseMimeType: 'application/json',
+                    },
                 }),
             });
             const data = await response.json();

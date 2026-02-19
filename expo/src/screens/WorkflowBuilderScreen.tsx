@@ -17,6 +17,7 @@ import {
     StatusBar,
     Platform,
     Switch,
+    ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -84,7 +85,11 @@ type RecipeId =
     | 'news_rss'
     | 'daily_reminder'
     | 'contact_search'
-    | 'quick_translate';
+    | 'quick_translate'
+    | 'business_card_to_contact'
+    | 'receipt_to_expense_json'
+    | 'note_to_summary'
+    | 'whatsapp_ai_reply_confirm';
 
 export const WorkflowBuilderScreen: React.FC = () => {
     const navigation = useNavigation<WorkflowBuilderNavigationProp>();
@@ -731,6 +736,237 @@ export const WorkflowBuilderScreen: React.FC = () => {
             };
         }
 
+        if (recipeId === 'business_card_to_contact') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const camera = createNode('CAMERA_CAPTURE', { x: 320, y: 120 });
+            const parseCard = createNode('AGENT_AI', { x: 560, y: 120 });
+            const saveContact = createNode('CONTACTS_WRITE', { x: 800, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 1040, y: 120 });
+
+            camera.config = {
+                ...(camera.config || {}),
+                cameraType: 'back',
+                quality: 'high',
+                enableOcr: true,
+                variableName: 'business_card_image',
+                textVariableName: 'business_card_text',
+            } as any;
+
+            parseCard.config = {
+                ...(parseCard.config || {}),
+                provider: 'gemini',
+                model: 'gemini-2.0-flash',
+                outputFormat: 'json',
+                temperature: 0.1,
+                variableName: 'card_contact',
+                prompt: [
+                    'Aşağıdaki kartvizit OCR metninden kişi bilgisini JSON olarak çıkar.',
+                    'Sadece JSON döndür.',
+                    'Alanlar: {"firstName":"","lastName":"","phoneNumber":"","email":"","company":""}',
+                    'Metin: {{business_card_text}}'
+                ].join('\n'),
+            } as any;
+
+            saveContact.config = {
+                ...(saveContact.config || {}),
+                firstName: '{{card_contact.firstName}}',
+                lastName: '{{card_contact.lastName}}',
+                phoneNumber: '{{card_contact.phoneNumber}}',
+                email: '{{card_contact.email}}',
+                company: '{{card_contact.company}}',
+                variableName: 'saved_contact_id',
+            } as any;
+
+            show.config = {
+                ...(show.config || {}),
+                title: 'Kartvizit Kaydedildi',
+                content: [
+                    'Kişi: {{card_contact.firstName}} {{card_contact.lastName}}',
+                    'Telefon: {{card_contact.phoneNumber}}',
+                    'E-posta: {{card_contact.email}}',
+                    'Şirket: {{card_contact.company}}'
+                ].join('\n'),
+            } as any;
+
+            newWorkflow = {
+                ...createWorkflow('Kartvizitten Rehbere Ekle'),
+                nodes: [trigger, camera, parseCard, saveContact, show],
+                edges: [
+                    createEdge(trigger.id, camera.id, 'default'),
+                    createEdge(camera.id, parseCard.id, 'default'),
+                    createEdge(parseCard.id, saveContact.id, 'default'),
+                    createEdge(saveContact.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'receipt_to_expense_json') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const camera = createNode('CAMERA_CAPTURE', { x: 320, y: 120 });
+            const parseReceipt = createNode('AGENT_AI', { x: 560, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
+
+            camera.config = {
+                ...(camera.config || {}),
+                cameraType: 'back',
+                quality: 'high',
+                enableOcr: true,
+                variableName: 'receipt_image',
+                textVariableName: 'receipt_text',
+            } as any;
+
+            parseReceipt.config = {
+                ...(parseReceipt.config || {}),
+                provider: 'gemini',
+                model: 'gemini-2.0-flash',
+                outputFormat: 'json',
+                temperature: 0.1,
+                variableName: 'expense_info',
+                prompt: [
+                    'Aşağıdaki fiş metninden harcama bilgisini çıkar.',
+                    'Sadece JSON döndür.',
+                    'Alanlar: {"merchant":"","date":"","total":0,"category":""}',
+                    'Metin: {{receipt_text}}'
+                ].join('\n'),
+            } as any;
+
+            show.config = {
+                ...(show.config || {}),
+                title: 'Fiş Özeti',
+                content: '{{expense_info}}',
+            } as any;
+
+            newWorkflow = {
+                ...createWorkflow('Fişten Harcama Özeti'),
+                nodes: [trigger, camera, parseReceipt, show],
+                edges: [
+                    createEdge(trigger.id, camera.id, 'default'),
+                    createEdge(camera.id, parseReceipt.id, 'default'),
+                    createEdge(parseReceipt.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'note_to_summary') {
+            const trigger = createNode('MANUAL_TRIGGER', { x: 80, y: 120 });
+            const input = createNode('TEXT_INPUT', { x: 320, y: 120 });
+            const summarize = createNode('AGENT_AI', { x: 560, y: 120 });
+            const show = createNode('SHOW_TEXT', { x: 800, y: 120 });
+
+            input.config = {
+                ...(input.config || {}),
+                prompt: 'Toplantı/not metnini yazın',
+                variableName: 'note_text',
+            } as any;
+
+            summarize.config = {
+                ...(summarize.config || {}),
+                provider: 'gemini',
+                model: 'gemini-2.0-flash',
+                temperature: 0.2,
+                variableName: 'note_summary',
+                prompt: [
+                    'Aşağıdaki metni kısa ve net şekilde özetle.',
+                    '3 bölüm kullan: "Özet", "Aksiyonlar", "Riskler".',
+                    'Metin: {{note_text}}'
+                ].join('\n'),
+            } as any;
+
+            show.config = {
+                ...(show.config || {}),
+                title: 'Özet',
+                content: '{{note_summary}}',
+            } as any;
+
+            newWorkflow = {
+                ...createWorkflow('Notu Özetle'),
+                nodes: [trigger, input, summarize, show],
+                edges: [
+                    createEdge(trigger.id, input.id, 'default'),
+                    createEdge(input.id, summarize.id, 'default'),
+                    createEdge(summarize.id, show.id, 'default'),
+                ],
+            };
+        }
+
+        if (recipeId === 'whatsapp_ai_reply_confirm') {
+            const trigger = createNode('WHATSAPP_TRIGGER', { x: 80, y: 140 });
+            const ai = createNode('AGENT_AI', { x: 320, y: 140 });
+            const menu = createNode('SHOW_MENU', { x: 560, y: 140 });
+            const condition = createNode('IF_ELSE', { x: 800, y: 140 });
+            const send = createNode('WHATSAPP_SEND', { x: 1040, y: 80 });
+            const sentNotification = createNode('NOTIFICATION', { x: 1280, y: 80 });
+            const cancelNotification = createNode('NOTIFICATION', { x: 1040, y: 240 });
+
+            trigger.config = {
+                ...(trigger.config || {}),
+                variableName: 'whatsappInfo',
+            } as any;
+
+            ai.config = {
+                ...(ai.config || {}),
+                provider: 'gemini',
+                model: 'gemini-2.0-flash',
+                temperature: 0.3,
+                variableName: 'reply_draft',
+                prompt: [
+                    'Asagidaki WhatsApp mesajina kisa, nazik ve net bir yanit taslagi uret.',
+                    'Sadece gonderilecek metni dondur. Aciklama ekleme.',
+                    'Gonderen: {{whatsappInfo.sender}}',
+                    'Mesaj: {{whatsappInfo.message}}',
+                ].join('\n'),
+            } as any;
+
+            menu.config = {
+                ...(menu.config || {}),
+                title: 'Taslak yanit: {{reply_draft}}\nMesaji gondermek istiyor musun?',
+                options: ['Gonder', 'Iptal'],
+                variableName: 'reply_action',
+            } as any;
+
+            condition.config = {
+                ...(condition.config || {}),
+                left: 'reply_action',
+                operator: '==',
+                right: 'Gonder',
+            } as any;
+
+            send.config = {
+                ...(send.config || {}),
+                mode: 'backend',
+                phoneNumber: '{{whatsappInfo.senderPhone}}',
+                message: '{{reply_draft}}',
+                variableName: 'whatsapp_send_result',
+            } as any;
+
+            sentNotification.config = {
+                ...(sentNotification.config || {}),
+                title: 'WhatsApp',
+                message: 'Yanit gonderildi.',
+                type: 'toast',
+            } as any;
+
+            cancelNotification.config = {
+                ...(cancelNotification.config || {}),
+                title: 'WhatsApp',
+                message: 'Yanit iptal edildi.',
+                type: 'toast',
+            } as any;
+
+            newWorkflow = {
+                ...createWorkflow('WhatsApp AI Yanit (Onayli)'),
+                nodes: [trigger, ai, menu, condition, send, sentNotification, cancelNotification],
+                edges: [
+                    createEdge(trigger.id, ai.id, 'default'),
+                    createEdge(ai.id, menu.id, 'default'),
+                    createEdge(menu.id, condition.id, 'default'),
+                    createEdge(condition.id, send.id, 'true'),
+                    createEdge(send.id, sentNotification.id, 'default'),
+                    createEdge(condition.id, cancelNotification.id, 'false'),
+                ],
+            };
+        }
+
         if (newWorkflow) {
             setWorkflow(newWorkflow);
             setHasChanges(true);
@@ -934,6 +1170,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                 <View style={styles.recipesOverlay} pointerEvents="box-none">
                     <View style={styles.recipesCard}>
                         <Text style={styles.recipesTitle}>Ne yapmak istersin?</Text>
+                        <ScrollView style={styles.recipesScroll} showsVerticalScrollIndicator={false}>
                         <TouchableOpacity
                             style={styles.recipeItem}
                             onPress={() => setRecipeWizard({
@@ -1012,6 +1249,34 @@ export const WorkflowBuilderScreen: React.FC = () => {
                             <Text style={styles.recipeItemTitle}>Hızlı Çeviri</Text>
                             <Text style={styles.recipeItemDesc}>Metni yaz, otomatik çevir, sonucu göster.</Text>
                         </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('business_card_to_contact')}
+                        >
+                            <Text style={styles.recipeItemTitle}>Kartviziti Rehbere Ekle</Text>
+                            <Text style={styles.recipeItemDesc}>Kartvizit fotoğrafı çek, Gemini ile oku, kişiyi kaydet.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('receipt_to_expense_json')}
+                        >
+                            <Text style={styles.recipeItemTitle}>Fişten Harcama Çıkar</Text>
+                            <Text style={styles.recipeItemDesc}>Fişi çek, tutar/tarih/işyeri bilgisini JSON olarak çıkar.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('note_to_summary')}
+                        >
+                            <Text style={styles.recipeItemTitle}>Notu Özetle</Text>
+                            <Text style={styles.recipeItemDesc}>Uzun metni özet, aksiyon ve risk başlıklarıyla toparla.</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.recipeItem}
+                            onPress={() => applyRecipe('whatsapp_ai_reply_confirm')}
+                        >
+                            <Text style={styles.recipeItemTitle}>WhatsApp AI Yanit (Onayli)</Text>
+                            <Text style={styles.recipeItemDesc}>Mesaji oku, AI yanit taslagi uretsin, gonder onayini sen ver.</Text>
+                        </TouchableOpacity>
                         <View style={styles.recipesActions}>
                             <TouchableOpacity style={styles.recipeSecondary} onPress={() => setHideRecipes(true)}>
                                 <Text style={styles.recipeSecondaryText}>Boş Başla</Text>
@@ -1020,6 +1285,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                 <Text style={styles.recipePrimaryText}>AI ile Oluştur</Text>
                             </TouchableOpacity>
                         </View>
+                        </ScrollView>
                     </View>
                 </View>
             )}
@@ -1839,6 +2105,9 @@ const styles = StyleSheet.create({
         padding: 16,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.08)',
+    },
+    recipesScroll: {
+        maxHeight: 460,
     },
     recipesTitle: {
         color: '#E2E8F0',

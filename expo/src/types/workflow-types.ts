@@ -662,6 +662,7 @@ export interface WhatsAppSendConfig {
     templateLanguage?: string; // Template language code (default: tr)
     backendUrl?: string; // WhatsApp backend service URL (default: http://localhost:3001)
     backendAuthKey?: string; // Backend auth key
+    backendSessionId?: string; // Session ID for multi-device isolation
 }
 
 // Communication Configs

@@ -10,8 +10,9 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const FALLBACK_MODELS: Record<AIProvider, AssistantModelInfo[]> = {
     gemini: [
-        { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
         { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+        { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview' },
+        { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
     ],
     openai: [
         { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
@@ -25,6 +26,13 @@ const FALLBACK_MODELS: Record<AIProvider, AssistantModelInfo[]> = {
 
 class ModelCatalogService {
     private cache = new Map<AIProvider, CatalogCacheItem>();
+
+    private normalizeGeminiModelId(name: string): string {
+        const raw = String(name || '').trim();
+        if (!raw) return '';
+        const extracted = raw.includes('/models/') ? (raw.split('/models/').pop() || '') : raw;
+        return extracted.replace(/^models\//, '').trim();
+    }
 
     private getCached(provider: AIProvider): AssistantModelInfo[] | null {
         const item = this.cache.get(provider);
@@ -49,16 +57,26 @@ class ModelCatalogService {
                 const data = await response.json();
                 if (!response.ok) throw new Error(data?.error?.message || 'Gemini model list error');
                 const items = Array.isArray(data?.models) ? data.models : [];
-                models = items
+                const filtered = items
                     .filter((m: any) => String(m?.name || '').includes('gemini'))
                     .filter((m: any) => {
                         const methods: string[] = Array.isArray(m?.supportedGenerationMethods) ? m.supportedGenerationMethods : [];
                         return methods.includes('generateContent');
                     })
                     .map((m: any) => {
-                        const fullName = String(m?.name || '').replace(/^models\//, '');
-                        return { id: fullName, label: m?.displayName || fullName };
-                    });
+                        const id = this.normalizeGeminiModelId(String(m?.name || ''));
+                        return { id, label: m?.displayName || id };
+                    })
+                    .filter((m: AssistantModelInfo) =>
+                        !!m.id &&
+                        !m.id.includes('embedding') &&
+                        !m.id.includes('aqa')
+                    );
+                const deduped = new Map<string, AssistantModelInfo>();
+                for (const model of filtered) {
+                    deduped.set(model.id, model);
+                }
+                models = Array.from(deduped.values());
             } else if (provider === 'openai') {
                 const response = await fetch('https://api.openai.com/v1/models', {
                     headers: { Authorization: `Bearer ${apiKey}` },
@@ -103,7 +121,8 @@ class ModelCatalogService {
 
         if (provider === 'gemini') {
             return (
-                models.find(m => m.id.includes('2.0-flash')) ||
+                models.find(m => m.id.includes('2.5-pro')) ||
+                models.find(m => m.id.includes('3-flash')) ||
                 models.find(m => m.id.includes('flash')) ||
                 models[0]
             );
