@@ -37,6 +37,7 @@ import {
 } from '../../types/workflow-types';
 import { useApp } from '../../context/AppContext';
 import { copySingleNode, pasteNodes, duplicateNode } from '../../services/WorkflowClipboard';
+import { evaluateConnectionCompatibility } from '../../services/WorkflowTypeCompatibility';
 
 // --- Default Theme Fallback (if not in context) ---
 const DEFAULT_THEME = {
@@ -111,6 +112,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         port: EdgePort;
         start: { x: number; y: number };
         end: { x: number; y: number };
+        hoverTargetNodeId?: string | null;
+        isCompatible?: boolean;
+        mismatchReason?: string;
     } | null>(null);
 
     const containerRef = useRef<View>(null);
@@ -191,6 +195,15 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         if (selectedNodeId === nodeId) onNodeSelect(null);
     }, [workflow, onWorkflowChange, selectedNodeId, onNodeSelect]);
 
+    const checkConnectionCompatibility = useCallback((sourceNodeId: string, targetNodeId: string, sourcePort: EdgePort) => {
+        const sourceNode = workflow.nodes.find(n => n.id === sourceNodeId);
+        const targetNode = workflow.nodes.find(n => n.id === targetNodeId);
+        if (!sourceNode || !targetNode) {
+            return { compatible: false, reason: 'Node bulunamadi.' };
+        }
+        return evaluateConnectionCompatibility(sourceNode, sourcePort, targetNode);
+    }, [workflow.nodes]);
+
     // Edge Ops
     const addEdge = useCallback((sourceNodeId: string, targetNodeId: string, sourcePort: EdgePort) => {
         console.log('[DEBUG] addEdge called:', { sourceNodeId, targetNodeId, sourcePort });
@@ -199,10 +212,20 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
             console.log('[DEBUG] Edge already exists, skipping');
             return;
         }
+
+        const compatibility = checkConnectionCompatibility(sourceNodeId, targetNodeId, sourcePort);
+        if (!compatibility.compatible) {
+            Alert.alert(
+                'Uyumsuz baglanti',
+                `Bu node baglantisi veri tipi uyusmadigi icin kurulamaz.\n${compatibility.reason || ''}`
+            );
+            return;
+        }
+
         const newEdge = createEdge(sourceNodeId, targetNodeId, sourcePort);
         console.log('[DEBUG] Creating new edge:', newEdge);
         onWorkflowChange({ ...workflow, edges: [...workflow.edges, newEdge] });
-    }, [workflow, onWorkflowChange]);
+    }, [workflow, onWorkflowChange, checkConnectionCompatibility]);
 
     const deleteEdge = useCallback((edgeId: string) => {
         onWorkflowChange({ ...workflow, edges: workflow.edges.filter(e => e.id !== edgeId) });
@@ -246,31 +269,8 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         return { x, y };
     }, []);
 
-    const startDragConnection = useCallback((nodeId: string, port: EdgePort) => {
-        const node = workflow.nodes.find(n => n.id === nodeId);
-        if (!node) return;
-        const start = getOutputPortPosition(node, port);
-        setDraggingConnection({ sourceNodeId: nodeId, port, start, end: start });
-    }, [workflow.nodes, getOutputPortPosition]);
-
-    const updateDragConnection = useCallback((pageX: number, pageY: number) => {
-        setDraggingConnection(prev => {
-            if (!prev) return null;
-            const end = pageToCanvas(pageX, pageY);
-            return { ...prev, end };
-        });
-    }, [pageToCanvas]);
-
-    const endDragConnection = useCallback((sourceId: string, sourcePort: EdgePort, pageX: number, pageY: number, didMove: boolean) => {
-        if (!didMove) {
-            setDraggingConnection(null);
-            setConnectingFrom({ nodeId: sourceId, port: sourcePort });
-            return;
-        }
-
-        const end = pageToCanvas(pageX, pageY);
+    const findClosestInputNode = useCallback((sourceId: string, end: { x: number; y: number }) => {
         const candidates = workflow.nodes.filter(n => n.id !== sourceId);
-
         let best: { id: string; dist: number } | null = null;
         for (const node of candidates) {
             const meta = NODE_REGISTRY[node.type] || { hasInputPort: true };
@@ -283,9 +283,69 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 best = { id: node.id, dist };
             }
         }
+        return best;
+    }, [workflow.nodes, getInputPortPosition]);
+
+    const startDragConnection = useCallback((nodeId: string, port: EdgePort) => {
+        const node = workflow.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        const start = getOutputPortPosition(node, port);
+        setDraggingConnection({
+            sourceNodeId: nodeId,
+            port,
+            start,
+            end: start,
+            hoverTargetNodeId: null,
+            isCompatible: true,
+            mismatchReason: undefined,
+        });
+    }, [workflow.nodes, getOutputPortPosition]);
+
+    const updateDragConnection = useCallback((pageX: number, pageY: number) => {
+        setDraggingConnection(prev => {
+            if (!prev) return null;
+            const end = pageToCanvas(pageX, pageY);
+            const best = findClosestInputNode(prev.sourceNodeId, end);
+            if (!best) {
+                return {
+                    ...prev,
+                    end,
+                    hoverTargetNodeId: null,
+                    isCompatible: true,
+                    mismatchReason: undefined,
+                };
+            }
+            const compatibility = checkConnectionCompatibility(prev.sourceNodeId, best.id, prev.port);
+            return {
+                ...prev,
+                end,
+                hoverTargetNodeId: best.id,
+                isCompatible: compatibility.compatible,
+                mismatchReason: compatibility.reason,
+            };
+        });
+    }, [pageToCanvas, findClosestInputNode, checkConnectionCompatibility]);
+
+    const endDragConnection = useCallback((sourceId: string, sourcePort: EdgePort, pageX: number, pageY: number, didMove: boolean) => {
+        if (!didMove) {
+            setDraggingConnection(null);
+            setConnectingFrom({ nodeId: sourceId, port: sourcePort });
+            return;
+        }
+
+        const end = pageToCanvas(pageX, pageY);
+        const best = findClosestInputNode(sourceId, end);
 
         if (best) {
-            addEdge(sourceId, best.id, sourcePort);
+            const compatibility = checkConnectionCompatibility(sourceId, best.id, sourcePort);
+            if (compatibility.compatible) {
+                addEdge(sourceId, best.id, sourcePort);
+            } else {
+                Alert.alert(
+                    'Uyumsuz baglanti',
+                    `Bu baglanti kurulamadi.\n${compatibility.reason || ''}`
+                );
+            }
         } else if (onQuickAddRequested) {
             const snappedX = Math.round(end.x / GRID_SIZE) * GRID_SIZE;
             const snappedY = Math.round(end.y / GRID_SIZE) * GRID_SIZE;
@@ -297,7 +357,7 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         }
 
         setDraggingConnection(null);
-    }, [workflow.nodes, pageToCanvas, getInputPortPosition, addEdge, onQuickAddRequested]);
+    }, [pageToCanvas, findClosestInputNode, checkConnectionCompatibility, addEdge, onQuickAddRequested]);
 
     const handleQuickAddPress = useCallback((e: any) => {
         if (!connectingFrom || !onQuickAddRequested) return;
@@ -436,6 +496,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                     </View>
                 )}
 
+                {draggingConnection?.isCompatible === false && (
+                    <View style={[styles.connectionIndicator, styles.connectionErrorIndicator]}>
+                        <Text style={styles.connectionText}>
+                            Uyumsuz baglanti: {draggingConnection.mismatchReason || 'Veri tipi uyusmuyor'}
+                        </Text>
+                    </View>
+                )}
+
                 {/* Paste Button */}
                 <TouchableOpacity
                     style={[styles.pasteButton, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -489,6 +557,9 @@ interface EdgeLinesProps {
         port: EdgePort;
         start: { x: number; y: number };
         end: { x: number; y: number };
+        hoverTargetNodeId?: string | null;
+        isCompatible?: boolean;
+        mismatchReason?: string;
     } | null;
     isDark?: boolean;
 }
@@ -588,7 +659,9 @@ const EdgeLines: React.FC<EdgeLinesProps> = ({ edges, nodes, onDeleteEdge, dragg
                     return (
                         <Path
                             d={d}
-                            stroke={isDark ? "#34D399" : "#10B981"}
+                            stroke={draggingConnection.isCompatible === false
+                                ? (isDark ? '#F87171' : '#EF4444')
+                                : (isDark ? "#34D399" : "#10B981")}
                             strokeWidth="3"
                             fill="none"
                         />
@@ -948,6 +1021,10 @@ const styles = StyleSheet.create({
         shadowColor: '#000',
         elevation: 5,
         zIndex: 50, // Below ports (200) but above other UI
+    },
+    connectionErrorIndicator: {
+        backgroundColor: '#7F1D1D',
+        bottom: 140,
     },
     connectionText: {
         color: '#FFF',
