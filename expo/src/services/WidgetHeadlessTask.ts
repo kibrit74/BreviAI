@@ -59,7 +59,7 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
 
         // PRIORITY 1: Use trigger variables passed directly from native layer (via Intent extras)
         // This is the fastest path - native sends _triggerType directly in the task data
-        let initialVariables: Record<string, any> = {};
+        let initialVariables: Record<string, any> = { _isHeadless: true };
 
         if (data._triggerType) {
             initialVariables._triggerType = data._triggerType;

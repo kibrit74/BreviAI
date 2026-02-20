@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -11,29 +11,61 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
 import { WidgetService } from '../services/WidgetService';
-import { WidgetButton, DEFAULT_WIDGET_CONFIG } from '../types/widget';
+import {
+    WidgetButton,
+    WidgetSize,
+    WIDGET_LAYOUTS,
+    DEFAULT_WIDGET_CONFIG,
+    normalizeWidgetButtons,
+    createDefaultButtonsForSize,
+} from '../types/widget';
 import { SavedShortcut } from '../services/ShortcutStorage';
 import { WorkflowStorage } from '../services/WorkflowStorage';
 import ShortcutPickerModal from '../components/ui/ShortcutPickerModal';
-
-// Import native module properly
-let BreviSettings: any = null;
-try {
-    BreviSettings = require('brevi-settings');
-} catch (e) {
-    console.log('BreviSettings not available for WidgetConfigScreen');
-}
 
 interface WidgetButtonConfig extends WidgetButton {
     assignedShortcut?: SavedShortcut | null;
 }
 
+interface WidgetConfigRouteParams {
+    widgetId?: string;
+}
+
+const SIZE_OPTIONS: Array<{ value: WidgetSize; title: string; subtitle: string }> = [
+    { value: '2x2', title: '2x2', subtitle: '4 tus' },
+    { value: '2x3', title: '2x3', subtitle: '6 tus' },
+    { value: '4x2', title: '4x2', subtitle: '8 tus' },
+];
+
+function mapWorkflowToSavedShortcut(workflow: any): SavedShortcut {
+    return {
+        id: workflow.id,
+        name: workflow.name,
+        prompt: workflow.description || '',
+        steps: [],
+        createdAt: workflow.createdAt,
+        lastUsed: new Date().toISOString(),
+        usageCount: 0,
+        isFavorite: false,
+        icon: workflow.icon,
+        color: workflow.color,
+    } as SavedShortcut;
+}
+
 export default function WidgetConfigScreen({ navigation }: any) {
     const { colors, t } = useApp();
+    const route = useRoute();
+    const routeParams = (route.params || {}) as WidgetConfigRouteParams;
+    const requestedWidgetId = typeof routeParams.widgetId === 'string' ? routeParams.widgetId : undefined;
+
     const [buttons, setButtons] = useState<WidgetButtonConfig[]>([]);
+    const [widgetSize, setWidgetSize] = useState<WidgetSize>('2x3');
+    const [widgetName, setWidgetName] = useState('BreviAI Widget');
+    const [currentWidgetId, setCurrentWidgetId] = useState(requestedWidgetId || 'default_widget');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedButtonIndex, setSelectedButtonIndex] = useState<number | null>(null);
@@ -43,7 +75,7 @@ export default function WidgetConfigScreen({ navigation }: any) {
     useFocusEffect(
         useCallback(() => {
             loadWidgetConfig();
-        }, [])
+        }, [requestedWidgetId])
     );
 
     const loadWidgetConfig = async () => {
@@ -51,45 +83,63 @@ export default function WidgetConfigScreen({ navigation }: any) {
         try {
             const widgetService = WidgetService.getInstance();
             const prefs = await widgetService.getWidgetPreferences();
+            const resolvedWidgetId = requestedWidgetId || prefs.defaultWidgetId || 'default_widget';
 
-            // Get default widget or create one
-            let config = prefs.defaultWidgetId
-                ? prefs.widgets[prefs.defaultWidgetId]
-                : null;
+            const directConfig = prefs.widgets[resolvedWidgetId];
+            const fallbackConfig = prefs.defaultWidgetId ? prefs.widgets[prefs.defaultWidgetId] : null;
+            const config = directConfig || fallbackConfig || null;
+            const size = (config?.size || DEFAULT_WIDGET_CONFIG.size) as WidgetSize;
 
-            // Use default buttons if no config exists
-            const configButtons = config?.buttons || DEFAULT_WIDGET_CONFIG.buttons;
-
-            // Load workflow details for each button (from WorkflowStorage, not ShortcutStorage)
             const workflows = await WorkflowStorage.getAll();
-            const buttonsWithShortcuts: WidgetButtonConfig[] = configButtons.map(btn => {
-                const assignedWorkflow = btn.shortcutId
-                    ? workflows.find(w => w.id === btn.shortcutId) || null
-                    : null;
-                // Map workflow to SavedShortcut interface for compatibility
-                const assignedShortcut = assignedWorkflow ? {
-                    id: assignedWorkflow.id,
-                    name: assignedWorkflow.name,
-                    prompt: assignedWorkflow.description || '',
-                    steps: [],
-                    createdAt: assignedWorkflow.createdAt,
-                    lastUsed: new Date().toISOString(),
-                    usageCount: 0,
-                    isFavorite: false,
-                    icon: (assignedWorkflow as any).icon,
-                    color: (assignedWorkflow as any).color
-                } as SavedShortcut : null;
-                return { ...btn, assignedShortcut };
+            const workflowsById = new Map(workflows.map((w: any) => [w.id, w]));
+
+            const normalizedButtons = normalizeWidgetButtons(config?.buttons, size);
+            const hydratedButtons: WidgetButtonConfig[] = normalizedButtons.map((button) => {
+                const assignedWorkflow = button.shortcutId ? workflowsById.get(button.shortcutId) : null;
+                const assignedShortcut = assignedWorkflow ? mapWorkflowToSavedShortcut(assignedWorkflow) : null;
+
+                return {
+                    ...button,
+                    assignedShortcut,
+                };
             });
 
-            setButtons(buttonsWithShortcuts);
+            setCurrentWidgetId(resolvedWidgetId);
+            setWidgetName(config?.name || 'BreviAI Widget');
+            setWidgetSize(size);
+            setButtons(hydratedButtons);
+            setHasChanges(false);
         } catch (error) {
             console.error('Error loading widget config:', error);
-            // Fallback to default
-            setButtons(DEFAULT_WIDGET_CONFIG.buttons.map(btn => ({ ...btn, assignedShortcut: null })));
+            const fallbackSize: WidgetSize = '2x3';
+            setWidgetSize(fallbackSize);
+            setButtons(createDefaultButtonsForSize(fallbackSize).map((btn) => ({ ...btn, assignedShortcut: null })));
         } finally {
             setLoading(false);
         }
+    };
+
+    const resizeButtons = (nextSize: WidgetSize) => {
+        const existing = buttons.map(({ assignedShortcut, ...btn }) => ({
+            ...btn,
+            shortcutId: assignedShortcut?.id || btn.shortcutId,
+            action: assignedShortcut ? { type: 'workflow' as const, payload: { shortcutId: assignedShortcut.id } } : btn.action,
+        }));
+
+        const normalized = normalizeWidgetButtons(existing, nextSize);
+        const previousById = new Map(buttons.map((btn) => [btn.id, btn]));
+
+        return normalized.map((button) => ({
+            ...button,
+            assignedShortcut: previousById.get(button.id)?.assignedShortcut || null,
+        }));
+    };
+
+    const handleSizeChange = (nextSize: WidgetSize) => {
+        if (nextSize === widgetSize) return;
+        setWidgetSize(nextSize);
+        setButtons(resizeButtons(nextSize));
+        setHasChanges(true);
     };
 
     const handleButtonPress = (index: number) => {
@@ -111,9 +161,8 @@ export default function WidgetConfigScreen({ navigation }: any) {
             label: shortcut.name,
             assignedShortcut: shortcut,
             action: { type: 'workflow', payload: { shortcutId: shortcut.id } },
-            // Save visual properties
             icon: workflowIcon,
-            color: workflowColor
+            color: workflowColor,
         };
 
         setButtons(updatedButtons);
@@ -123,8 +172,8 @@ export default function WidgetConfigScreen({ navigation }: any) {
     };
 
     const handleClearButton = (index: number) => {
-        const button = buttons[index];
-        const defaultButton = DEFAULT_WIDGET_CONFIG.buttons[index];
+        const defaultButton = createDefaultButtonsForSize(widgetSize)[index];
+        if (!defaultButton) return;
 
         const updatedButtons = [...buttons];
         updatedButtons[index] = {
@@ -140,40 +189,41 @@ export default function WidgetConfigScreen({ navigation }: any) {
         setSaving(true);
         try {
             const widgetService = WidgetService.getInstance();
-            const prefs = await widgetService.getWidgetPreferences();
 
-            // Create or update default widget config
-            const widgetId = prefs.defaultWidgetId || 'default_widget';
+            const normalizedButtons = normalizeWidgetButtons(
+                buttons.map(({ assignedShortcut, ...btn }) => ({
+                    ...btn,
+                    shortcutId: assignedShortcut?.id || undefined,
+                    action: assignedShortcut
+                        ? { type: 'workflow' as const, payload: { shortcutId: assignedShortcut.id } }
+                        : undefined,
+                })),
+                widgetSize
+            );
 
             const configToSave = {
-                id: widgetId,
-                name: 'BreviAI Widget',
-                size: '2x3' as const,
-                // 🔥 FIXED: Pass only the ID string, not the entire object
-                buttons: buttons.map(({ assignedShortcut, ...btn }) => ({
-                    ...btn,
-                    shortcutId: assignedShortcut?.id || undefined, // Pass ID string only!
-                    action: assignedShortcut ? { type: 'workflow' as const, payload: { shortcutId: assignedShortcut.id } } : undefined,
-                })),
+                id: currentWidgetId,
+                name: widgetName,
+                size: widgetSize,
+                buttons: normalizedButtons,
                 appearance: DEFAULT_WIDGET_CONFIG.appearance,
             };
 
-            // Save to AsyncStorage via WidgetService
-            // Save to AsyncStorage via WidgetService
             await widgetService.updateWidgetConfig({
-                widgetId,
+                widgetId: currentWidgetId,
                 config: configToSave,
                 forceUpdate: true,
             });
 
+            if (!requestedWidgetId) {
+                await widgetService.setDefaultWidget(currentWidgetId);
+            }
+
             setHasChanges(false);
-            Alert.alert(
-                t('success') || 'Başarılı',
-                'Widget konfigürasyonu kaydedildi. Widget\'ı güncellemek için ana ekrana gidin.'
-            );
+            Alert.alert(t('success') || 'Basarili', 'Widget ayarlari kaydedildi.');
         } catch (error: any) {
             console.error('Error saving widget config:', error);
-            Alert.alert(t('error') || 'Hata', 'Konfigürasyon kaydedilemedi: ' + (error.message || String(error)));
+            Alert.alert(t('error') || 'Hata', 'Kaydedilemedi: ' + (error?.message || String(error)));
         } finally {
             setSaving(false);
         }
@@ -181,8 +231,8 @@ export default function WidgetConfigScreen({ navigation }: any) {
 
     const getButtonIcon = (button: WidgetButtonConfig): string => {
         if (button.icon) return button.icon;
-        if (button.assignedShortcut) return '⚡';
-        return '➕';
+        if (button.assignedShortcut) return 'AI';
+        return '+';
     };
 
     const renderButton = (button: WidgetButtonConfig, index: number) => {
@@ -191,22 +241,20 @@ export default function WidgetConfigScreen({ navigation }: any) {
 
         return (
             <TouchableOpacity
-                key={button.id}
+                key={`${button.id}-${index}`}
                 style={[
                     styles.widgetButton,
                     {
-                        backgroundColor: hasShortcut ? buttonColor + '15' : colors.card,
-                        borderColor: hasShortcut ? buttonColor : colors.border,
-                    }
+                        backgroundColor: hasShortcut ? `${buttonColor}1A` : '#101827',
+                        borderColor: hasShortcut ? buttonColor : '#243447',
+                    },
                 ]}
                 onPress={() => handleButtonPress(index)}
                 onLongPress={() => hasShortcut && handleClearButton(index)}
+                activeOpacity={0.85}
             >
                 <Text style={styles.buttonIcon}>{getButtonIcon(button)}</Text>
-                <Text
-                    style={[styles.buttonLabel, { color: colors.text }]}
-                    numberOfLines={2}
-                >
+                <Text style={styles.buttonLabel} numberOfLines={2}>
                     {button.label}
                 </Text>
                 {hasShortcut && (
@@ -218,9 +266,29 @@ export default function WidgetConfigScreen({ navigation }: any) {
         );
     };
 
+    const renderPreviewGrid = () => {
+        const layout = WIDGET_LAYOUTS[widgetSize];
+        const rows: WidgetButtonConfig[][] = [];
+
+        for (let rowIndex = 0; rowIndex < layout.rows; rowIndex++) {
+            const start = rowIndex * layout.columns;
+            rows.push(buttons.slice(start, start + layout.columns));
+        }
+
+        return (
+            <View style={styles.buttonGrid}>
+                {rows.map((row, rowIndex) => (
+                    <View style={styles.buttonRow} key={`row-${rowIndex}`}>
+                        {row.map((button, colIndex) => renderButton(button, rowIndex * layout.columns + colIndex))}
+                    </View>
+                ))}
+            </View>
+        );
+    };
+
     if (loading) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <SafeAreaView style={[styles.container, { backgroundColor: '#050B16' }]}>
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={colors.primary} />
                 </View>
@@ -229,95 +297,104 @@ export default function WidgetConfigScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>
-                    Widget Ayarları
-                </Text>
-                <View style={{ width: 40 }} />
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                {/* Instructions */}
-                <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Ionicons name="information-circle" size={20} color={colors.primary} />
-                    <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                        Butona dokunarak otomasyon atayın. Silmek için uzun basın.
-                    </Text>
+        <SafeAreaView style={[styles.container, { backgroundColor: '#050B16' }]}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <View style={styles.headerRow}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={22} color="#E6EEF8" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Widget Studio</Text>
+                    <View style={styles.headerSpacer} />
                 </View>
 
-                {/* Widget Preview */}
-                <View style={[styles.widgetPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={[styles.previewTitle, { color: colors.textSecondary }]}>
-                        Widget Önizleme
-                    </Text>
+                <LinearGradient
+                    colors={['#0EA5E9', '#2563EB', '#7C3AED']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.heroCard}
+                >
+                    <Text style={styles.heroTitle}>{widgetName}</Text>
+                    <Text style={styles.heroSubtitle}>Widget ID: {currentWidgetId}</Text>
+                    <Text style={styles.heroHint}>Kisa dokun: ata - Uzun dokun: temizle</Text>
+                </LinearGradient>
 
-                    <View style={styles.buttonGrid}>
-                        {/* Row 1 */}
-                        <View style={styles.buttonRow}>
-                            {buttons.slice(0, 3).map((btn, idx) => renderButton(btn, idx))}
-                        </View>
-                        {/* Row 2 */}
-                        <View style={styles.buttonRow}>
-                            {buttons.slice(3, 6).map((btn, idx) => renderButton(btn, idx + 3))}
-                        </View>
-                    </View>
+                <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Boyut</Text>
+                    <Text style={styles.sectionSubtitle}>Aktif: {widgetSize}</Text>
                 </View>
 
-                {/* Button List */}
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                    Buton Detayları
-                </Text>
+                <View style={styles.sizeSelectorRow}>
+                    {SIZE_OPTIONS.map((option) => {
+                        const isActive = option.value === widgetSize;
+                        return (
+                            <TouchableOpacity
+                                key={option.value}
+                                style={[styles.sizeChip, isActive && styles.sizeChipActive]}
+                                onPress={() => handleSizeChange(option.value)}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.sizeChipTitle, isActive && styles.sizeChipTitleActive]}>{option.title}</Text>
+                                <Text style={[styles.sizeChipSubtitle, isActive && styles.sizeChipSubtitleActive]}>{option.subtitle}</Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
 
-                {buttons.map((button, index) => (
-                    <View
-                        key={button.id}
-                        style={[styles.buttonDetail, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    >
-                        <Text style={styles.detailIcon}>{getButtonIcon(button)}</Text>
-                        <View style={styles.detailContent}>
-                            <Text style={[styles.detailLabel, { color: colors.text }]}>
-                                Buton {index + 1}
-                            </Text>
-                            <Text style={[styles.detailValue, { color: colors.textSecondary }]}>
-                                {button.assignedShortcut ? button.label : 'Varsayılan: ' + button.label}
-                            </Text>
+                <View style={styles.previewCard}>
+                    <View style={styles.previewHeader}>
+                        <Text style={styles.previewTitle}>Canli Onizleme</Text>
+                        <View style={styles.previewBadge}>
+                            <Text style={styles.previewBadgeText}>{WIDGET_LAYOUTS[widgetSize].buttonCount} tus</Text>
                         </View>
-                        <TouchableOpacity
-                            style={[styles.editButton, { backgroundColor: colors.primary + '20' }]}
-                            onPress={() => handleButtonPress(index)}
-                        >
-                            <Ionicons name="pencil" size={16} color={colors.primary} />
-                        </TouchableOpacity>
                     </View>
-                ))}
+                    {renderPreviewGrid()}
+                </View>
+
+                <Text style={styles.sectionTitle}>Tus Atamalari</Text>
+
+                {buttons.map((button, index) => {
+                    const hasShortcut = !!button.assignedShortcut;
+                    return (
+                        <View key={`${button.id}-detail`} style={styles.buttonDetail}>
+                            <View style={styles.detailIconWrap}>
+                                <Text style={styles.detailIcon}>{getButtonIcon(button)}</Text>
+                            </View>
+                            <View style={styles.detailContent}>
+                                <Text style={styles.detailLabel}>Tus {index + 1}</Text>
+                                <Text style={styles.detailValue} numberOfLines={1}>
+                                    {hasShortcut ? button.label : 'Atama yok'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity style={styles.detailActionBtn} onPress={() => handleButtonPress(index)}>
+                                <Ionicons name="pencil" size={15} color="#D5E6FF" />
+                            </TouchableOpacity>
+                        </View>
+                    );
+                })}
             </ScrollView>
 
-            {/* Save Button */}
             {hasChanges && (
-                <View style={[styles.saveContainer, { backgroundColor: colors.background }]}>
-                    <TouchableOpacity
-                        style={[styles.saveButton, { backgroundColor: colors.primary }]}
-                        onPress={saveWidgetConfig}
-                        disabled={saving}
-                    >
-                        {saving ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                            <>
-                                <Ionicons name="save" size={20} color="#fff" />
-                                <Text style={styles.saveButtonText}>Kaydet</Text>
-                            </>
-                        )}
+                <View style={styles.saveContainer}>
+                    <TouchableOpacity onPress={saveWidgetConfig} disabled={saving} activeOpacity={0.85}>
+                        <LinearGradient
+                            colors={saving ? ['#334155', '#334155'] : ['#06B6D4', '#2563EB']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.saveButton}
+                        >
+                            {saving ? (
+                                <ActivityIndicator size="small" color="#fff" />
+                            ) : (
+                                <>
+                                    <Ionicons name="save" size={18} color="#fff" />
+                                    <Text style={styles.saveButtonText}>Kaydet</Text>
+                                </>
+                            )}
+                        </LinearGradient>
                     </TouchableOpacity>
                 </View>
             )}
 
-            {/* Shortcut Picker Modal */}
             <ShortcutPickerModal
                 visible={pickerVisible}
                 onSelect={handleShortcutSelect}
@@ -326,9 +403,7 @@ export default function WidgetConfigScreen({ navigation }: any) {
                     setSelectedButtonIndex(null);
                 }}
                 currentShortcutId={
-                    selectedButtonIndex !== null
-                        ? buttons[selectedButtonIndex]?.shortcutId
-                        : undefined
+                    selectedButtonIndex !== null ? buttons[selectedButtonIndex]?.shortcutId : undefined
                 }
             />
         </SafeAreaView>
@@ -344,60 +419,156 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    header: {
+    scrollContent: {
+        padding: 16,
+        paddingBottom: 120,
+    },
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 16,
-        paddingTop: 8,
+        marginBottom: 12,
     },
     backButton: {
-        padding: 8,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#101B2E',
+        borderWidth: 1,
+        borderColor: '#25354A',
     },
     headerTitle: {
+        color: '#E8EEF8',
         fontSize: 18,
-        fontWeight: '600',
+        fontWeight: '700',
+        letterSpacing: 0.4,
     },
-    scrollContent: {
+    headerSpacer: {
+        width: 36,
+    },
+    heroCard: {
+        borderRadius: 18,
         padding: 16,
-        paddingBottom: 100,
+        marginBottom: 16,
+        ...Platform.select({
+            android: { elevation: 6 },
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.25,
+                shadowRadius: 14,
+            },
+        }),
     },
-    infoCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 14,
-        borderRadius: 12,
-        borderWidth: 1,
-        marginBottom: 20,
-        gap: 10,
+    heroTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '700',
     },
-    infoText: {
-        flex: 1,
-        fontSize: 13,
+    heroSubtitle: {
+        color: '#E6F2FF',
+        fontSize: 12,
+        marginTop: 6,
     },
-    widgetPreview: {
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        marginBottom: 24,
-    },
-    previewTitle: {
+    heroHint: {
+        color: '#F3F8FF',
+        marginTop: 10,
         fontSize: 12,
         fontWeight: '500',
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    sectionTitle: {
+        color: '#E8EEF8',
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 10,
+    },
+    sectionSubtitle: {
+        color: '#A7BBD8',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    sizeSelectorRow: {
+        flexDirection: 'row',
+        gap: 10,
+        marginBottom: 16,
+    },
+    sizeChip: {
+        flex: 1,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2A3D57',
+        backgroundColor: '#101827',
+        paddingVertical: 10,
+        alignItems: 'center',
+    },
+    sizeChipActive: {
+        borderColor: '#60A5FA',
+        backgroundColor: '#172B44',
+    },
+    sizeChipTitle: {
+        color: '#D2DCE8',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    sizeChipTitleActive: {
+        color: '#FFFFFF',
+    },
+    sizeChipSubtitle: {
+        color: '#8FA3BC',
+        fontSize: 11,
+        marginTop: 2,
+    },
+    sizeChipSubtitleActive: {
+        color: '#CFE4FF',
+    },
+    previewCard: {
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#2A3D57',
+        backgroundColor: '#0C1626',
+        padding: 14,
+        marginBottom: 18,
+    },
+    previewHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         marginBottom: 12,
-        textAlign: 'center',
+    },
+    previewTitle: {
+        color: '#DDE9F8',
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    previewBadge: {
+        borderRadius: 999,
+        backgroundColor: '#1D3758',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    previewBadgeText: {
+        color: '#BBD7FF',
+        fontSize: 10,
+        fontWeight: '600',
     },
     buttonGrid: {
         gap: 8,
     },
     buttonRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         gap: 8,
     },
     widgetButton: {
         flex: 1,
-        aspectRatio: 1,
+        minHeight: 74,
         borderRadius: 12,
         borderWidth: 1,
         justifyContent: 'center',
@@ -406,13 +577,16 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     buttonIcon: {
-        fontSize: 24,
-        marginBottom: 4,
+        color: '#F2F7FF',
+        fontSize: 18,
+        fontWeight: '700',
+        marginBottom: 5,
     },
     buttonLabel: {
+        color: '#E4EDF8',
         fontSize: 11,
         textAlign: 'center',
-        fontWeight: '500',
+        fontWeight: '600',
     },
     assignedBadge: {
         position: 'absolute',
@@ -424,37 +598,52 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    sectionTitle: {
-        fontSize: 16,
-        fontWeight: '600',
-        marginBottom: 12,
-    },
     buttonDetail: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 14,
         borderRadius: 12,
         borderWidth: 1,
-        marginBottom: 10,
+        borderColor: '#2A3D57',
+        backgroundColor: '#0D1829',
+        padding: 12,
+        marginBottom: 9,
+    },
+    detailIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        backgroundColor: '#1A2C45',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
     },
     detailIcon: {
-        fontSize: 24,
-        marginRight: 12,
+        color: '#EFF6FF',
+        fontSize: 14,
+        fontWeight: '700',
     },
     detailContent: {
         flex: 1,
     },
     detailLabel: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 2,
+        color: '#E6EEF8',
+        fontSize: 13,
+        fontWeight: '600',
     },
     detailValue: {
-        fontSize: 13,
+        color: '#9EB3CC',
+        fontSize: 12,
+        marginTop: 2,
     },
-    editButton: {
-        padding: 8,
-        borderRadius: 8,
+    detailActionBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: '#315075',
+        backgroundColor: '#172840',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     saveContainer: {
         position: 'absolute',
@@ -462,19 +651,20 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: 16,
-        paddingBottom: 32,
+        paddingBottom: 28,
+        backgroundColor: 'rgba(5, 11, 22, 0.96)',
     },
     saveButton: {
+        height: 52,
+        borderRadius: 14,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 16,
-        borderRadius: 12,
         gap: 8,
     },
     saveButtonText: {
         color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
+        fontSize: 15,
+        fontWeight: '700',
     },
 });

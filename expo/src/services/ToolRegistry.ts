@@ -203,12 +203,13 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'send_whatsapp',
-        description: 'Sends a WhatsApp message to a specific phone number.',
+        description: 'Sends a WhatsApp message to a specific phone number. Optional mode can be set to backend, direct, or cloud_api.',
         parameters: {
             type: 'OBJECT',
             properties: {
                 phoneNumber: { type: 'STRING', description: 'Recipient phone number (e.g., 905551234567)' },
-                message: { type: 'STRING', description: 'Message content' }
+                message: { type: 'STRING', description: 'Message content' },
+                mode: { type: 'STRING', description: 'Optional send mode: "backend" (default), "direct", or "cloud_api". Use "direct" if backend session is not ready.' }
             },
             required: ['phoneNumber', 'message']
         },

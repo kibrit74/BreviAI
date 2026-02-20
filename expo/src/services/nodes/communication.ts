@@ -18,6 +18,24 @@ import { apiService } from '../ApiService';
 import { interactionService } from '../InteractionService';
 
 const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
+const WHATSAPP_CONNECT_USER_STORAGE_KEY = 'whatsapp_connect_user_id';
+
+function extractPhoneFromText(raw: string): string {
+    const text = String(raw || '');
+    if (!text) return '';
+
+    const match = text.match(/(?:\+?\d[\d\s()\-]{8,}\d)/);
+    if (!match) return '';
+
+    let digits = match[0].replace(/[^\d]/g, '');
+    if (digits.startsWith('0') && digits.length === 11) {
+        digits = '90' + digits.substring(1);
+    }
+    if (digits.length === 10 && digits.startsWith('5')) {
+        digits = '90' + digits;
+    }
+    return digits.length >= 10 ? digits : '';
+}
 
 function generateSessionId(): string {
     return `device_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -41,6 +59,172 @@ async function getOrCreateWhatsAppSessionId(explicitSessionId?: string): Promise
         // best effort
     }
     return created;
+}
+
+function normalizeWhatsAppBackendUrl(rawUrl: string): string {
+    const trimmed = String(rawUrl || '').trim().replace(/\/+$/, '');
+    if (!trimmed) return '';
+    if (trimmed.endsWith('/whatsapp')) return trimmed;
+    return `${trimmed}/whatsapp`;
+}
+
+function extractSessionStatusFromError(errorText: string): string {
+    const raw = String(errorText || '');
+    const match = raw.match(/status:\s*([a-z_]+)/i);
+    return (match?.[1] || '').toLowerCase();
+}
+
+function getSessionNotReadyHint(sessionStatus: string): string {
+    switch ((sessionStatus || '').toLowerCase()) {
+        case 'qr_pending':
+            return 'WhatsApp bagli degil. Ayarlar > WhatsApp ekranindan QR kodu taratin.';
+        case 'initializing':
+        case 'loading':
+        case 'authenticated':
+            return 'WhatsApp oturumu baslatiliyor. Biraz bekleyip tekrar deneyin.';
+        case 'disconnected':
+            return 'WhatsApp baglantisi koptu. Ayarlar > WhatsApp ekranindan yeniden baglanin.';
+        case 'auth_failed':
+            return 'WhatsApp kimlik dogrulamasi basarisiz. Oturumu temizleyip QR ile yeniden baglanin.';
+        default:
+            return 'WhatsApp oturumu hazir degil. Ayarlar > WhatsApp ekranindan durumu kontrol edin.';
+    }
+}
+
+async function readJsonSafely(response: Response): Promise<any> {
+    const text = await response.text();
+    if (!text) return {};
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { raw: text };
+    }
+}
+
+async function getStoredWhatsAppConnectUserId(): Promise<string> {
+    try {
+        return (await AsyncStorage.getItem(WHATSAPP_CONNECT_USER_STORAGE_KEY))?.trim() || '';
+    } catch {
+        return '';
+    }
+}
+
+async function fetchWhatsAppSessionStatus(
+    whatsappBackendUrl: string,
+    authKey: string,
+    sessionId: string
+): Promise<any | null> {
+    if (!whatsappBackendUrl || !authKey || !sessionId) return null;
+
+    try {
+        const response = await fetch(`${whatsappBackendUrl}/status?sessionId=${encodeURIComponent(sessionId)}`, {
+            method: 'GET',
+            headers: {
+                'x-auth-key': authKey,
+                'x-session-id': sessionId,
+                'Bypass-Tunnel-Reminder': 'true',
+                'ngrok-skip-browser-warning': 'true',
+            },
+        });
+
+        const data = await readJsonSafely(response);
+        if (!response.ok || data?.error) return null;
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+async function fetchWhatsAppConnectInfo(
+    whatsappBackendUrl: string,
+    authKey: string
+): Promise<{ connectUrl?: string; statusUrl?: string; sessionId?: string } | null> {
+    const userId = await getStoredWhatsAppConnectUserId();
+    if (!userId) return null;
+
+    try {
+        const response = await fetch(`${whatsappBackendUrl}/connect/start`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-auth-key': authKey,
+                'Bypass-Tunnel-Reminder': 'true',
+                'ngrok-skip-browser-warning': 'true',
+            },
+            body: JSON.stringify({ userId }),
+        });
+
+        const data = await readJsonSafely(response);
+        if (!response.ok || data?.error) return null;
+
+        return {
+            connectUrl: String(data?.connectUrl || '').trim() || undefined,
+            statusUrl: String(data?.statusUrl || '').trim() || undefined,
+            sessionId: String(data?.sessionId || '').trim() || undefined,
+        };
+    } catch {
+        return null;
+    }
+}
+
+async function resolveCanonicalWhatsAppSessionId(
+    whatsappBackendUrl: string,
+    authKey: string,
+    localSessionId: string
+): Promise<string> {
+    const localId = String(localSessionId || '').trim();
+    const connectInfo = await fetchWhatsAppConnectInfo(whatsappBackendUrl, authKey);
+    const canonicalId = String(connectInfo?.sessionId || '').trim();
+
+    if (!canonicalId || canonicalId === localId) return localId;
+
+    try {
+        await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, canonicalId);
+    } catch {
+        // best effort
+    }
+
+    console.log('[WHATSAPP Backend] Canonical sessionId override:', localId, '->', canonicalId);
+    return canonicalId;
+}
+
+async function findReadyWhatsAppSessionId(
+    whatsappBackendUrl: string,
+    authKey: string
+): Promise<string | null> {
+    try {
+        const response = await fetch(`${whatsappBackendUrl}/sessions`, {
+            method: 'GET',
+            headers: {
+                'x-auth-key': authKey,
+                'Bypass-Tunnel-Reminder': 'true',
+                'ngrok-skip-browser-warning': 'true',
+            },
+        });
+
+        const data = await readJsonSafely(response);
+        if (!response.ok || data?.error) return null;
+
+        const sessions = Array.isArray(data?.sessions) ? data.sessions : [];
+        const readySessions = sessions.filter((s: any) => !!s?.ready && String(s?.status || '').toLowerCase() === 'ready');
+        if (readySessions.length === 0) return null;
+
+        const connectUserId = await getStoredWhatsAppConnectUserId();
+        if (connectUserId) {
+            const userMatched = readySessions.find((s: any) => String(s?.userId || '').trim() === connectUserId);
+            if (userMatched?.sessionId) return String(userMatched.sessionId);
+        }
+
+        readySessions.sort((a: any, b: any) => Number(b?.updatedAt || 0) - Number(a?.updatedAt || 0));
+        const best = readySessions[0];
+        return best?.sessionId ? String(best.sessionId) : null;
+    } catch {
+        return null;
+    }
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function resolvePhoneFromContactsByName(rawName: string): Promise<string | null> {
@@ -204,7 +388,7 @@ export async function executeWhatsAppSend(
     config: WhatsAppSendConfig,
     variableManager: VariableManager
 ): Promise<any> {
-    const phoneNumber = variableManager.resolveString(config.phoneNumber);
+    let phoneNumber = variableManager.resolveString(config.phoneNumber);
     const message = variableManager.resolveString(config.message);
     const mode = config.mode || 'backend';
 
@@ -323,11 +507,25 @@ export async function executeWhatsAppSend(
             }
             backendUrl = variableManager.resolveString(backendUrl);
             authKey = variableManager.resolveString(authKey);
+            backendUrl = normalizeWhatsAppBackendUrl(backendUrl);
             const explicitSessionId = variableManager.resolveString(config.backendSessionId || '');
-            const sessionId = await getOrCreateWhatsAppSessionId(explicitSessionId);
+            let sessionId = await getOrCreateWhatsAppSessionId(explicitSessionId);
+            sessionId = await resolveCanonicalWhatsAppSessionId(backendUrl, authKey, sessionId);
+            const waInfo = variableManager.get('_whatsappInfo') || variableManager.get('whatsappInfo') || {};
+            const fallbackSenderPhone = String(variableManager.get('_whatsappSenderPhone') || waInfo?.senderPhone || '').trim();
+            const fallbackSender = String(variableManager.get('_whatsappSender') || waInfo?.sender || '').trim();
+            const fallbackTitle = String(variableManager.get('_notificationTitle') || '').trim();
+
+            if (!phoneNumber || !phoneNumber.trim()) {
+                phoneNumber = fallbackSenderPhone || fallbackSender || fallbackTitle || '';
+                console.warn('[WHATSAPP Backend] phoneNumber empty, fallback used:', phoneNumber);
+            }
 
             // Format phone number: remove ALL non-digit characters (handles ÷, +, spaces, etc.)
             let cleanPhone = phoneNumber.replace(/[^\d]/g, '');
+            if (!cleanPhone || cleanPhone.length < 10) {
+                cleanPhone = extractPhoneFromText(`${phoneNumber} ${fallbackSender} ${fallbackTitle}`);
+            }
 
             // Auto-fix Turkish numbers: 0532... -> 90532...
             if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
@@ -340,7 +538,8 @@ export async function executeWhatsAppSend(
 
             // Fallback: WhatsApp notification title can be a contact name (not number).
             if (!cleanPhone || cleanPhone.length < 10) {
-                const resolvedFromContacts = await resolvePhoneFromContactsByName(phoneNumber);
+                const contactCandidate = fallbackSender || fallbackTitle || phoneNumber;
+                const resolvedFromContacts = await resolvePhoneFromContactsByName(contactCandidate);
                 if (resolvedFromContacts) {
                     cleanPhone = resolvedFromContacts;
                     console.log('[WHATSAPP Backend] Resolved phone from contacts:', cleanPhone);
@@ -360,48 +559,119 @@ export async function executeWhatsAppSend(
                 };
             }
 
-            const response = await fetch(`${backendUrl}/send`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-auth-key': authKey,
-                    'x-session-id': sessionId,
-                },
-                body: JSON.stringify({
-                    phone: cleanPhone,
-                    message: message,
-                    sessionId,
-                })
-            });
+            const RETRYABLE_SESSION_STATUSES = new Set(['initializing', 'loading', 'authenticated']);
+            const maxAttempts = 3;
+            let lastFailure: any = null;
 
-            const data = await response.json();
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                const response = await fetch(`${backendUrl}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-key': authKey,
+                        'x-session-id': sessionId,
+                    },
+                    body: JSON.stringify({
+                        phone: cleanPhone,
+                        message: message,
+                        sessionId,
+                    })
+                });
 
-            if (!response.ok || data.error) {
-                console.error('[WHATSAPP Backend] Error:', data);
-                return {
+                const data = await readJsonSafely(response);
+
+                if (response.ok && !data?.error) {
+                    console.log('[WHATSAPP Backend] Message sent:', data);
+
+                    const result = {
+                        success: true,
+                        mode: 'backend',
+                        messageId: data.messageId,
+                        to: data.to,
+                        totalSent: data.totalSent,
+                        sessionId: data.sessionId || sessionId,
+                    };
+
+                    if (config.variableName) {
+                        variableManager.set(config.variableName, result);
+                    }
+
+                    return result;
+                }
+
+                const rawError = String(data?.error || `HTTP ${response.status}`);
+                const statusFromError = extractSessionStatusFromError(rawError);
+                const looksLikeNotReady = /not ready/i.test(rawError) || !!statusFromError;
+
+                if (!looksLikeNotReady) {
+                    lastFailure = {
+                        success: false,
+                        mode: 'backend',
+                        error: rawError,
+                        hint: String(data?.hint || ''),
+                    };
+                    break;
+                }
+
+                const liveStatus = await fetchWhatsAppSessionStatus(backendUrl, authKey, sessionId);
+                const sessionStatus = String(liveStatus?.status || statusFromError || 'unknown').toLowerCase();
+
+                if (RETRYABLE_SESSION_STATUSES.has(sessionStatus) && attempt < maxAttempts) {
+                    const delayMs = attempt * 1500;
+                    console.log(`[WHATSAPP Backend] Session not ready (${sessionStatus}), retrying in ${delayMs}ms...`);
+                    await sleep(delayMs);
+                    continue;
+                }
+
+                if (
+                    (sessionStatus === 'qr_pending' || sessionStatus === 'not_started' || sessionStatus === 'disconnected' || sessionStatus === 'auth_failed' || sessionStatus === 'unknown') &&
+                    attempt < maxAttempts
+                ) {
+                    const readySessionId = await findReadyWhatsAppSessionId(backendUrl, authKey);
+                    if (readySessionId && readySessionId !== sessionId) {
+                        console.log('[WHATSAPP Backend] Switching to ready session:', readySessionId);
+                        sessionId = readySessionId;
+                        try {
+                            await AsyncStorage.setItem(WHATSAPP_SESSION_STORAGE_KEY, sessionId);
+                        } catch {
+                            // best effort
+                        }
+                        continue;
+                    }
+                }
+
+                let connectInfo: { connectUrl?: string; statusUrl?: string; sessionId?: string } | null = null;
+                if (sessionStatus === 'qr_pending' || sessionStatus === 'not_started' || sessionStatus === 'disconnected' || sessionStatus === 'auth_failed') {
+                    connectInfo = await fetchWhatsAppConnectInfo(backendUrl, authKey);
+                }
+
+                lastFailure = {
                     success: false,
                     mode: 'backend',
-                    error: data.error || `HTTP ${response.status}`,
-                    hint: data.hint || ''
+                    code: 'WHATSAPP_SESSION_NOT_READY',
+                    error: rawError,
+                    sessionStatus,
+                    sessionId,
+                    recoverable: true,
+                    recommendedMode: 'direct',
+                    connectUrl: connectInfo?.connectUrl,
+                    statusUrl: connectInfo?.statusUrl,
+                    qrCode: liveStatus?.qrCode,
+                    hint: getSessionNotReadyHint(sessionStatus),
                 };
+                break;
             }
 
-            console.log('[WHATSAPP Backend] Message sent:', data);
+            if (lastFailure) {
+                console.error('[WHATSAPP Backend] Error:', lastFailure);
+                return lastFailure;
+            }
 
-            const result = {
-                success: true,
+            return {
+                success: false,
                 mode: 'backend',
-                messageId: data.messageId,
-                to: data.to,
-                totalSent: data.totalSent,
-                sessionId: data.sessionId || sessionId,
+                error: 'WhatsApp backend send failed',
             };
-
-            if (config.variableName) {
-                variableManager.set(config.variableName, result);
-            }
-
-            return result;
 
         } catch (error) {
             console.error('[WHATSAPP Backend] Error:', error);
@@ -418,6 +688,16 @@ export async function executeWhatsAppSend(
     // MODE: Direct (Accessibility-based automation — existing)
     // ═══════════════════════════════════════════════════════════
     try {
+        if (variableManager.get('_isHeadless')) {
+            return {
+                success: false,
+                mode: 'direct',
+                code: 'WHATSAPP_DIRECT_UNAVAILABLE_HEADLESS',
+                error: 'Direct mode headless calismada kullanilamaz',
+                hint: 'Headless tetikleyicide backend modu kullanin.',
+            };
+        }
+
         let mediaPath = variableManager.resolveString(config.mediaPath || '');
         let finalMessage = message;
 
@@ -457,4 +737,3 @@ export async function executeWhatsAppSend(
         };
     }
 }
-

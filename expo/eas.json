@@ -7,6 +7,9 @@
         "development": {
             "developmentClient": true,
             "distribution": "internal",
+            "env": {
+                "EXPO_NEW_ARCH_ENABLED": "1"
+            },
             "android": {
                 "buildType": "apk",
                 "gradleCommand": ":app:assembleDebug"
@@ -18,12 +21,16 @@
                 "buildType": "apk"
             },
             "env": {
+                "EXPO_NEW_ARCH_ENABLED": "1",
                 "EXPO_PUBLIC_API_URL": "https://breviai.vercel.app",
                 "EXPO_PUBLIC_SUPABASE_URL": "https://inhzwjvhnispiqbjhkpg.supabase.co",
                 "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImluaHp3anZobmlzcGlxYmpoa3BnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2MDk3MTQsImV4cCI6MjA4MzE4NTcxNH0.SaauRA9Tgtubys4vgmVIkiSiepj9pSPP_LNASEphSCc"
             }
         },
         "production": {
+            "env": {
+                "EXPO_NEW_ARCH_ENABLED": "1"
+            },
             "android": {
                 "buildType": "app-bundle"
             }

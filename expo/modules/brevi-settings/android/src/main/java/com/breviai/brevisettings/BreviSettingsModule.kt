@@ -535,7 +535,11 @@ class BreviSettingsModule : Module() {
     AsyncFunction("updateWidget") { widgetId: String, configJson: String, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    promise.reject("CONTEXT_ERROR", "React context is not available")
+                    return@launch
+                }
                 
                 // Save config to SharedPreferences for native widget to read
                 val prefs = context.getSharedPreferences("WidgetConfigs", Context.MODE_PRIVATE)
@@ -570,7 +574,13 @@ class BreviSettingsModule : Module() {
             try {
                 // This should integrate with WorkflowEngine
                 // For now, we'll open the app with the shortcut ID
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    withContext(Dispatchers.Main) {
+                        promise.reject("CONTEXT_ERROR", "React context is not available")
+                    }
+                    return@launch
+                }
                 val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
                 intent?.apply {
                     putExtra("shortcut_id", shortcutId)
@@ -591,7 +601,11 @@ class BreviSettingsModule : Module() {
     AsyncFunction("openBreviAI") { payload: Map<String, Any>, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.Main).launch {
             try {
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    promise.reject("CONTEXT_ERROR", "React context is not available")
+                    return@launch
+                }
                 val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
                 intent?.apply {
                     putExtra("widget_payload", java.util.HashMap(payload))
@@ -609,7 +623,11 @@ class BreviSettingsModule : Module() {
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val mode = action["mode"] as? String
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    promise.reject("CONTEXT_ERROR", "React context is not available")
+                    return@launch
+                }
                 
                 when (mode) {
                     "cinema" -> {
@@ -646,7 +664,13 @@ class BreviSettingsModule : Module() {
     AsyncFunction("getWidgetConfig") { widgetId: String, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    withContext(Dispatchers.Main) {
+                        promise.reject("CONTEXT_ERROR", "React context is not available")
+                    }
+                    return@launch
+                }
                 val prefs = context.getSharedPreferences("WidgetConfigs", Context.MODE_PRIVATE)
                 val configJson = prefs.getString(widgetId, null)
                 promise.resolve(configJson)
@@ -659,7 +683,13 @@ class BreviSettingsModule : Module() {
     AsyncFunction("saveWidgetConfig") { widgetId: String, config: Map<String, Any>, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val context = appContext.reactContext ?: return@launch
+                val context = appContext.reactContext
+                if (context == null) {
+                    withContext(Dispatchers.Main) {
+                        promise.reject("CONTEXT_ERROR", "React context is not available")
+                    }
+                    return@launch
+                }
                 val prefs = context.getSharedPreferences("WidgetConfigs", Context.MODE_PRIVATE)
                 val configJson = android.util.Base64.encodeToString(
                     JSONObject(config).toString().toByteArray(), 

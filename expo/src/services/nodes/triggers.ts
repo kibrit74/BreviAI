@@ -6,6 +6,27 @@
 import { WorkflowNode, ManualTriggerConfig, TimeTriggerConfig, NotificationTriggerConfig, CallTriggerConfig, EmailTriggerConfig, TelegramTriggerConfig, DeepLinkTriggerConfig, SMSTriggerConfig, WhatsAppTriggerConfig, WebhookTriggerConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 
+function extractPhoneFromTexts(...values: Array<any>): string {
+    const text = values
+        .map(v => (v == null ? '' : String(v)))
+        .filter(Boolean)
+        .join(' ');
+
+    if (!text) return '';
+
+    const m = text.match(/(?:\+?\d[\d\s()\-]{8,}\d)/);
+    if (!m) return '';
+
+    let digits = m[0].replace(/[^\d]/g, '');
+    if (digits.startsWith('0') && digits.length === 11) {
+        digits = '90' + digits.substring(1);
+    }
+    if (digits.length === 10 && digits.startsWith('5')) {
+        digits = '90' + digits;
+    }
+    return digits.length >= 10 ? digits : '';
+}
+
 export async function executeTriggerNode(
     node: WorkflowNode,
     variableManager: VariableManager
@@ -270,6 +291,9 @@ export async function executeWhatsAppTrigger(
     const injectedSender = variableManager.get('_whatsappSender');
     const injectedGroup = variableManager.get('_whatsappGroup');
     const injectedSenderPhone = variableManager.get('_whatsappSenderPhone');
+    const notificationTitle = variableManager.get('_notificationTitle');
+    const notificationText = variableManager.get('_notificationText');
+    const notificationBigText = variableManager.get('_notificationBigText');
 
     if (injectedMessage || injectedSender) {
         const now = new Date();
@@ -280,15 +304,25 @@ export async function executeWhatsAppTrigger(
         variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
         variableManager.set('triggerMessage', injectedMessage || injectedSender || '');
 
+        const existingInfo = variableManager.get('_whatsappInfo');
+        // Avoid extracting phone numbers from message body because it often contains
+        // unrelated numeric content (OTP/order codes) and can produce false recipients.
+        const detectedPhone = extractPhoneFromTexts(
+            existingInfo?.senderPhone,
+            injectedSenderPhone,
+            injectedSender,
+            notificationTitle
+        );
+        const whatsappInfo = {
+            sender: existingInfo?.sender || injectedSender || notificationTitle || 'Unknown',
+            senderPhone: detectedPhone || '',
+            message: existingInfo?.message || injectedMessage || notificationText || '',
+            group: existingInfo?.group || injectedGroup || '',
+        };
+        variableManager.set('_whatsappSenderPhone', whatsappInfo.senderPhone);
+        variableManager.set('_whatsappInfo', whatsappInfo);
+        variableManager.set('whatsappInfo', whatsappInfo);
         if (config.variableName) {
-            const existingInfo = variableManager.get('_whatsappInfo');
-            const whatsappInfo = {
-                sender: existingInfo?.sender || injectedSender || 'Unknown',
-                senderPhone: existingInfo?.senderPhone || injectedSenderPhone || '',
-                message: existingInfo?.message || injectedMessage || '',
-                group: existingInfo?.group || injectedGroup || '',
-            };
-            variableManager.set('_whatsappInfo', whatsappInfo);
             variableManager.set(config.variableName, whatsappInfo);
         }
 

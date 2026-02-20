@@ -89,3 +89,28 @@
 - Agent saat bazlı selamlaşma (30 dk)
 - Son 5 işlemi hafızada tutma (1 saat)
 - Kullanıcı tercihleri AsyncStorage (2 saat)
+
+---
+
+## 2026-02-19 - WhatsApp ve Runtime Duzeltmeleri
+
+### Tamamlananlar
+- `send_whatsapp` backend hatalarinda session durumu daha detayli raporlaniyor (`WHATSAPP_SESSION_NOT_READY`, `sessionStatus`, `connectUrl`, `statusUrl`).
+- Backend mode basarisiz olursa uygun durumda `mode: "direct"` fallback akisi eklendi.
+- Headless calismada direct mode engellendi (`_isHeadless=true`), yanlis fallback denemeleri azaltildi.
+- WhatsApp trigger tarafinda telefon numarasi cikarma daha guvenli hale getirildi; mesaj govdesinden rastgele numara yakalama kisitlandi.
+- Agent prompt kurallarina WhatsApp fallback davranisi eklendi.
+- Tool schema tarafinda `send_whatsapp` icin opsiyonel `mode` parametresi tanimlandi.
+- Reanimated 4 icin New Architecture zorlamasi eklendi:
+  - `expo/app.json` -> `newArchEnabled: true`
+  - `expo/eas.json` -> `EXPO_NEW_ARCH_ENABLED=1` (development/preview/production)
+
+### Tespit Edilen Sorunlar
+- Bazi isteklerde backend hala `qr_pending` donebiliyor, UI'da bagli gorunse bile aktif session id farkli olabiliyor.
+- Dogrudan `http://136.109.124.154:3001/whatsapp/qr` cagrisinda `Unauthorized` hatasi alinabiliyor.
+
+### Notlar / Aksiyon
+- QR endpoint token veya `x-auth-key` ister; dogru akis:
+  1. `POST /whatsapp/connect/start` (`x-auth-key` + `userId`)
+  2. Donen `connectUrl` ve `statusUrl` ile devam et
+- Reanimated hatasi icin sadece kod degisikligi yetmez; uygulama binary yeniden build/install edilmeli.

@@ -1,39 +1,47 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   WidgetConfig,
   WidgetPreferences,
-  WidgetButton,
   WidgetUpdateRequest,
   WidgetExecutionResult,
   WidgetError,
   WIDGET_ERROR_CODES,
-  DEFAULT_WIDGET_CONFIG
+  DEFAULT_WIDGET_CONFIG,
+  WidgetSize,
+  normalizeWidgetButtons
 } from '../types/widget';
 import { Platform, NativeModules } from 'react-native';
-import { WorkflowEngine } from '../services/WorkflowEngine';
 
-// Get native module directly from NativeModules
 const { BreviHelperModule } = NativeModules;
 
+let BreviSettingsModule: any = null;
+try {
+  const mod = require('brevi-settings');
+  BreviSettingsModule = mod?.default ?? mod;
+} catch {
+  BreviSettingsModule = null;
+}
+
 const WIDGET_STORAGE_KEY = '@breviai_widget_preferences';
-const WIDGET_CONFIG_PREFIX = 'widget_config_';
+
+type NativeWidgetManager = {
+  updateWidget?: (widgetId: string, configJson?: string) => Promise<void> | void;
+  openBreviAI?: (payload: any) => Promise<void> | void;
+  executeWidgetWorkflow?: (shortcutId: string) => Promise<boolean> | boolean;
+  executeSystemAction?: (action: any) => Promise<void> | void;
+  launchApp?: (packageName: string) => Promise<boolean> | boolean;
+};
+
+function resolveNativeWidgetManager(): NativeWidgetManager | null {
+  if (Platform.OS !== 'android') return null;
+  return (BreviSettingsModule as NativeWidgetManager) ?? (BreviHelperModule as NativeWidgetManager) ?? null;
+}
 
 export class WidgetService {
   private static instance: WidgetService;
-  private _workflowEngine: WorkflowEngine | null = null;
-  private nativeWidgetManager = Platform.OS === 'android' ? BreviHelperModule : null;
+  private nativeWidgetManager: NativeWidgetManager | null = resolveNativeWidgetManager();
 
-  private constructor() {
-    // Lazy initialization - WorkflowEngine loaded on first use
-  }
-
-  // Lazy getter for WorkflowEngine to avoid circular dependency
-  private get workflowEngine(): WorkflowEngine {
-    if (!this._workflowEngine) {
-      this._workflowEngine = WorkflowEngine.getInstance();
-    }
-    return this._workflowEngine;
-  }
+  private constructor() {}
 
   static getInstance(): WidgetService {
     if (!WidgetService.instance) {
@@ -42,17 +50,18 @@ export class WidgetService {
     return WidgetService.instance;
   }
 
-  /**
-   * Get all widget configurations
-   */
   async getWidgetPreferences(): Promise<WidgetPreferences> {
     try {
       const stored = await AsyncStorage.getItem(WIDGET_STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored) as WidgetPreferences;
+        return {
+          widgets: parsed.widgets || {},
+          defaultWidgetId: parsed.defaultWidgetId,
+          autoUpdateEnabled: parsed.autoUpdateEnabled !== false
+        };
       }
 
-      // Return default preferences
       return {
         widgets: {},
         autoUpdateEnabled: true
@@ -66,9 +75,6 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Get specific widget configuration
-   */
   async getWidgetConfig(widgetId: string): Promise<WidgetConfig | null> {
     try {
       const preferences = await this.getWidgetPreferences();
@@ -82,10 +88,7 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Create new widget configuration
-   */
-  async createWidgetConfig(name: string, size: '2x2' | '2x3' | '4x2' = '2x3'): Promise<WidgetConfig> {
+  async createWidgetConfig(name: string, size: WidgetSize = '2x3'): Promise<WidgetConfig> {
     const widgetId = this.generateWidgetId();
     const now = Date.now();
 
@@ -94,6 +97,7 @@ export class WidgetService {
       id: widgetId,
       name,
       size,
+      buttons: normalizeWidgetButtons(DEFAULT_WIDGET_CONFIG.buttons, size),
       createdAt: now,
       updatedAt: now
     };
@@ -102,27 +106,25 @@ export class WidgetService {
     return config;
   }
 
-  /**
-   * Update widget configuration
-   */
   async updateWidgetConfig(request: WidgetUpdateRequest): Promise<void> {
     try {
-      // Get all preferences directly to avoid throwing if specific widget missing
       const preferences = await this.getWidgetPreferences();
       const existingConfig = preferences.widgets[request.widgetId];
+      const now = Date.now();
 
       let configToSave: WidgetConfig;
 
       if (!existingConfig) {
-        // If not found, only proceed if we can create (upsert)
-        // We need a config object in the request to create
         if (request.forceUpdate && request.config) {
+          const targetSize = (request.config.size || DEFAULT_WIDGET_CONFIG.size) as WidgetSize;
           configToSave = {
             ...DEFAULT_WIDGET_CONFIG,
             ...request.config,
             id: request.widgetId,
-            updatedAt: Date.now(),
-            createdAt: Date.now()
+            size: targetSize,
+            buttons: normalizeWidgetButtons(request.config.buttons, targetSize),
+            createdAt: now,
+            updatedAt: now
           } as WidgetConfig;
         } else {
           throw new WidgetError(
@@ -131,19 +133,25 @@ export class WidgetService {
           );
         }
       } else {
-        // Update existing
-        configToSave = {
+        const mergedConfig = {
           ...existingConfig,
-          ...request.config,
-          id: request.widgetId, // Ensure ID doesn't change
-          updatedAt: Date.now()
+          ...request.config
+        };
+        const targetSize = (mergedConfig.size || existingConfig.size) as WidgetSize;
+
+        configToSave = {
+          ...mergedConfig,
+          id: request.widgetId,
+          size: targetSize,
+          buttons: normalizeWidgetButtons(mergedConfig.buttons, targetSize),
+          createdAt: existingConfig.createdAt || now,
+          updatedAt: now
         };
       }
 
       await this.saveWidgetConfig(configToSave);
 
-      // Force native widget update if requested
-      if (request.forceUpdate && this.nativeWidgetManager) {
+      if (request.forceUpdate && this.nativeWidgetManager?.updateWidget) {
         await this.updateNativeWidget(request.widgetId);
       }
     } catch (error) {
@@ -157,9 +165,6 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Assign shortcut to widget button
-   */
   async assignShortcutToWidget(
     widgetId: string,
     buttonId: string,
@@ -174,7 +179,6 @@ export class WidgetService {
         );
       }
 
-      // Update the button with shortcut assignment
       const updatedButtons = config.buttons.map(button =>
         button.id === buttonId
           ? { ...button, shortcutId, action: { type: 'workflow' as const, payload: { shortcutId } } }
@@ -197,20 +201,11 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Execute widget action
-   */
-  async executeWidgetAction(
-    widgetId: string,
-    buttonId: string
-  ): Promise<WidgetExecutionResult> {
+  async executeWidgetAction(widgetId: string, buttonId: string): Promise<WidgetExecutionResult> {
     try {
       const config = await this.getWidgetConfig(widgetId);
       if (!config) {
-        throw new WidgetError(
-          `Widget ${widgetId} not found`,
-          WIDGET_ERROR_CODES.CONFIG_NOT_FOUND
-        );
+        throw new WidgetError(`Widget ${widgetId} not found`, WIDGET_ERROR_CODES.CONFIG_NOT_FOUND);
       }
 
       const button = config.buttons.find(b => b.id === buttonId);
@@ -228,20 +223,15 @@ export class WidgetService {
         );
       }
 
-      // Execute action based on type
       switch (button.action.type) {
         case 'workflow':
           return await this.executeWorkflowAction(button.action.payload.shortcutId);
-
         case 'app':
           return await this.executeAppAction(button.action.payload);
-
         case 'system':
           return await this.executeSystemAction(button.action.payload);
-
         case 'custom':
           return await this.executeCustomAction(button.action.payload);
-
         default:
           throw new WidgetError(
             `Unknown action type: ${button.action.type}`,
@@ -260,9 +250,6 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Delete widget configuration
-   */
   async deleteWidgetConfig(widgetId: string): Promise<void> {
     try {
       const preferences = await this.getWidgetPreferences();
@@ -287,9 +274,6 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Set default widget
-   */
   async setDefaultWidget(widgetId: string): Promise<void> {
     try {
       const preferences = await this.getWidgetPreferences();
@@ -304,23 +288,27 @@ export class WidgetService {
     }
   }
 
-  // Private helper methods
-
   private async saveWidgetConfig(config: WidgetConfig): Promise<void> {
     try {
-      const preferences = await this.getWidgetPreferences();
-      preferences.widgets[config.id] = config;
+      const now = Date.now();
+      const normalizedSize = (config.size || DEFAULT_WIDGET_CONFIG.size) as WidgetSize;
+      const normalizedConfig: WidgetConfig = {
+        ...config,
+        size: normalizedSize,
+        buttons: normalizeWidgetButtons(config.buttons, normalizedSize),
+        createdAt: config.createdAt || now,
+        updatedAt: config.updatedAt || now
+      };
 
-      // Set as default if it's the first widget
+      const preferences = await this.getWidgetPreferences();
+      preferences.widgets[normalizedConfig.id] = normalizedConfig;
+
       if (!preferences.defaultWidgetId) {
-        preferences.defaultWidgetId = config.id;
+        preferences.defaultWidgetId = normalizedConfig.id;
       }
 
       await AsyncStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(preferences));
-
-      // 🔥 CRITICAL: Sync to native SharedPreferences for widget to read
-      // Without this, ShortcutWidgetProvider can't find shortcutId and opens app instead
-      await this.syncToNativeWidget(config);
+      await this.syncToNativeWidget(normalizedConfig, preferences.defaultWidgetId);
     } catch (error) {
       throw new WidgetError(
         'Failed to save widget configuration',
@@ -330,44 +318,48 @@ export class WidgetService {
     }
   }
 
-  /**
-   * Sync widget config to native SharedPreferences
-   * ShortcutWidgetProvider reads from SharedPreferences, not AsyncStorage
-   */
-  private async syncToNativeWidget(config: WidgetConfig): Promise<void> {
+  private async syncToNativeWidget(config: WidgetConfig, defaultWidgetId?: string): Promise<void> {
     try {
       if (this.nativeWidgetManager?.updateWidget) {
         await this.nativeWidgetManager.updateWidget(config.id, JSON.stringify(config));
-        console.log(`[WidgetService] Synced widget ${config.id} to native`);
       }
 
-      // Also sync to 'default_widget' key for widgets without specific ID mapping
-      if (this.nativeWidgetManager?.updateWidget) {
+      if (
+        this.nativeWidgetManager?.updateWidget &&
+        (config.id === 'default_widget' || defaultWidgetId === config.id)
+      ) {
         await this.nativeWidgetManager.updateWidget('default_widget', JSON.stringify(config));
       }
     } catch (error) {
       console.warn('[WidgetService] Native sync failed:', error);
-      // Don't throw - native sync is best-effort
     }
   }
 
   private async executeWorkflowAction(shortcutId: string): Promise<WidgetExecutionResult> {
     try {
-      // For now, we'll open the app with the shortcut ID since WorkflowEngine expects a full Workflow object
-      // In the future, we could add a method to execute by shortcut ID directly
+      if (this.nativeWidgetManager?.executeWidgetWorkflow) {
+        const result = await this.nativeWidgetManager.executeWidgetWorkflow(shortcutId);
+        if (result) {
+          return {
+            success: true,
+            executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+          };
+        }
+      }
+
       if (this.nativeWidgetManager?.openBreviAI) {
-        await this.nativeWidgetManager.openBreviAI({ shortcutId, source: 'widget' });
+        await this.invokeOpenBreviAI({ shortcutId, source: 'widget' });
         return {
           success: true,
-          executionId: `widget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
         };
-      } else {
-        throw new Error('Native widget bridge not available');
       }
-    } catch (error) {
+
+      throw new Error('Native widget workflow bridge not available');
+    } catch (error: any) {
       return {
         success: false,
-        error: `Workflow execution failed: ${error.message}`
+        error: `Workflow execution failed: ${error?.message || String(error)}`
       };
     }
   }
@@ -375,15 +367,15 @@ export class WidgetService {
   private async executeAppAction(payload: { packageName: string }): Promise<WidgetExecutionResult> {
     try {
       if (this.nativeWidgetManager?.launchApp) {
-        await this.nativeWidgetManager.launchApp(payload.packageName);
-        return { success: true };
-      } else {
-        throw new Error('Native app launcher not available');
+        const launched = await this.nativeWidgetManager.launchApp(payload.packageName);
+        return launched === false ? { success: false, error: 'App could not be launched' } : { success: true };
       }
-    } catch (error) {
+
+      throw new Error('Native app launcher not available');
+    } catch (error: any) {
       return {
         success: false,
-        error: `Failed to launch app: ${error.message}`
+        error: `Failed to launch app: ${error?.message || String(error)}`
       };
     }
   }
@@ -393,30 +385,29 @@ export class WidgetService {
       if (this.nativeWidgetManager?.executeSystemAction) {
         await this.nativeWidgetManager.executeSystemAction(payload);
         return { success: true };
-      } else {
-        throw new Error('Native system action not available');
       }
-    } catch (error) {
+
+      throw new Error('Native system action not available');
+    } catch (error: any) {
       return {
         success: false,
-        error: `Failed to execute system action: ${error.message}`
+        error: `Failed to execute system action: ${error?.message || String(error)}`
       };
     }
   }
 
   private async executeCustomAction(payload: any): Promise<WidgetExecutionResult> {
-    // Custom actions - could open the app to a specific screen
     try {
       if (this.nativeWidgetManager?.openBreviAI) {
-        await this.nativeWidgetManager.openBreviAI(payload);
+        await this.invokeOpenBreviAI(payload);
         return { success: true };
-      } else {
-        throw new Error('Native custom action not available');
       }
-    } catch (error) {
+
+      throw new Error('Native custom action not available');
+    } catch (error: any) {
       return {
         success: false,
-        error: `Failed to execute custom action: ${error.message}`
+        error: `Failed to execute custom action: ${error?.message || String(error)}`
       };
     }
   }
@@ -427,16 +418,29 @@ export class WidgetService {
       return;
     }
 
-    // Fetch latest config
     const config = await this.getWidgetConfig(widgetId);
     if (config) {
-      // Send config JSON to native module
-      // BreviSettingsManager.updateWidget(widgetId, configJson)
       await this.nativeWidgetManager.updateWidget(widgetId, JSON.stringify(config));
     }
   }
 
   private generateWidgetId(): string {
-    return `widget_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  }
+
+  private async invokeOpenBreviAI(payload: any): Promise<void> {
+    if (!this.nativeWidgetManager?.openBreviAI) {
+      throw new Error('Native openBreviAI is not available');
+    }
+
+    try {
+      await this.nativeWidgetManager.openBreviAI(payload);
+    } catch (error) {
+      // Legacy bridge fallback: some RN modules accept only string payload.
+      if (typeof payload === 'string') {
+        throw error;
+      }
+      await this.nativeWidgetManager.openBreviAI(JSON.stringify(payload));
+    }
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -42,8 +42,10 @@ export default function ShortcutPickerModal({
             // Load workflows from WorkflowStorage
             console.log('[ShortcutPicker] Loading workflows...');
 
-            // Seed test workflows if WorkflowListScreen was never visited
-            await WorkflowStorage.seedTestWorkflows();
+            // Seed test workflows only in development.
+            if (__DEV__) {
+                await WorkflowStorage.seedTestWorkflows();
+            }
 
             const workflows = await WorkflowStorage.getAll();
             console.log('[ShortcutPicker] Loaded workflows:', workflows.length, workflows.map(w => w.name));
@@ -65,7 +67,7 @@ export default function ShortcutPickerModal({
                 usageCount: 0,
                 isFavorite: false,
                 // Extra properties for widget display
-                icon: wf.icon || '⚡',
+                icon: wf.icon || 'AI',
                 color: wf.color || '#6366F1'
             }));
 
@@ -138,7 +140,7 @@ export default function ShortcutPickerModal({
                         {item.name}
                     </Text>
                     <Text style={[styles.shortcutPrompt, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {item.steps.length} adım
+                        {item.steps.length} adÄ±m
                     </Text>
                 </View>
                 {isSelected && (
@@ -160,7 +162,7 @@ export default function ShortcutPickerModal({
                     {/* Header */}
                     <View style={[styles.header, { borderBottomColor: colors.border }]}>
                         <Text style={[styles.title, { color: colors.text }]}>
-                            {t('selectShortcut') || 'Otomasyon Seç'}
+                            {t('selectShortcut') || 'Otomasyon SeÃ§'}
                         </Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                             <Ionicons name="close" size={24} color={colors.text} />
@@ -176,10 +178,10 @@ export default function ShortcutPickerModal({
                         <View style={styles.emptyContainer}>
                             <Ionicons name="cube-outline" size={48} color={colors.textSecondary} />
                             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                {t('noShortcutsYet') || 'Henüz kayıtlı otomasyon yok'}
+                                {t('noShortcutsYet') || 'HenÃ¼z kayÄ±tlÄ± otomasyon yok'}
                             </Text>
                             <Text style={[styles.emptyHint, { color: colors.textSecondary }]}>
-                                Önce bir otomasyon oluşturun
+                                Ã–nce bir otomasyon oluÅŸturun
                             </Text>
                         </View>
                     ) : (

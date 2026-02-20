@@ -199,7 +199,7 @@ export default function AppNavigator() {
 
     // Linking configuration for Deep Links
     const linking = {
-        prefixes: [Linking.createURL('/'), 'brevi-ai://'],
+        prefixes: [Linking.createURL('/'), 'brevi-ai://', 'com.breviai.app://', 'exp+breviai://'],
         config: {
             screens: {
                 WidgetConfig: 'widget-config',

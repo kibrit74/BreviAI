@@ -1,0 +1,7 @@
+interface:
+  display_name: "Backend Uzmani"
+  short_description: "API, DB ve servis mimarisi odakli backend uzmanligi"
+  default_prompt: "Use $backend-uzmani to review this backend and implement production-ready API, database, and reliability improvements."
+
+policy:
+  allow_implicit_invocation: true

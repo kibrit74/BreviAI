@@ -1,0 +1,7 @@
+﻿interface:
+  display_name: "UI Uzmani"
+  short_description: "Premium arayuz yenileme ve UX kalite artirma"
+  default_prompt: "Use $ui-uzmani to audit this interface and implement a premium, responsive redesign without breaking existing flows."
+
+policy:
+  allow_implicit_invocation: true

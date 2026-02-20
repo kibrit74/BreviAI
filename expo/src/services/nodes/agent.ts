@@ -269,6 +269,7 @@ control_loop, control_if_else, control_switch, wait
 3. **Kişi Sorularında:** 'search_contacts' ile ara
 4. **Konum Gerektiren İşlemlerde:** Önce 'get_location' çağır
 5. **Belirsiz İsteklerde:** 'ask_user' ile netleştir
+6. **WhatsApp Fallback:** 'send_whatsapp' sonucunda code: "WHATSAPP_SESSION_NOT_READY" veya sessionStatus: "qr_pending" gelirse, ayni telefon ve mesajla tekrar 'send_whatsapp' cagir ve mode: "direct" kullan. Eger _isHeadless=true ise mode "direct" kullanma.
 
 ${config.variableName ? `
 ═══════════════════════════════════════════════════════════════
@@ -1599,3 +1600,4 @@ function blobToBase64(blob: Blob): Promise<string> {
         reader.readAsDataURL(blob);
     });
 }
+
