@@ -80,6 +80,26 @@ class ApiService {
         'x-app-secret': APP_SECRET,
     };
 
+    private readMcpJson<T>(result?: McpToolResult): T | null {
+        if (!result?.content || !Array.isArray(result.content)) {
+            return null;
+        }
+        const jsonPart = result.content.find(
+            (part): part is { type: 'json'; json: unknown } => part.type === 'json'
+        );
+        return (jsonPart?.json as T) ?? null;
+    }
+
+    private readMcpText(result?: McpToolResult): string {
+        if (!result?.content || !Array.isArray(result.content)) {
+            return '';
+        }
+        const textPart = result.content.find(
+            (part): part is { type: 'text'; text: string } => part.type === 'text'
+        );
+        return textPart?.text || '';
+    }
+
 
     async generateShortcut(prompt: string, userContext?: any): Promise<GenerateResponse> {
         debugLog('network', 'Generative API Request', { prompt, context: userContext });
@@ -357,6 +377,66 @@ INSTRUCTIONS:
     }
 
     async searchWeb(query: string): Promise<{ success: boolean; results?: { title: string; snippet: string; url: string }[]; resultCount?: number; error?: string }> {
+        const normalizedQuery = query.trim();
+        if (!normalizedQuery) {
+            return { success: false, error: 'Search query is empty' };
+        }
+
+        // Preferred path: MCP tool (breviai.web_search)
+        try {
+            const mcp = await this.callMcpTool('breviai.web_search', {
+                query: normalizedQuery,
+                limit: 10,
+            });
+
+            if (mcp.success && mcp.result) {
+                type McpWebSearchPayload = {
+                    query?: string;
+                    count?: number;
+                    results?: Array<{
+                        title?: string;
+                        snippet?: string;
+                        url?: string;
+                        source?: string;
+                    }>;
+                };
+
+                const payload = this.readMcpJson<McpWebSearchPayload>(mcp.result);
+                if (payload && Array.isArray(payload.results)) {
+                    const normalizedResults = payload.results
+                        .filter((item) => item && typeof item.url === 'string')
+                        .map((item) => ({
+                            title: String(item.title || ''),
+                            snippet: String(item.snippet || ''),
+                            url: String(item.url || ''),
+                        }));
+
+                    return {
+                        success: true,
+                        results: normalizedResults,
+                        resultCount:
+                            typeof payload.count === 'number'
+                                ? payload.count
+                                : normalizedResults.length,
+                    };
+                }
+
+                const mcpTextError = this.readMcpText(mcp.result);
+                return {
+                    success: false,
+                    error: mcpTextError || 'MCP web_search returned invalid payload',
+                };
+            }
+
+            console.warn(
+                '[ApiService] MCP web_search failed, falling back to legacy /api/search:',
+                mcp.error
+            );
+        } catch (mcpError) {
+            console.warn('[ApiService] MCP web_search exception, using fallback:', mcpError);
+        }
+
+        // Fallback path: legacy search endpoint
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
@@ -368,7 +448,7 @@ INSTRUCTIONS:
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
-                body: JSON.stringify({ query }),
+                body: JSON.stringify({ query: normalizedQuery }),
             }).finally(() => clearTimeout(timeoutId));
 
             const data = await response.json();

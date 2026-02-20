@@ -382,7 +382,7 @@ export async function executeWebSearch(
     const query = variableManager.resolveString(config.query);
     if (!query) return { success: false, error: 'Arama sorgusu boş olamaz' };
 
-    console.log('[WebSearch] Searching via backend API:', query);
+    console.log('[WebSearch] Searching via MCP-backed API:', query);
 
     try {
         // Import apiService dynamically to avoid circular dependency

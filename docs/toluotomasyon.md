@@ -334,3 +334,67 @@ Not:
 - McKinsey automation research: https://www.mckinsey.com/featured-insights/future-of-work
 - WHO medication adherence: https://www.who.int/news/item/01-07-2003-failure-to-take-prescribed-medicine-for-chronic-diseases-is-a-massive-world-wide-problem
 - DOE energy efficiency: https://www.energy.gov/energysaver
+
+## 17) MCP Destekli Gunluk Haber Arastirma ve Ozet
+Not:
+- Bu senaryodaki `WEB_SEARCH` node'u artik MCP `breviai.web_search` araci uzerinden calisir.
+- MCP tarafinda sorun olursa istemci otomatik olarak eski `/api/search` fallback yoluna gecer.
+
+```json
+{
+  "name": "MCP Destekli Gunluk Haber Arastirma ve Ozet",
+  "nodes": [
+    {
+      "id": "1",
+      "type": "TIME_TRIGGER",
+      "label": "Hafta ici 08:30",
+      "config": { "hour": 8, "minute": 30, "repeat": true, "days": [1,2,3,4,5] },
+      "position": { "x": 100, "y": 50 }
+    },
+    {
+      "id": "2",
+      "type": "WEB_SEARCH",
+      "label": "MCP ile web ara",
+      "config": { "query": "Turkiye ekonomi ve teknoloji son dakika haberleri" },
+      "position": { "x": 100, "y": 170 }
+    },
+    {
+      "id": "3",
+      "type": "AGENT_AI",
+      "label": "Yonetici ozeti uret",
+      "config": {
+        "provider": "gemini",
+        "variableName": "briefing",
+        "prompt": "Asagidaki arama sonuclarini ({{searchResults}}) en fazla 6 maddede ozetle. Her maddede neden onemli oldugunu tek cumle ile belirt."
+      },
+      "position": { "x": 100, "y": 290 }
+    },
+    {
+      "id": "4",
+      "type": "SHOW_TEXT",
+      "label": "Ozeti goster",
+      "config": {
+        "title": "Gunluk Haber Ozeti",
+        "content": "{{briefing}}"
+      },
+      "position": { "x": 100, "y": 410 }
+    },
+    {
+      "id": "5",
+      "type": "WHATSAPP_SEND",
+      "label": "Takima gonder",
+      "config": {
+        "phoneNumber": "90555XXXXXXX",
+        "message": "Gunluk MCP haber ozeti:\n{{briefing}}"
+      },
+      "position": { "x": 260, "y": 410 }
+    }
+  ],
+  "edges": [
+    { "id": "e1-2", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+    { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+    { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" },
+    { "id": "e3-5", "sourceNodeId": "3", "targetNodeId": "5", "sourcePort": "default" }
+  ]
+}
+```
