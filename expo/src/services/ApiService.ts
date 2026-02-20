@@ -39,6 +39,28 @@ interface GenerateResponse {
     alternative?: string;
 }
 
+export interface McpToolDescriptor {
+    name: string;
+    title: string;
+    description: string;
+    readOnly: boolean;
+    inputSchema: {
+        type: 'object';
+        properties?: Record<string, unknown>;
+        required?: string[];
+        additionalProperties?: boolean;
+    };
+}
+
+export interface McpToolResult {
+    isError?: boolean;
+    content: Array<
+        | { type: 'text'; text: string }
+        | { type: 'json'; json: unknown }
+    >;
+    metadata?: Record<string, unknown>;
+}
+
 export interface ShortcutStep {
     step_id: number;
     type: 'SYSTEM_ACTION' | 'APP_ACTION' | 'INTENT_ACTION' | 'MEDIA_ACTION' | 'NOTIFICATION_ACTION' | 'ACCESSIBILITY_ACTION' | 'URL_ACTION' | string;
@@ -363,6 +385,56 @@ INSTRUCTIONS:
             }
         } catch (error) {
             console.error('[ApiService] searchWeb error:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    async listMcpTools(): Promise<{ success: boolean; tools?: McpToolDescriptor[]; error?: string }> {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
+                signal: controller.signal,
+                method: 'GET',
+                headers: this.headers,
+            }).finally(() => clearTimeout(timeoutId));
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                return { success: true, tools: data.tools || [] };
+            }
+            return { success: false, error: data.error || 'MCP list failed' };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
+    }
+
+    async callMcpTool(
+        toolName: string,
+        args: Record<string, unknown> = {}
+    ): Promise<{ success: boolean; result?: McpToolResult; error?: string }> {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
+                signal: controller.signal,
+                method: 'POST',
+                headers: this.headers,
+                body: JSON.stringify({
+                    action: 'call_tool',
+                    toolName,
+                    arguments: args,
+                }),
+            }).finally(() => clearTimeout(timeoutId));
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                return { success: true, result: data.result };
+            }
+            return { success: false, error: data.error || 'MCP tool call failed' };
+        } catch (error) {
             return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
     }

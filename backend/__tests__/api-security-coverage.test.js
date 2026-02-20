@@ -16,6 +16,7 @@ describe('API security coverage', () => {
       'src/app/api/email/send/route.ts',
       'src/app/api/email/read/route.ts',
       'src/app/api/google/sheets/read/route.ts',
+      'src/app/api/mcp/route.ts',
     ];
 
     for (const routePath of appProtectedRoutes) {

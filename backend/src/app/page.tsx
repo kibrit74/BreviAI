@@ -30,6 +30,9 @@ export default function HomePage() {
                     <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
                         <code>GET /api/templates</code> - List available templates
                     </li>
+                    <li style={{ padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <code>GET/POST /api/mcp</code> - MCP pilot gateway (tools list/call)
+                    </li>
                     <li style={{ padding: '0.5rem 0' }}>
                         <code>POST /api/feedback</code> - Submit feedback
                     </li>
