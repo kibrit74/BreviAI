@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './admin.module.css';
+import { withAdminAuthHeaders } from '@/lib/admin-client-auth';
 
 interface Template {
     id: string;
@@ -25,7 +26,8 @@ export default function AdminDashboard() {
 
     const fetchTemplates = async () => {
         try {
-            const res = await fetch('/api/templates');
+            const headers = await withAdminAuthHeaders();
+            const res = await fetch('/api/admin/templates', { headers });
             const data = await res.json();
             if (data.success) {
                 setTemplates(data.templates);
@@ -43,8 +45,10 @@ export default function AdminDashboard() {
         if (!confirm('Are you sure you want to delete this template?')) return;
 
         try {
+            const headers = await withAdminAuthHeaders();
             const res = await fetch(`/api/admin/templates/${id}`, {
                 method: 'DELETE',
+                headers,
             });
             const data = await res.json();
             if (data.success) {

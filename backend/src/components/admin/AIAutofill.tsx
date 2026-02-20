@@ -3,6 +3,7 @@
 
 import { useState } from 'react';
 import styles from '../admin.module.css'; // Adjust path as needed, assuming we are in src/components/admin
+import { withAdminAuthHeaders } from '@/lib/admin-client-auth';
 
 interface AIAutofillProps {
     onGenerated: (data: any) => void;
@@ -20,9 +21,10 @@ export default function AIAutofill({ onGenerated }: AIAutofillProps) {
         setError('');
 
         try {
+            const headers = await withAdminAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetch('/api/admin/generate-template', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ prompt }),
             });
 

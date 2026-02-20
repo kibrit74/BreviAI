@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { verifyAdminKey } from '@/lib/api/auth';
+import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -20,7 +20,7 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
@@ -94,7 +94,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },

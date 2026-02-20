@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styles from '../../admin.module.css';
+import { withAdminAuthHeaders } from '@/lib/admin-client-auth';
 
 const CATEGORIES = ['Battery', 'Security', 'Productivity', 'Lifestyle', 'Social', 'Health', 'Travel'];
 
@@ -36,7 +37,8 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
 
     const fetchTemplate = async () => {
         try {
-            const res = await fetch(`/api/admin/templates/${id}`);
+            const headers = await withAdminAuthHeaders();
+            const res = await fetch(`/api/admin/templates/${id}`, { headers });
             const data = await res.json();
 
             if (data.success && data.template) {
@@ -104,9 +106,10 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
                 template_json: parsedJson
             };
 
+            const headers = await withAdminAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetch(`/api/admin/templates/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(payload)
             });
 

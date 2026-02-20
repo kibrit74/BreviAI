@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { SEED_TEMPLATES } from '@/data/seed_templates';
-import { verifyAdminKey } from '@/lib/api/auth';
+import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -23,7 +23,7 @@ export async function OPTIONS() {
  * USE WITH CAUTION - This deletes all existing templates!
  */
 export async function POST(request: NextRequest) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
  * Returns current template count
  */
 export async function GET(request: NextRequest) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },

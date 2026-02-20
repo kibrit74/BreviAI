@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styles from '../admin.module.css';
+import { withAdminAuthHeaders } from '@/lib/admin-client-auth';
 
 const CATEGORIES = ['Battery', 'Security', 'Productivity', 'Lifestyle', 'Social', 'Health', 'Travel'];
 
@@ -126,9 +127,10 @@ export default function NewTemplatePage() {
                 template_json: parsedJson
             };
 
+            const headers = await withAdminAuthHeaders({ 'Content-Type': 'application/json' });
             const res = await fetch('/api/admin/templates', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify(payload)
             });
 

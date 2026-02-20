@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getFlash25Model } from '@/lib/gemini';
 import { SYSTEM_PROMPT_TURKISH } from '@/lib/prompt-templates';
-import { verifyAdminKey } from '@/lib/api/auth';
+import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
 export async function POST(request: Request) {
-  const adminAuth = verifyAdminKey(request);
+  const adminAuth = await verifyAdminAccess(request);
   if (!adminAuth.ok) {
     return NextResponse.json(
       { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },

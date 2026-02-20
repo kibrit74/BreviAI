@@ -1,13 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { verifyAdminKey } from '@/lib/api/auth';
+import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -17,8 +17,44 @@ export async function OPTIONS() {
     });
 }
 
+export async function GET(request: NextRequest) {
+    const adminAuth = await verifyAdminAccess(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
+    const category = request.nextUrl.searchParams.get('category');
+
+    let query = supabase
+        .from('templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (category && category !== 'All') {
+        query = query.eq('category', category);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+        return NextResponse.json(
+            { success: false, error: error.message },
+            { status: 500, headers: corsHeaders }
+        );
+    }
+
+    return NextResponse.json({
+        success: true,
+        templates: data || [],
+        total: data?.length || 0,
+    }, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
-    const adminAuth = verifyAdminKey(request);
+    const adminAuth = await verifyAdminAccess(request);
     if (!adminAuth.ok) {
         return NextResponse.json(
             { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
