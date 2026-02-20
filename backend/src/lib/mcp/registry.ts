@@ -9,6 +9,7 @@ import type {
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;
+const MCP_WEB_SEARCH_TIMEOUT_MS = 20_000;
 
 function normalizeLimit(raw: unknown, fallback = DEFAULT_LIMIT, max = MAX_LIMIT) {
     const value = typeof raw === 'number' ? raw : Number(raw);
@@ -24,6 +25,24 @@ function toolError(message: string, details?: Record<string, unknown>): McpToolR
             { type: 'json', json: { error: message, ...(details || {}) } },
         ],
     };
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+    let timeoutHandle: NodeJS.Timeout | null = null;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+            reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+    });
+
+    try {
+        return await Promise.race([promise, timeoutPromise]);
+    } finally {
+        if (timeoutHandle) {
+            clearTimeout(timeoutHandle);
+        }
+    }
 }
 
 const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
@@ -50,34 +69,48 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
             }
 
             const limit = normalizeLimit(args.limit, DEFAULT_LIMIT, MAX_LIMIT);
-            const results = (await searchWeb(query)).slice(0, limit).map((item) => ({
-                title: item.title,
-                url: item.url,
-                snippet: item.snippet,
-                source: item.source,
-            }));
+            try {
+                const rawResults = await withTimeout(
+                    searchWeb(query),
+                    MCP_WEB_SEARCH_TIMEOUT_MS,
+                    'web_search'
+                );
+                const results = rawResults.slice(0, limit).map((item) => ({
+                    title: item.title,
+                    url: item.url,
+                    snippet: item.snippet,
+                    source: item.source,
+                }));
 
-            return {
-                content: [
-                    {
-                        type: 'json',
-                        json: {
-                            query,
-                            count: results.length,
-                            results,
+                return {
+                    content: [
+                        {
+                            type: 'json',
+                            json: {
+                                query,
+                                count: results.length,
+                                results,
+                            },
                         },
+                        {
+                            type: 'text',
+                            text: `Found ${results.length} web results for "${query}".`,
+                        },
+                    ],
+                    metadata: {
+                        requestId: context.requestId,
+                        readOnly: true,
+                        tool: 'breviai.web_search',
                     },
-                    {
-                        type: 'text',
-                        text: `Found ${results.length} web results for "${query}".`,
-                    },
-                ],
-                metadata: {
+                };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'web_search failed';
+                return toolError('web_search failed', {
                     requestId: context.requestId,
-                    readOnly: true,
-                    tool: 'breviai.web_search',
-                },
-            };
+                    details: message,
+                    query,
+                });
+            }
         },
     },
     'breviai.list_templates': {

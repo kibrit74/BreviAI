@@ -11,6 +11,8 @@ describe('MCP pilot coverage', () => {
     expect(source.includes('breviai.web_search')).toBe(true);
     expect(source.includes('breviai.list_templates')).toBe(true);
     expect(source.includes('readOnly: true')).toBe(true);
+    expect(source.includes('MCP_WEB_SEARCH_TIMEOUT_MS')).toBe(true);
+    expect(source.includes('withTimeout(')).toBe(true);
   });
 
   test('MCP API route supports list and call actions', () => {

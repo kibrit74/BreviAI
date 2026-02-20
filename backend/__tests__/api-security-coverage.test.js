@@ -36,7 +36,9 @@ describe('API security coverage', () => {
 
     for (const routePath of adminProtectedRoutes) {
       const source = read(routePath);
-      expect(source.includes('verifyAdminKey')).toBe(true);
+      const hasLegacyCheck = source.includes('verifyAdminKey');
+      const hasUnifiedCheck = source.includes('verifyAdminAccess');
+      expect(hasLegacyCheck || hasUnifiedCheck).toBe(true);
     }
   });
 });
