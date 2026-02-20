@@ -134,11 +134,6 @@ export default function AdminLayout({
         );
     }
 
-    // If not authenticated and not on login page, we are redirecting, so don't show content
-    if (!authenticated && pathname !== '/admin/login') {
-        return null;
-    }
-
     return (
         <div style={{ minHeight: '100vh' }}>
             {configError && pathname === '/admin/login' && (
