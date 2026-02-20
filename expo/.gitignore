@@ -4,15 +4,16 @@ dist/
 web-build/
 
 # Native
-# Native
-# Native
-/android/
-/ios/
+/android
+/ios
 
 # Force inclusion of local module native code
-# Force inclusion of local modules
 !/modules/**
+!/modules/**/android
+!/modules/**/android/**
+!/modules/**/ios
+!/modules/**/ios/**
 /modules/**/build/
 /modules/**/.gradle/
-local.properties
+/local.properties
 
