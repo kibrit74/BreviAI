@@ -1,12 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
+    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -17,6 +18,14 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     try {
         const body = await request.json();
 

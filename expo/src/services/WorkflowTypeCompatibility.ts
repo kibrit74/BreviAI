@@ -41,7 +41,12 @@ const NODE_TYPE_SIGNATURES: Partial<Record<NodeType, NodeTypeSignature>> = {
 
 const FLOW_PORTS: EdgePort[] = ['true', 'false', 'error', 'loop', 'done', 'case_1', 'case_2', 'case_3', 'case_4'];
 
-const toUnique = (types?: WorkflowDataType[]) => Array.from(new Set(types || ['any']));
+const DEFAULT_WORKFLOW_TYPES: WorkflowDataType[] = ['any'];
+
+const toUnique = (types?: WorkflowDataType[]): WorkflowDataType[] => {
+    const source = types && types.length > 0 ? types : DEFAULT_WORKFLOW_TYPES;
+    return Array.from(new Set<WorkflowDataType>(source));
+};
 
 const getInputTypes = (nodeType: NodeType): WorkflowDataType[] => {
     return toUnique(NODE_TYPE_SIGNATURES[nodeType]?.input || ['any']);

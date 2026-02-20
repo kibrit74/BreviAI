@@ -1,5 +1,5 @@
 /**
- * Prompt Router - Selects optimal AI model based on command complexity
+ * Prompt Router - Selects optimal AI model based on command complexity.
  */
 
 export type ModelType = 'flash-25' | 'flash-30';
@@ -10,86 +10,93 @@ interface PromptAnalysis {
     complexity: 'simple' | 'moderate' | 'complex';
 }
 
-// Keywords that indicate simple commands
 const SIMPLE_KEYWORDS = [
-    'aç', 'kapat', 'ayarla', 'başlat', 'durdur', 'değiştir',
-    'wi-fi', 'wifi', 'bluetooth', 'ses', 'parlaklık', 'mod'
+    'ac', 'kapat', 'ayarla', 'baslat', 'durdur', 'degistir',
+    'wi-fi', 'wifi', 'bluetooth', 'ses', 'parlaklik', 'mod',
 ];
 
-// Keywords that indicate complex commands
 const COMPLEX_KEYWORDS = [
-    'eğer', 'şartıyla', 'koşulunda', 'veya', 'hem', 'hem de',
-    'izlemeye başlarsa', 'açarsa', 'kapanırsa', 'geldiğinde',
-    'dakika', 'saat', 'limit', 'süre', 'engelle', 'bildir',
-    'rapor', 'istatistik', 'takip', 'izle'
+    'eger', 'sartiyla', 'kosulunda', 'veya', 'hem', 'hem de',
+    'izlemeye baslarsa', 'acarsa', 'kapanirsa', 'geldiginde',
+    'dakika', 'saat', 'limit', 'sure', 'engelle', 'bildir',
+    'rapor', 'istatistik', 'takip', 'izle',
 ];
 
-// App-related keywords (usually need complex handling)
 const APP_KEYWORDS = [
     'youtube', 'tiktok', 'instagram', 'snapchat', 'twitter',
-    'oyun', 'game', 'uygulama', 'app', 'shorts', 'reels'
+    'oyun', 'game', 'uygulama', 'app', 'shorts', 'reels',
 ];
 
+function normalizeForMatch(input: string): string {
+    return input
+        .toLowerCase()
+        .replace(/\u00e7/g, 'c')
+        .replace(/\u011f/g, 'g')
+        .replace(/\u0131/g, 'i')
+        .replace(/\u00f6/g, 'o')
+        .replace(/\u015f/g, 's')
+        .replace(/\u00fc/g, 'u');
+}
+
 /**
- * Analyze prompt and determine the best model to use
+ * Analyze prompt and determine the best model to use.
  */
 export function analyzePrompt(prompt: string): PromptAnalysis {
-    const lowerPrompt = prompt.toLowerCase();
-    const words = lowerPrompt.split(/\s+/);
-
-    // Count indicators
+    const normalizedPrompt = normalizeForMatch(prompt);
     let simpleScore = 0;
     let complexScore = 0;
 
-    // Check simple keywords
     for (const keyword of SIMPLE_KEYWORDS) {
-        if (lowerPrompt.includes(keyword)) {
-            simpleScore++;
+        if (normalizedPrompt.includes(keyword)) {
+            simpleScore += 1;
         }
     }
 
-    // Check complex keywords
     for (const keyword of COMPLEX_KEYWORDS) {
-        if (lowerPrompt.includes(keyword)) {
-            complexScore += 2; // Weight complex indicators more
+        if (normalizedPrompt.includes(keyword)) {
+            complexScore += 2;
         }
     }
 
-    // Check app-related keywords
     for (const keyword of APP_KEYWORDS) {
-        if (lowerPrompt.includes(keyword)) {
-            complexScore++;
+        if (normalizedPrompt.includes(keyword)) {
+            complexScore += 1;
         }
     }
 
-    // Check prompt length
     if (prompt.length < 30) {
         simpleScore += 2;
     } else if (prompt.length > 100) {
         complexScore += 2;
     }
 
-    // Check for multiple conditions (commas, 've', 'veya')
-    const conditionCount = (lowerPrompt.match(/,|ve\s|veya\s/g) || []).length;
+    const conditionCount = (normalizedPrompt.match(/,|ve\s|veya\s/g) || []).length;
     if (conditionCount >= 2) {
         complexScore += conditionCount;
     }
 
-    // Determine model
-    // FOR MVP STABILITY: Always return flash-25 (Gemini 1.5 Flash) which is proven to work correctly.
-    // The complexity score is still calculated for logging/analytics but routing is fixed to the reliable model.
+    if (/\b(her gun|every day|saat|dakika|hafta|ay|schedule|cron)\b/.test(normalizedPrompt)) {
+        complexScore += 2;
+    }
+
+    const likelyComplex =
+        complexScore > simpleScore || (complexScore === simpleScore && prompt.length > 90);
+    const complexity: PromptAnalysis['complexity'] = likelyComplex
+        ? (complexScore >= 6 ? 'complex' : 'moderate')
+        : 'simple';
+
+    const model: ModelType = complexity === 'simple' ? 'flash-25' : 'flash-30';
+    const reason = model === 'flash-30'
+        ? `Karmasik komut (skor: ${complexScore}/${simpleScore}) - Gemini 3.0 Flash secildi`
+        : `Basit komut (skor: ${simpleScore}/${complexScore}) - Gemini 2.5 Flash secildi`;
+
     return {
-        model: 'flash-25',
-        reason: complexScore > simpleScore
-            ? `Karmaşık komut (skor: ${complexScore}/${simpleScore}) - Stabilite için Gemini 2.5 pro kullanılıyor`
-            : `Basit komut (skor: ${simpleScore}/${complexScore}) - Stabilite için Gemini 2.5 pro kullanılıyor`,
-        complexity: complexScore > simpleScore ? (complexScore > 5 ? 'complex' : 'moderate') : 'simple'
+        model,
+        reason,
+        complexity,
     };
 }
 
-/**
- * Get the model name string for logging
- */
 export function getModelDisplayName(model: ModelType): string {
     return model === 'flash-25' ? 'Gemini 2.5 Flash' : 'Gemini 3.0 Flash';
 }

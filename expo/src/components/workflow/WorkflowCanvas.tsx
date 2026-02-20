@@ -254,9 +254,9 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
     }, [containerOffset, translationX, translationY, scale]);
 
     const getOutputPortPosition = useCallback((node: WorkflowNode, port: EdgePort) => {
-        const metadata = NODE_REGISTRY[node.type] || { outputPorts: ['default'] };
+        const outputPorts: EdgePort[] = NODE_REGISTRY[node.type]?.outputPorts || ['default'];
         const { width, height } = getNodeDimensions(node.type);
-        const index = Math.max(0, metadata.outputPorts.indexOf(port));
+        const index = Math.max(0, outputPorts.indexOf(port));
         const x = node.position.x + width + 20;
         const y = node.position.y + (height / 2) + (index * 36);
         return { x, y };

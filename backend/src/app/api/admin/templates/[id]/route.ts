@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
+    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -19,6 +20,14 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     const id = params.id;
 
     const { data, error } = await supabaseAdmin
@@ -41,6 +50,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     try {
         const id = params.id;
         const body = await request.json();
@@ -77,6 +94,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     const id = params.id;
 
     const { error } = await supabaseAdmin

@@ -1,7 +1,16 @@
 
 import { NextResponse } from 'next/server';
+import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 export async function POST(request: Request) {
+    const auth = verifyAppSecretAuth(request);
+    if (!auth.ok) {
+        return NextResponse.json(
+            { error: auth.message || 'Unauthorized', code: auth.code || 'UNAUTHORIZED' },
+            { status: auth.status || 401 }
+        );
+    }
+
     try {
         const body = await request.json();
         const { spreadsheetId, range, accessToken } = body;

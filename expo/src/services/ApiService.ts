@@ -7,6 +7,10 @@ import * as FileSystem from 'expo-file-system';
 // Always use production Vercel backend
 const API_BASE_URL = 'https://breviai.vercel.app';
 console.log('[ApiService] Using Production URL:', API_BASE_URL);
+const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || '';
+if (!APP_SECRET) {
+    console.warn('[ApiService] EXPO_PUBLIC_APP_SECRET is not set. Authenticated API requests may fail.');
+}
 
 import { WorkflowNode, WorkflowEdge } from '../types/workflow-types';
 import { SYSTEM_PROMPT_TURKISH } from '../constants/SystemPrompt';
@@ -51,7 +55,7 @@ class ApiService {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'BreviAI-App/1.0', // Helps with Vercel/WAF blocking
-        'x-app-secret': process.env.EXPO_PUBLIC_APP_SECRET || 'breviai-test-secret-12345',
+        'x-app-secret': APP_SECRET,
     };
 
 

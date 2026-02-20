@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFlash25Model, getFlash30Model, generateContent, getProModel } from '@/lib/gemini';
+import { getFlash25Model, getFlash30Model } from '@/lib/gemini';
 import { analyzePrompt, getModelDisplayName } from '@/lib/prompt-router';
-import { SYSTEM_PROMPT_TURKISH, SYSTEM_PROMPT_SIMPLE } from '@/lib/prompt-templates';
-import { parseAIResponse } from '@/lib/json-validator';
+import { SYSTEM_PROMPT_TURKISH } from '@/lib/prompt-templates';
+import { recordExecution } from '@/lib/api/execution-history';
+import { getClientIp } from '@/lib/api/rate-limit';
+import { createRequestId } from '@/lib/api/response';
+import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 // CORS headers
 const corsHeaders = {
@@ -42,21 +45,6 @@ function checkRateLimit(ip: string): boolean {
     return true;
 }
 
-/**
- * Verify app secret
- */
-function verifyAppSecret(request: NextRequest): boolean {
-    const secret = request.headers.get('x-app-secret');
-
-    // DEV MODE: Always allow if no secret env is set or if explicitly skipped
-    if (!process.env.APP_SECRET || process.env.NODE_ENV === 'development') return true;
-
-    // Allow basic test secret for ease of development
-    if (secret === 'breviai-test-secret-12345') return true;
-
-    return secret === process.env.APP_SECRET;
-}
-
 export async function GET(request: NextRequest) {
     return NextResponse.json({
         status: 'online',
@@ -71,22 +59,47 @@ export async function GET(request: NextRequest) {
  * Generate shortcut from natural language prompt
  */
 export async function POST(request: NextRequest) {
+    const requestId = createRequestId('generate');
     const startTime = Date.now();
+    const ip = getClientIp(request);
 
     try {
         // Verify authentication
-        if (!verifyAppSecret(request)) {
+        const auth = verifyAppSecretAuth(request);
+        if (!auth.ok) {
+            recordExecution({
+                route: '/api/generate',
+                method: 'POST',
+                statusCode: auth.status || 401,
+                success: false,
+                durationMs: Date.now() - startTime,
+                requestId,
+                ip,
+                errorCode: auth.code || 'UNAUTHORIZED',
+                errorMessage: auth.message || 'Unauthorized',
+            });
             return NextResponse.json(
-                { success: false, error: 'Yetkisiz erişim' },
-                { status: 401, headers: corsHeaders }
+                { success: false, error: auth.message || 'Unauthorized' },
+                { status: auth.status || 401, headers: corsHeaders }
             );
         }
 
         // Check rate limit
-        const ip = request.headers.get('x-forwarded-for') || 'unknown';
-        if (!checkRateLimit(ip)) {
+        const rateLimitIp = request.headers.get('x-forwarded-for') || 'unknown';
+        if (!checkRateLimit(rateLimitIp)) {
+            recordExecution({
+                route: '/api/generate',
+                method: 'POST',
+                statusCode: 429,
+                success: false,
+                durationMs: Date.now() - startTime,
+                requestId,
+                ip: String(rateLimitIp),
+                errorCode: 'RATE_LIMITED',
+                errorMessage: 'Ã‡ok fazla istek. LÃ¼tfen bekleyin.',
+            });
             return NextResponse.json(
-                { success: false, error: 'Çok fazla istek. Lütfen bekleyin.' },
+                { success: false, error: 'Ã‡ok fazla istek. LÃ¼tfen bekleyin.' },
                 { status: 429, headers: corsHeaders }
             );
         }
@@ -96,6 +109,17 @@ export async function POST(request: NextRequest) {
         const { prompt, user_context, context } = body;
 
         if (!prompt || typeof prompt !== 'string') {
+            recordExecution({
+                route: '/api/generate',
+                method: 'POST',
+                statusCode: 400,
+                success: false,
+                durationMs: Date.now() - startTime,
+                requestId,
+                ip,
+                errorCode: 'INVALID_PROMPT',
+                errorMessage: 'Prompt gerekli',
+            });
             return NextResponse.json(
                 { success: false, error: 'Prompt gerekli' },
                 // @ts-ignore
@@ -103,8 +127,14 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Select model
-        const model = getFlash25Model();
+        // Route by prompt complexity (PRD alignment)
+        const promptAnalysis = analyzePrompt(prompt);
+        const selectedModel =
+            promptAnalysis.model === 'flash-30' ? getFlash30Model() : getFlash25Model();
+        const selectedModelName = getModelDisplayName(promptAnalysis.model);
+        console.log(
+            `[Generate] Model routing -> ${selectedModelName} | complexity=${promptAnalysis.complexity} | ${promptAnalysis.reason}`
+        );
 
         // -------------------------------------------------------------
         // WEB AGENT MODE HANDLING
@@ -145,7 +175,7 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             console.log('[Generate] Using Web Agent System Prompt');
 
             // Generate with AI (Web Mode)
-            const result = await model.generateContent([
+            const result = await selectedModel.generateContent([
                 { text: webAgentPrompt },
                 { text: prompt } // The prompt already follows the "GOAL: ... PAGE STATE: ..." format from frontend
             ]);
@@ -168,6 +198,20 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
 
             try {
                 const actionData = JSON.parse(jsonStr);
+                recordExecution({
+                    route: '/api/generate',
+                    method: 'POST',
+                    statusCode: 200,
+                    success: true,
+                    durationMs: Date.now() - startTime,
+                    requestId,
+                    ip,
+                    meta: {
+                        mode: 'web-agent',
+                        model: selectedModelName,
+                        complexity: promptAnalysis.complexity,
+                    },
+                });
                 return NextResponse.json(actionData, { headers: corsHeaders });
             } catch (e) {
                 console.error('[WebAgent] JSON Parse Failed:', e);
@@ -194,12 +238,12 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             lowerPrompt.includes('gpt');
 
         // Build user prompt with context
-        let fullPrompt = `Kullanıcı komutu: "${prompt}"`;
+        let fullPrompt = `KullanÄ±cÄ± komutu: "${prompt}"`;
 
         // Add explicit instruction for AI requests
         if (isAIRequest) {
-            fullPrompt += `\n\n⚠️ ÖNEMLİ: Bu istek yapay zeka/sohbet botu içeriyor. MUTLAKA AGENT_AI node'u kullan!
-1. MANUAL_TRIGGER → 2. TEXT_INPUT (kullanıcıdan mesaj al) → 3. AGENT_AI (mesajı işle) → 4. SHOW_TEXT (yanıtı göster)`;
+            fullPrompt += `\n\nâš ï¸ Ã–NEMLÄ°: Bu istek yapay zeka/sohbet botu iÃ§eriyor. MUTLAKA AGENT_AI node'u kullan!
+1. MANUAL_TRIGGER â†’ 2. TEXT_INPUT (kullanÄ±cÄ±dan mesaj al) â†’ 3. AGENT_AI (mesajÄ± iÅŸle) â†’ 4. SHOW_TEXT (yanÄ±tÄ± gÃ¶ster)`;
             console.log('[Generate] AI request detected, adding AGENT_AI instruction');
         }
 
@@ -208,16 +252,16 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
                 fullPrompt += `\nCihaz: ${user_context.device_id}`;
             }
             if (user_context.installed_apps?.length) {
-                fullPrompt += `\nYüklü uygulamalar: ${user_context.installed_apps.slice(0, 10).join(', ')}`;
+                fullPrompt += `\nYÃ¼klÃ¼ uygulamalar: ${user_context.installed_apps.slice(0, 10).join(', ')}`;
             }
         }
 
         // Always add current date context
-        fullPrompt += `\nBUGÜNÜN TARİHİ: ${new Date().toLocaleDateString('tr-TR')} (Her zaman bu tarihi referans al)`;
+        fullPrompt += `\nBUGÃœNÃœN TARÄ°HÄ°: ${new Date().toLocaleDateString('tr-TR')} (Her zaman bu tarihi referans al)`;
 
         console.log('[Generate] Starting AI generation...');
         // Generate with AI
-        const result = await model.generateContent([
+        const result = await selectedModel.generateContent([
             { text: systemPrompt },
             { text: fullPrompt }
         ]);
@@ -249,6 +293,20 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
         // Special handling for Web Agent Actions (Bypass workflow normalization)
         if (workflowData.type && (workflowData.selector || workflowData.value || workflowData.reasoning || workflowData.type === 'finish' || workflowData.type === 'scroll' || workflowData.type === 'wait')) {
             console.log('[Generate] Detected Web Action response, returning as-is.');
+            recordExecution({
+                route: '/api/generate',
+                method: 'POST',
+                statusCode: 200,
+                success: true,
+                durationMs: Date.now() - startTime,
+                requestId,
+                ip,
+                meta: {
+                    mode: 'web-action',
+                    model: selectedModelName,
+                    complexity: promptAnalysis.complexity,
+                },
+            });
             return NextResponse.json(workflowData, { headers: corsHeaders });
         }
 
@@ -283,7 +341,7 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             const edges: any[] = [];
 
             // Add Trigger
-            nodes.push({ id: "1", type: "MANUAL_TRIGGER", label: "Başlat", position: { x: 100, y: 50 } });
+            nodes.push({ id: "1", type: "MANUAL_TRIGGER", label: "BaÅŸlat", position: { x: 100, y: 50 } });
 
             let yOffset = 200;
             let lastNodeId = "1";
@@ -346,38 +404,69 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             workflowData.edges = edges;
         }
 
-        return NextResponse.json({
+        const responseBody = {
             success: true,
             workflow: {
-                name: workflowData.name || "Yeni Akış",
+                name: workflowData.name || "Yeni AkÄ±ÅŸ",
                 nodes: workflowData.nodes || [],
                 edges: workflowData.edges || [],
                 description: workflowData.description,
-                ai_model_used: "Gemini 2.5 Pro",
+                ai_model_used: selectedModelName,
             },
-            model_used: "Gemini 2.5 Pro",
-            complexity: "complex",
+            model_used: selectedModelName,
+            complexity: promptAnalysis.complexity,
+            routing_reason: promptAnalysis.reason,
             processing_time_ms: Date.now() - startTime,
-        }, { headers: corsHeaders });
+        };
+
+        recordExecution({
+            route: '/api/generate',
+            method: 'POST',
+            statusCode: 200,
+            success: true,
+            durationMs: Date.now() - startTime,
+            requestId,
+            ip,
+            meta: {
+                workflowName: responseBody.workflow.name,
+                nodeCount: responseBody.workflow.nodes.length,
+                model: selectedModelName,
+                complexity: promptAnalysis.complexity,
+            },
+        });
+
+        return NextResponse.json(responseBody, { headers: corsHeaders });
 
     } catch (error) {
         console.error('[Generate] Error:', error);
 
         // Determine error type and return appropriate message
-        let errorMessage = 'Sunucu hatası';
+        let errorMessage = 'Sunucu hatasÄ±';
         let details = error instanceof Error ? error.message : 'Bilinmeyen hata';
         let statusCode = 500;
 
         if (details.includes('API key') || details.includes('401') || details.includes('403')) {
-            errorMessage = 'Gemini API anahtarı geçersiz veya eksik';
+            errorMessage = 'Gemini API anahtarÄ± geÃ§ersiz veya eksik';
             statusCode = 503;
         } else if (details.includes('quota') || details.includes('rate')) {
-            errorMessage = 'API kullanım limiti aşıldı';
+            errorMessage = 'API kullanÄ±m limiti aÅŸÄ±ldÄ±';
             statusCode = 429;
         } else if (details.includes('model') || details.includes('not found')) {
-            errorMessage = 'AI modeli bulunamadı';
+            errorMessage = 'AI modeli bulunamadÄ±';
             statusCode = 503;
         }
+
+        recordExecution({
+            route: '/api/generate',
+            method: 'POST',
+            statusCode: statusCode,
+            success: false,
+            durationMs: Date.now() - startTime,
+            requestId,
+            ip,
+            errorCode: 'GENERATE_FAILED',
+            errorMessage: details,
+        });
 
         return NextResponse.json(
             {
@@ -400,4 +489,5 @@ export async function OPTIONS() {
         headers: corsHeaders,
     });
 }
+
 

@@ -991,6 +991,7 @@ export interface DatabaseWriteConfig {
 }
 
 export type NodeConfig =
+    | ExecuteWorkflowConfig
     | ManualTriggerConfig
     | TimeTriggerConfig
     | ManualTriggerConfig
@@ -998,6 +999,15 @@ export type NodeConfig =
     | NotificationTriggerConfig
     | EmailTriggerConfig
     | TelegramTriggerConfig
+    | CallTriggerConfig
+    | SMSTriggerConfig
+    | WhatsAppTriggerConfig
+    | WebhookTriggerConfig
+    | StepTriggerConfig
+    | GeofenceTriggerConfig
+    | GeofenceEnterConfig
+    | GeofenceExitConfig
+    | DeepLinkTriggerConfig
     | DelayConfig
     | DelayConfig
     | IfElseConfig
@@ -1057,7 +1067,11 @@ export type NodeConfig =
     | GoogleTranslateConfig
     | TelegramSendConfig
     | SlackSendConfig
+    | DiscordSendConfig
     | WhatsAppSendConfig
+    | NotionCreateConfig
+    | NotionReadConfig
+    | PhilipsHueConfig
     | SwitchConfig
     | ContactsReadConfig
     | ContactsWriteConfig
@@ -1078,6 +1092,8 @@ export type NodeConfig =
     | CodeExecutionConfig
     | DynamicExecutorConfig
     | WebAutomationConfig
+    | ViewUdfConfig
+    | RealtimeAIConfig
     | SearchMemoryConfig
     | AddToMemoryConfig
     | BulkAddToMemoryConfig

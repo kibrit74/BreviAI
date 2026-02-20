@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getFlash25Model } from '@/lib/gemini';
 import { SYSTEM_PROMPT_TURKISH } from '@/lib/prompt-templates';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 export async function POST(request: Request) {
+  const adminAuth = verifyAdminKey(request);
+  if (!adminAuth.ok) {
+    return NextResponse.json(
+      { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+      { status: adminAuth.status || 401 }
+    );
+  }
+
   try {
     const { prompt } = await request.json();
 

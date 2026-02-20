@@ -4,8 +4,17 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import imaps from 'imap-simple';
 import { XMLParser } from 'fast-xml-parser';
+import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 export async function POST(request: Request) {
+    const auth = verifyAppSecretAuth(request);
+    if (!auth.ok) {
+        return NextResponse.json(
+            { error: auth.message || 'Unauthorized', code: auth.code || 'UNAUTHORIZED' },
+            { status: auth.status || 401 }
+        );
+    }
+
     let connection: any = null;
     let imapError: any = null;
 

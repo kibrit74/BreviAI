@@ -57,8 +57,8 @@ describe('Node coverage consistency', () => {
     const executorKeys = parseExecutorRegistryKeys(executorRegistry);
 
     test('NodeType list has no duplicates', () => {
-        const raw = Array.from(workflowTypes.matchAll(/export type NodeType\s*=\s*([^;]+);/s));
-        const block = raw[0]?.[1] || '';
+        const raw = workflowTypes.match(/export type NodeType\s*=\s*([^;]+);/s);
+        const block = raw?.[1] || '';
         const all = Array.from(block.matchAll(/'([^']+)'/g)).map(m => m[1]);
         const seen = new Set<string>();
         const dups = new Set<string>();

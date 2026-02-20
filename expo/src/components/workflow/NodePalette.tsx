@@ -59,6 +59,8 @@ const CATEGORY_INFO: Record<NodeCategory | 'all', { name: string; icon: string; 
     microsoft: { name: 'Microsoft', icon: 'logo-windows', color: '#0078D4' },
     social: { name: 'Sosyal Medya', icon: 'share-social', color: '#1877F2' },
     data: { name: 'Veri', icon: 'server', color: '#6366F1' },
+    memory: { name: 'Hafiza', icon: 'albums', color: '#14B8A6' },
+    display: { name: 'Gosterim', icon: 'desktop', color: '#F59E0B' },
 };
 
 // Item width for 2-column grid

@@ -5,6 +5,11 @@ async function testGenerate() {
     console.log('Testing /api/generate...');
 
     try {
+        const appSecret = process.env.APP_SECRET || '';
+        if (!appSecret) {
+            throw new Error('APP_SECRET is required to run verify-workflow script.');
+        }
+
         // const apiUrl = 'http://localhost:3000/api/generate';
         const apiUrl = 'https://breviai.vercel.app/api/generate';
 
@@ -14,7 +19,7 @@ async function testGenerate() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-app-secret': 'breviai-test-secret-12345' // Using the dev secret from route.ts
+                'x-app-secret': appSecret
             },
             body: JSON.stringify({
                 prompt: 'Pil %20 altına düştüğünde tasarruf modunu aç',

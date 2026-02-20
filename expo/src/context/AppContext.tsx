@@ -19,6 +19,7 @@ interface AppContextType {
 
 const darkColors = {
     background: '#111827',
+    surface: '#1f2937',
     card: '#1f2937',
     cardAlt: '#374151',
     primary: '#3b82f6', // Blue 500
@@ -34,6 +35,7 @@ const darkColors = {
 
 const lightColors = {
     background: '#f3f4f6',
+    surface: '#ffffff',
     card: '#ffffff',
     cardAlt: '#e5e7eb',
     primary: '#2563eb', // Blue 600

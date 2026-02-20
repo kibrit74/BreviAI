@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { SEED_TEMPLATES } from '@/data/seed_templates';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
+    'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, x-admin-key',
 };
 
 export async function OPTIONS() {
@@ -22,6 +23,14 @@ export async function OPTIONS() {
  * USE WITH CAUTION - This deletes all existing templates!
  */
 export async function POST(request: NextRequest) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     try {
         // 1. Delete all existing templates
         const { error: deleteError } = await supabase
@@ -87,7 +96,15 @@ export async function POST(request: NextRequest) {
  * GET /api/admin/reseed
  * Returns current template count
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return NextResponse.json(
+            { success: false, code: adminAuth.code || 'UNAUTHORIZED', error: adminAuth.message || 'Unauthorized' },
+            { status: adminAuth.status || 401, headers: corsHeaders }
+        );
+    }
+
     const { count, error } = await supabase
         .from('templates')
         .select('*', { count: 'exact', head: true });
