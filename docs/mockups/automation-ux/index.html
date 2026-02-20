@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automation UI Mockups</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f7f4ef;
+        --ink: #1b1d1f;
+        --muted: #59626b;
+        --card: #ffffff;
+        --line: #dfd9cf;
+        --accent-a: #e85d2a;
+        --accent-b: #148277;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 80% 0%, #ffe6cc, transparent 45%),
+          radial-gradient(circle at 10% 95%, #d3efe8, transparent 40%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1080px, 92%);
+        margin: 48px auto;
+      }
+
+      .hero {
+        margin-bottom: 28px;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font: 700 40px/1.05 "Space Grotesk", sans-serif;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 20px;
+        text-decoration: none;
+        color: inherit;
+        box-shadow: 0 10px 26px rgba(27, 29, 31, 0.08);
+        transform: translateY(12px);
+        opacity: 0;
+        animation: rise 0.5s ease forwards;
+      }
+
+      .card:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+
+      .card:nth-child(3) {
+        animation-delay: 0.16s;
+      }
+
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        margin-bottom: 12px;
+      }
+
+      .tag.a {
+        background: #ffe6db;
+        color: #8f2d0f;
+      }
+
+      .tag.b {
+        background: #d9efe9;
+        color: #0f5e56;
+      }
+
+      .tag.c {
+        background: #f5eccc;
+        color: #7a5f00;
+      }
+
+      h2 {
+        margin: 0 0 8px;
+        font: 700 24px/1.15 "Space Grotesk", sans-serif;
+      }
+
+      .meta {
+        margin-top: 16px;
+        font-size: 14px;
+        color: #30383f;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+      }
+
+      .a .dot {
+        background: var(--accent-a);
+      }
+
+      .b .dot {
+        background: var(--accent-b);
+      }
+
+      .c .dot {
+        background: #ba9800;
+      }
+
+      @keyframes rise {
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 32px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <h1>Automation Builder Mockups</h1>
+        <p>
+          Three standalone UI directions for creating automations. No app
+          integration, only clickable mockups.
+        </p>
+      </section>
+
+      <section class="grid">
+        <a class="card" href="./concept-a-shortcuts-deck.html">
+          <span class="tag a">Concept A</span>
+          <h2>Shortcuts Deck</h2>
+          <p>
+            Card-first flow similar to phone shortcuts. Fast for non-technical
+            users.
+          </p>
+          <div class="meta a"><span class="dot"></span>Best for speed</div>
+        </a>
+
+        <a class="card" href="./concept-b-flow-canvas.html">
+          <span class="tag b">Concept B</span>
+          <h2>Flow Canvas</h2>
+          <p>
+            Visual graph editor with left block palette and right inspector
+            panel.
+          </p>
+          <div class="meta b"><span class="dot"></span>Best for complexity</div>
+        </a>
+
+        <a class="card" href="./concept-c-wizard-command.html">
+          <span class="tag c">Concept C</span>
+          <h2>Wizard Command</h2>
+          <p>
+            Guided 3-step builder with natural language and generated flow
+            summary.
+          </p>
+          <div class="meta c"><span class="dot"></span>Best onboarding</div>
+        </a>
+      </section>
+    </main>
+  </body>
+</html>

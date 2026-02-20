@@ -1,8 +1,15 @@
-# Explicitly allow local modules
-!modules/
-!modules/**
+# Common build/dependency artifacts
+node_modules/
+.expo/
+dist/
+web-build/
 
 # Ignore generated Android build artifacts
 android/.gradle/
 android/build/
 android/app/build/
+
+# Ignore local module artifacts/dependencies
+modules/**/node_modules/
+modules/**/build/
+modules/**/.gradle/

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workflow UX Showcase</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5efe4;
+        --ink: #1f2933;
+        --muted: #5f6c78;
+        --line: #d8cdbb;
+        --card: #ffffff;
+        --before: #b84d1d;
+        --after: #0f7f70;
+        --chip: #eef8f6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 0 0, #ffe8c9, transparent 36%),
+          radial-gradient(circle at 100% 100%, #cfe9e1, transparent 42%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1280px, 95%);
+        margin: 22px auto 30px;
+      }
+
+      .head {
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 700 34px/1.04 "Space Grotesk", sans-serif;
+        letter-spacing: -0.02em;
+      }
+
+      .head p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        max-width: 820px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(270px, 1fr));
+        gap: 12px;
+      }
+
+      .panel {
+        background: rgba(255, 255, 255, 0.45);
+        border: 1px solid #e4dac9;
+        border-radius: 20px;
+        padding: 12px;
+      }
+
+      .panel h2 {
+        margin: 2px 0 10px;
+        font: 700 16px/1.1 "Space Grotesk", sans-serif;
+      }
+
+      .phones {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .phone {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: linear-gradient(180deg, #fff, #fffaf3);
+        min-height: 560px;
+        padding: 10px;
+        box-shadow: 0 12px 24px rgba(24, 30, 35, 0.1);
+      }
+
+      .notch {
+        width: 96px;
+        height: 20px;
+        margin: -10px auto 10px;
+        border-radius: 0 0 12px 12px;
+        background: #25313b;
+      }
+
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .label {
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 999px;
+        padding: 6px 8px;
+      }
+
+      .before {
+        background: #ffe7dd;
+        color: #7f2f10;
+      }
+
+      .after {
+        background: #e5f7f3;
+        color: #0b5d52;
+      }
+
+      .small {
+        color: #6c7883;
+        font-size: 11px;
+      }
+
+      .node {
+        margin-top: 9px;
+        border: 1px solid #d8d4cb;
+        border-radius: 12px;
+        background: #fff;
+        padding: 9px;
+      }
+
+      .node .k {
+        font-size: 11px;
+        color: #6f7a84;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .node .v {
+        margin-top: 4px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .hint {
+        margin-top: 10px;
+        border-radius: 11px;
+        padding: 10px;
+        font-size: 12px;
+      }
+
+      .hint.bad {
+        background: #3b1f22;
+        color: #ffd9de;
+      }
+
+      .hint.good {
+        border: 1px solid rgba(129, 140, 248, 0.4);
+        background: #1f2433;
+        color: #dbe5ff;
+      }
+
+      .chips {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .chip {
+        border: 1px solid #c8dbd7;
+        background: var(--chip);
+        color: #184c45;
+        border-radius: 999px;
+        padding: 6px 8px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .port-row {
+        margin-top: 10px;
+        display: flex;
+        justify-content: center;
+        gap: 7px;
+      }
+
+      .port {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .port.gray {
+        background: #95a1ad;
+      }
+
+      .port.plus {
+        background: #4f46e5;
+      }
+
+      .port.true {
+        background: #13a067;
+      }
+
+      .port.false {
+        background: #e33d3d;
+      }
+
+      .legend {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #687480;
+      }
+
+      @media (max-width: 1120px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="head">
+        <h1>What I meant by UX-only improvement</h1>
+        <p>
+          No node logic rewrite, no edge model rewrite. Same backend behavior, but
+          clearer mobile interaction on top.
+        </p>
+      </header>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>1) Connection guidance (same edge logic)</h2>
+          <div class="phones">
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label before">Before</span>
+                <span class="small">generic info</span>
+              </div>
+              <div class="node">
+                <div class="k">Node</div>
+                <div class="v">Weather API</div>
+              </div>
+              <div class="hint bad">
+                Connection mode: tap input or empty area to add node.
+              </div>
+            </div>
+
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label after">After</span>
+                <span class="small">source + action clarity</span>
+              </div>
+              <div class="node">
+                <div class="k">Node</div>
+                <div class="v">Weather API</div>
+              </div>
+              <div class="hint good">
+                Connecting from "Weather API" (default)<br />
+                Tap target input, or tap empty canvas for quick-add.
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>2) Quick add in palette</h2>
+          <div class="phones">
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label before">Before</span>
+                <span class="small">search + categories only</span>
+              </div>
+              <div class="node">
+                <div class="k">Palette</div>
+                <div class="v">Long list scroll</div>
+              </div>
+            </div>
+
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label after">After</span>
+                <span class="small">fast one-tap picks</span>
+              </div>
+              <div class="node">
+                <div class="k">Quick add row</div>
+                <div class="v">Most used nodes</div>
+              </div>
+              <div class="chips">
+                <span class="chip">HTTP Request</span>
+                <span class="chip">If / Else</span>
+                <span class="chip">AI Agent</span>
+                <span class="chip">Show Text</span>
+                <span class="chip">Notification</span>
+                <span class="chip">WhatsApp</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>3) Node card readability</h2>
+          <div class="phones">
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label before">Before</span>
+                <span class="small">title only</span>
+              </div>
+              <div class="node">
+                <div class="k">Card</div>
+                <div class="v">HTTP Request</div>
+                <div class="small">No quick config context</div>
+              </div>
+              <div class="port-row">
+                <span class="port gray">in</span>
+                <span class="port plus">+</span>
+              </div>
+            </div>
+
+            <div class="phone">
+              <div class="notch"></div>
+              <div class="row">
+                <span class="label after">After</span>
+                <span class="small">summary + explicit ports</span>
+              </div>
+              <div class="node">
+                <div class="k">Card</div>
+                <div class="v">Get KPI feed</div>
+                <div class="small">GET api.../kpi-live</div>
+              </div>
+              <div class="port-row">
+                <span class="port gray">in</span>
+                <span class="port plus">+</span>
+                <span class="port true">T</span>
+                <span class="port false">F</span>
+              </div>
+              <div class="legend">T/F only for branch-capable nodes.</div>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

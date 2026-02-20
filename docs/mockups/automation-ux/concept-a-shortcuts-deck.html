@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concept A - Shortcuts Deck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f6f2ea;
+        --panel: #ffffff;
+        --text: #1d2227;
+        --muted: #61707d;
+        --line: #dfd5c7;
+        --orange: #e86b2e;
+        --teal: #0f7f74;
+        --sand: #fff0db;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Manrope", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 95% 2%, #ffe0be, transparent 40%),
+          radial-gradient(circle at 0% 100%, #cde9e4, transparent 40%),
+          var(--bg);
+      }
+
+      .shell {
+        width: min(1160px, 92%);
+        margin: 28px auto 44px;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+
+      .back {
+        text-decoration: none;
+        color: #123b36;
+        border: 1px solid #9bc9c2;
+        border-radius: 999px;
+        padding: 9px 13px;
+        background: #edfaf8;
+        font-size: 14px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 700 36px/1.02 "Space Grotesk", sans-serif;
+        letter-spacing: -0.02em;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(310px, 390px) minmax(0, 1fr);
+      }
+
+      .phone {
+        background: linear-gradient(180deg, #fefefe, #fffaf1);
+        border: 1px solid var(--line);
+        border-radius: 32px;
+        padding: 18px;
+        box-shadow: 0 15px 36px rgba(20, 31, 28, 0.12);
+      }
+
+      .phone-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 7px 10px;
+      }
+
+      .chip.live {
+        background: #d9efe8;
+        color: #14564e;
+      }
+
+      .chip.time {
+        background: #fff2dd;
+        color: #7e4c1f;
+      }
+
+      .stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .action {
+        border-radius: 16px;
+        padding: 12px;
+        border: 1px solid #dddad2;
+        background: #fff;
+        display: grid;
+        gap: 7px;
+        transform: translateY(10px);
+        opacity: 0;
+        animation: lift 0.45s ease forwards;
+      }
+
+      .action:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+
+      .action:nth-child(3) {
+        animation-delay: 0.16s;
+      }
+
+      .action:nth-child(4) {
+        animation-delay: 0.24s;
+      }
+
+      .action:nth-child(5) {
+        animation-delay: 0.32s;
+      }
+
+      .action .k {
+        font-size: 11px;
+        color: #6f7d88;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .action .t {
+        font-weight: 700;
+      }
+
+      .action .v {
+        color: #30414f;
+        font-size: 14px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--panel);
+        padding: 18px;
+        box-shadow: 0 14px 34px rgba(23, 26, 30, 0.08);
+      }
+
+      .tool-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .tool {
+        border: 1px solid #d8ddd8;
+        border-radius: 14px;
+        padding: 10px;
+        background: #fdfefe;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .tool strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .tool p {
+        margin: 0;
+        font-size: 13px;
+        color: #5d6872;
+      }
+
+      .tool.active {
+        border-color: #0f7f74;
+        background: #ecf9f7;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .stat {
+        border: 1px solid #e0d8cb;
+        border-radius: 14px;
+        background: var(--sand);
+        padding: 12px;
+      }
+
+      .stat .n {
+        font: 700 26px/1.05 "Space Grotesk", sans-serif;
+      }
+
+      .stat .d {
+        color: #6b6257;
+        font-size: 13px;
+      }
+
+      .cta {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: 0;
+        border-radius: 999px;
+        padding: 11px 16px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .btn.primary {
+        background: var(--orange);
+        color: #fff;
+      }
+
+      .btn.ghost {
+        background: #edf5f4;
+        color: #164d46;
+        border: 1px solid #b9ddd7;
+      }
+
+      @keyframes lift {
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 29px;
+        }
+
+        .tool-grid,
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <div class="top">
+        <div>
+          <h1>Concept A: Shortcuts Deck</h1>
+          <p class="subtitle">
+            Mobile-first cards inspired by shortcut apps. Focus on speed.
+          </p>
+        </div>
+        <a href="./index.html" class="back">Back to concepts</a>
+      </div>
+
+      <section class="layout">
+        <article class="phone">
+          <div class="phone-head">
+            <span class="chip live">Auto run: Enabled</span>
+            <span class="chip time">07:15 daily</span>
+          </div>
+
+          <div class="stack">
+            <div class="action">
+              <span class="k">Trigger</span>
+              <span class="t">Morning schedule</span>
+              <span class="v">Runs every weekday at 07:15</span>
+            </div>
+            <div class="action">
+              <span class="k">Fetch</span>
+              <span class="t">Get USD/TRY</span>
+              <span class="v">Source: Central bank feed</span>
+            </div>
+            <div class="action">
+              <span class="k">Fetch</span>
+              <span class="t">Get Istanbul traffic</span>
+              <span class="v">Source: City API health endpoint</span>
+            </div>
+            <div class="action">
+              <span class="k">Compose</span>
+              <span class="t">Build one-page brief</span>
+              <span class="v">Template: Daily Ops Snapshot</span>
+            </div>
+            <div class="action">
+              <span class="k">Deliver</span>
+              <span class="t">Send to WhatsApp + Email</span>
+              <span class="v">To: Ops Lead Group</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="tool-head">
+            <h2 style="margin: 0; font: 700 24px/1.1 'Space Grotesk', sans-serif">
+              Action library
+            </h2>
+            <span class="chip live">11 suggested</span>
+          </div>
+
+          <div class="tool-grid" id="toolGrid">
+            <button class="tool active" type="button">
+              <strong>HTTP Request</strong>
+              <p>Call a REST endpoint and store JSON output.</p>
+            </button>
+            <button class="tool" type="button">
+              <strong>Condition Gate</strong>
+              <p>Route flow by value, status, or threshold.</p>
+            </button>
+            <button class="tool" type="button">
+              <strong>Formatter</strong>
+              <p>Turn raw data into short human text blocks.</p>
+            </button>
+            <button class="tool" type="button">
+              <strong>Send Message</strong>
+              <p>Deliver text to WhatsApp, SMS, or Telegram.</p>
+            </button>
+          </div>
+
+          <div class="row">
+            <div class="stat">
+              <div class="n">5 min</div>
+              <div class="d">Average setup time</div>
+            </div>
+            <div class="stat">
+              <div class="n">92%</div>
+              <div class="d">One-click template reuse</div>
+            </div>
+          </div>
+
+          <div class="cta">
+            <button class="btn primary">Use this direction</button>
+            <button class="btn ghost">Compare with concept B</button>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script>
+      const tools = document.querySelectorAll("#toolGrid .tool");
+      tools.forEach((item) => {
+        item.addEventListener("click", () => {
+          tools.forEach((x) => x.classList.remove("active"));
+          item.classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>

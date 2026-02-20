@@ -5,17 +5,17 @@ group = 'com.breviai.brevisettings'
 version = '1.0.0'
 
 android {
-    compileSdkVersion 34
+    compileSdkVersion rootProject.ext.compileSdkVersion
     namespace "com.breviai.brevisettings"
     defaultConfig {
-        minSdkVersion 26
-        targetSdkVersion 34
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
     }
 }
 
 dependencies {
     implementation project(':expo-modules-core')
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}"
     implementation 'com.sun.mail:android-mail:1.6.7'
     implementation 'com.sun.mail:android-activation:1.6.7'
     implementation 'org.jsoup:jsoup:1.15.3'

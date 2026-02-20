@@ -13,7 +13,6 @@ import android.os.IBinder
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.Toast
-import kotlin.math.sqrt
 
 class SensorAutomationService : Service(), SensorEventListener {
 
@@ -30,7 +29,6 @@ class SensorAutomationService : Service(), SensorEventListener {
     
     // Flip detection
     private var isFaceDown = false
-    private val FLIP_HYSTERESIS = 1000L // 1 sec stable time required? No, simpler for now.
     
     // Flashlight state
     private var isFlashlightOn = false
@@ -55,13 +53,13 @@ class SensorAutomationService : Service(), SensorEventListener {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
         
-        Toast.makeText(this, "BreviAI Sensör: Sallama ve Çevirme Aktif", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "BreviAI Sensor: Shake and Flip active", Toast.LENGTH_SHORT).show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
-        Toast.makeText(this, "Sensör Servisi Durduruldu", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Sensor service stopped", Toast.LENGTH_SHORT).show()
     }
 
     override fun onSensorChanged(event: SensorEvent) {

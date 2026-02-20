@@ -3,20 +3,14 @@ package com.breviai.brevisettings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import android.content.Context
-import android.content.SharedPreferences
 import android.content.Intent
 import android.app.NotificationManager
 import android.os.Build
 import android.provider.Settings
-import android.content.ComponentName
 
-import android.view.accessibility.AccessibilityNodeInfo
 import java.util.Properties
 import javax.mail.Folder
 import javax.mail.Session
-import javax.mail.Store
-import javax.mail.search.FlagTerm
-import javax.mail.Flags
 import javax.mail.Message
 import javax.mail.internet.MimeMultipart
 import kotlinx.coroutines.CoroutineScope
@@ -24,14 +18,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-import android.widget.Toast
 import android.appwidget.AppWidgetManager
 // import com.breviai.app.ShortcutWidgetProvider removed
 
 import android.hardware.camera2.CameraManager
 import org.json.JSONObject
 import android.content.pm.PackageManager
-import android.content.pm.ApplicationInfo
 class BreviSettingsModule : Module() {
     private val appPackageMap = mapOf(
         "netflix" to "com.netflix.mediaclient",
@@ -599,7 +591,7 @@ class BreviSettingsModule : Module() {
         }
     }
 
-    AsyncFunction("openBreviAI") { payload: Map<String, Any>, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("openBreviAI") { payload: Map<String, Any?>, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val context = appContext.reactContext
@@ -607,12 +599,17 @@ class BreviSettingsModule : Module() {
                     promise.reject("CONTEXT_ERROR", "React context is not available")
                     return@launch
                 }
-                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                intent?.apply {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                if (launchIntent == null) {
+                    promise.reject("APP_LAUNCH_ERROR", "Launch intent not found for package ${context.packageName}")
+                    return@launch
+                }
+
+                launchIntent.apply {
                     putExtra("widget_payload", java.util.HashMap(payload))
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
-                context.startActivity(intent)
+                context.startActivity(launchIntent)
                 promise.resolve(true)
             } catch (e: Exception) {
                 promise.reject("APP_LAUNCH_ERROR", "Failed to open BreviAI: ${e.message}", e)
@@ -620,7 +617,7 @@ class BreviSettingsModule : Module() {
         }
     }
 
-    AsyncFunction("executeSystemAction") { action: Map<String, Any>, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("executeSystemAction") { action: Map<String, Any?>, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.Main).launch {
             try {
                 val mode = action["mode"] as? String
@@ -681,7 +678,7 @@ class BreviSettingsModule : Module() {
         }
     }
 
-    AsyncFunction("saveWidgetConfig") { widgetId: String, config: Map<String, Any>, promise: expo.modules.kotlin.Promise ->
+    AsyncFunction("saveWidgetConfig") { widgetId: String, config: Map<String, Any?>, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val context = appContext.reactContext

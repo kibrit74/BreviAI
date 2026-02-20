@@ -31,7 +31,6 @@ class BreviAccessibilityService : AccessibilityService() {
 
     fun findNodeByText(text: String): AccessibilityNodeInfo? {
         val root = rootInActiveWindow ?: return null
-        val ignoreCase = true
         
         // Exact match first
         var nodes = root.findAccessibilityNodeInfosByText(text)

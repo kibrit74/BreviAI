@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mobile Lego Builder Mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f8f3e9;
+        --ink: #1f2529;
+        --muted: #5d6872;
+        --line: #dccfb9;
+        --card: #ffffff;
+        --amber: #e58a1f;
+        --teal: #117f70;
+        --slate: #2e3f53;
+        --mint: #e8f6f3;
+        --peach: #fff0de;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        color: var(--ink);
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 15% 0%, #ffe6c6, transparent 40%),
+          radial-gradient(circle at 90% 95%, #cfe9e2, transparent 45%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1280px, 96%);
+        margin: 18px auto 26px;
+      }
+
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: flex-end;
+        margin-bottom: 14px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 700 34px/1.02 "Space Grotesk", sans-serif;
+        letter-spacing: -0.02em;
+      }
+
+      .hero p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        max-width: 740px;
+      }
+
+      .tag {
+        border-radius: 999px;
+        border: 1px solid #8fc4b8;
+        background: #edf9f6;
+        color: #16594f;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 8px 11px;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(250px, 1fr));
+        gap: 12px;
+      }
+
+      .phone {
+        background: linear-gradient(180deg, #ffffff, #fffaf2);
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        padding: 14px;
+        box-shadow: 0 14px 28px rgba(30, 37, 44, 0.11);
+        min-height: 740px;
+        position: relative;
+        overflow: hidden;
+        transform: translateY(14px);
+        opacity: 0;
+        animation: rise 0.52s ease forwards;
+      }
+
+      .phone:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+      .phone:nth-child(3) {
+        animation-delay: 0.16s;
+      }
+      .phone:nth-child(4) {
+        animation-delay: 0.24s;
+      }
+
+      .notch {
+        width: 120px;
+        height: 22px;
+        border-radius: 0 0 14px 14px;
+        background: #222a31;
+        margin: -14px auto 12px;
+      }
+
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .head h2 {
+        margin: 0;
+        font: 700 16px/1.15 "Space Grotesk", sans-serif;
+      }
+
+      .pill {
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 6px 9px;
+      }
+
+      .pill.amber {
+        background: var(--peach);
+        color: #73430a;
+      }
+
+      .pill.teal {
+        background: var(--mint);
+        color: #14574d;
+      }
+
+      .mini {
+        font-size: 12px;
+        color: #66747f;
+        margin: 7px 0 10px;
+      }
+
+      .chain {
+        display: grid;
+        gap: 10px;
+      }
+
+      .node {
+        border: 1px solid #d8d4cb;
+        border-radius: 14px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .node .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 5px;
+      }
+
+      .node .kind {
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #687581;
+      }
+
+      .node .title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #283340;
+      }
+
+      .node .desc {
+        margin-top: 3px;
+        font-size: 12px;
+        color: #5f6972;
+      }
+
+      .plus-row {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .plus {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px dashed #8ebfb5;
+        color: #1c6d61;
+        background: #edfaf7;
+        font-size: 21px;
+        line-height: 30px;
+        text-align: center;
+        font-weight: 700;
+      }
+
+      .plus-row span {
+        font-size: 11px;
+        color: #6a7680;
+      }
+
+      .footer-btns {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 11px;
+        font-weight: 700;
+        padding: 10px 11px;
+        font-size: 12px;
+      }
+
+      .btn-ghost {
+        background: #eef2f5;
+        color: #385062;
+      }
+
+      .btn-main {
+        background: var(--teal);
+        color: #fff;
+      }
+
+      .sheet {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        border: 1px solid #d6d8d9;
+        border-radius: 16px;
+        background: #ffffff;
+        padding: 10px;
+        box-shadow: 0 10px 22px rgba(22, 28, 35, 0.13);
+      }
+
+      .sheet h3 {
+        margin: 0 0 8px;
+        font: 700 14px/1.1 "Space Grotesk", sans-serif;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+      }
+
+      .act {
+        border: 1px solid #d8dee1;
+        border-radius: 10px;
+        padding: 8px;
+        background: #fbfdfd;
+      }
+
+      .act strong {
+        display: block;
+        font-size: 12px;
+      }
+
+      .act small {
+        color: #66727d;
+        font-size: 11px;
+      }
+
+      .field {
+        border: 1px solid #d4d9db;
+        border-radius: 11px;
+        padding: 9px;
+        margin-bottom: 7px;
+        background: #fafcfb;
+      }
+
+      .field .k {
+        font-size: 11px;
+        color: #6f7a83;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .field .v {
+        margin-top: 4px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .result {
+        border: 1px dashed #b5cbc6;
+        border-radius: 12px;
+        padding: 10px;
+        margin-top: 8px;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #305149;
+        background: #f1faf8;
+      }
+
+      @keyframes rise {
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 1220px) {
+        .board {
+          grid-template-columns: repeat(2, minmax(250px, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        h1 {
+          font-size: 28px;
+        }
+
+        .hero {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .board {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="hero">
+        <div>
+          <h1>Mobile Lego Builder - Mockup</h1>
+          <p>
+            Existing template selection stays as-is. This mockup starts after
+            template/AI flow and focuses only on mobile chain editing.
+          </p>
+        </div>
+        <span class="tag">No template step duplicated</span>
+      </section>
+
+      <section class="board">
+        <article class="phone">
+          <div class="notch"></div>
+          <header class="head">
+            <h2>1) Chain Editor</h2>
+            <span class="pill amber">Lego mode</span>
+          </header>
+          <p class="mini">Tap + between blocks. Auto connect, no line drawing.</p>
+
+          <div class="chain">
+            <div class="node">
+              <div class="top">
+                <span class="kind">Trigger</span>
+                <span class="pill teal">07:15</span>
+              </div>
+              <div class="title">Weekday schedule</div>
+              <div class="desc">Runs every workday in Europe/Istanbul.</div>
+            </div>
+
+            <div class="plus-row">
+              <div class="plus">+</div>
+              <span>Add block</span>
+            </div>
+
+            <div class="node">
+              <div class="top">
+                <span class="kind">Fetch</span>
+                <span class="pill teal">HTTP</span>
+              </div>
+              <div class="title">Get USDTRY</div>
+              <div class="desc">Source: central bank endpoint.</div>
+            </div>
+
+            <div class="plus-row">
+              <div class="plus">+</div>
+              <span>Add block</span>
+            </div>
+
+            <div class="node">
+              <div class="top">
+                <span class="kind">Output</span>
+                <span class="pill teal">WA + Mail</span>
+              </div>
+              <div class="title">Send daily brief</div>
+              <div class="desc">Ops channel and fallback email group.</div>
+            </div>
+          </div>
+
+          <div class="footer-btns">
+            <button class="btn-ghost">Dry run</button>
+            <button class="btn-main">Publish</button>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="notch"></div>
+          <header class="head">
+            <h2>2) Add Block Sheet</h2>
+            <span class="pill amber">From plus</span>
+          </header>
+          <p class="mini">Block picker opens from the selected insertion point.</p>
+
+          <div class="chain">
+            <div class="node">
+              <div class="top">
+                <span class="kind">Trigger</span>
+                <span class="pill teal">Ready</span>
+              </div>
+              <div class="title">Morning trigger</div>
+              <div class="desc">Already configured.</div>
+            </div>
+
+            <div class="plus-row">
+              <div class="plus">+</div>
+              <span>Selected insertion point</span>
+            </div>
+
+            <div class="node" style="opacity: 0.6">
+              <div class="top">
+                <span class="kind">Output</span>
+              </div>
+              <div class="title">Final report</div>
+              <div class="desc">Will receive upstream values.</div>
+            </div>
+          </div>
+
+          <div class="sheet">
+            <h3>Choose next block</h3>
+            <div class="actions">
+              <div class="act">
+                <strong>HTTP Request</strong>
+                <small>Pull JSON data</small>
+              </div>
+              <div class="act">
+                <strong>If / Else</strong>
+                <small>Route by condition</small>
+              </div>
+              <div class="act">
+                <strong>AI Summary</strong>
+                <small>Build short brief</small>
+              </div>
+              <div class="act">
+                <strong>Delay</strong>
+                <small>Wait then continue</small>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="notch"></div>
+          <header class="head">
+            <h2>3) Node Quick Config</h2>
+            <span class="pill amber">Minimal fields</span>
+          </header>
+          <p class="mini">Only required fields first. Advanced hidden by default.</p>
+
+          <div class="node" style="margin-bottom: 10px">
+            <div class="top">
+              <span class="kind">HTTP Request</span>
+              <span class="pill teal">Editing</span>
+            </div>
+            <div class="title">Get Istanbul traffic index</div>
+            <div class="desc">Node inserted from plus action.</div>
+          </div>
+
+          <div class="field">
+            <div class="k">URL</div>
+            <div class="v">https://api.ibb.gov.tr/traffic/live</div>
+          </div>
+          <div class="field">
+            <div class="k">Method</div>
+            <div class="v">GET</div>
+          </div>
+          <div class="field">
+            <div class="k">Output variable</div>
+            <div class="v">trafficData</div>
+          </div>
+          <div class="field">
+            <div class="k">Failure rule</div>
+            <div class="v">Retry 2x then continue with warning</div>
+          </div>
+
+          <div class="footer-btns">
+            <button class="btn-ghost">Advanced</button>
+            <button class="btn-main">Save node</button>
+          </div>
+        </article>
+
+        <article class="phone">
+          <div class="notch"></div>
+          <header class="head">
+            <h2>4) Dry Run Result</h2>
+            <span class="pill amber">Before publish</span>
+          </header>
+          <p class="mini">Simulates run with sample data, then publish safely.</p>
+
+          <div class="field">
+            <div class="k">Execution status</div>
+            <div class="v">6 / 6 nodes success</div>
+          </div>
+          <div class="field">
+            <div class="k">Latency</div>
+            <div class="v">2.8s average</div>
+          </div>
+          <div class="field">
+            <div class="k">Fallback usage</div>
+            <div class="v">0</div>
+          </div>
+
+          <div class="result">
+            Good morning. USDTRY: 36.24 (+0.3%). Istanbul traffic: 58/100
+            moderate. Weather: 11C cloudy. Top headline: "..." Delivery targets:
+            WhatsApp Ops + Email Ops.
+          </div>
+
+          <div class="footer-btns">
+            <button class="btn-ghost">Back to edit</button>
+            <button class="btn-main">Publish automation</button>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

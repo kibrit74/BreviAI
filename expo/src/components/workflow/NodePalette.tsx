@@ -63,6 +63,15 @@ const CATEGORY_INFO: Record<NodeCategory | 'all', { name: string; icon: string; 
     display: { name: 'Gosterim', icon: 'desktop', color: '#F59E0B' },
 };
 
+const QUICK_NODE_TYPES: NodeType[] = [
+    'HTTP_REQUEST',
+    'IF_ELSE',
+    'AGENT_AI',
+    'SHOW_TEXT',
+    'NOTIFICATION',
+    'WHATSAPP_SEND',
+];
+
 // Item width for 2-column grid
 const ITEM_WIDTH = (SCREEN_WIDTH - 48) / 2;
 
@@ -107,6 +116,24 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
 
         return nodes;
     }, [nodesByCategory, selectedCategory, searchQuery]);
+
+    const quickNodes = useMemo(() => {
+        return QUICK_NODE_TYPES
+            .map((type) => {
+                const metadata = NODE_REGISTRY[type];
+                return metadata ? ({ type, ...metadata } as NodeItem) : null;
+            })
+            .filter((node): node is NodeItem => node !== null);
+    }, []);
+
+    const filteredQuickNodes = useMemo(() => {
+        if (!searchQuery.trim()) return quickNodes;
+        const query = searchQuery.toLowerCase();
+        return quickNodes.filter((node) =>
+            node.name.toLowerCase().includes(query) ||
+            node.description.toLowerCase().includes(query)
+        );
+    }, [quickNodes, searchQuery]);
 
     const handleSelectNode = (type: NodeType) => {
         onSelectNode(type);
@@ -207,6 +234,43 @@ export const NodePalette: React.FC<NodePaletteProps> = ({
                             )}
                         </View>
                     </View>
+
+                    {filteredQuickNodes.length > 0 && (
+                        <View style={styles.quickSection}>
+                            <Text style={[styles.quickTitle, { color: colors.textSecondary }]}>Hizli Ekle</Text>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.quickRow}
+                            >
+                                {filteredQuickNodes.map((item) => (
+                                    <TouchableOpacity
+                                        key={`quick-${item.type}`}
+                                        style={[
+                                            styles.quickChip,
+                                            {
+                                                backgroundColor: theme === 'dark' ? 'rgba(255,255,255,0.04)' : colors.card,
+                                                borderColor: theme === 'dark' ? 'rgba(255,255,255,0.08)' : colors.border,
+                                            },
+                                        ]}
+                                        onPress={() => handleSelectNode(item.type)}
+                                        activeOpacity={0.75}
+                                    >
+                                        <View style={[styles.quickChipIcon, { backgroundColor: item.color }]}>
+                                            {/^[a-z0-9-]+$/.test(item.icon) ? (
+                                                <Ionicons name={item.icon as any} size={12} color="#FFF" />
+                                            ) : (
+                                                <Text style={{ color: '#FFF', fontSize: 11 }}>{item.icon}</Text>
+                                            )}
+                                        </View>
+                                        <Text style={[styles.quickChipText, { color: colors.text }]} numberOfLines={1}>
+                                            {item.name}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
+                    )}
 
                     {/* Category tabs */}
                     <View style={[styles.tabsContainer, { borderBottomColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : colors.border }]}>
@@ -376,6 +440,41 @@ const styles = StyleSheet.create({
     },
     clearButton: {
         padding: 4,
+    },
+    quickSection: {
+        paddingHorizontal: 20,
+        marginBottom: 10,
+    },
+    quickTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        marginBottom: 8,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    quickRow: {
+        gap: 8,
+        paddingRight: 20,
+    },
+    quickChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 7,
+        borderWidth: 1,
+        borderRadius: 999,
+        paddingHorizontal: 11,
+        paddingVertical: 8,
+    },
+    quickChipIcon: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    quickChipText: {
+        fontSize: 12,
+        fontWeight: '600',
     },
     tabsContainer: {
         paddingBottom: 12,

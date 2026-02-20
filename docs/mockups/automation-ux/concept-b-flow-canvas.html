@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concept B - Flow Canvas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef3f4;
+        --panel: #ffffff;
+        --text: #192129;
+        --muted: #5e6872;
+        --line: #ced5da;
+        --mint: #087f70;
+        --amber: #f39e33;
+        --slate: #2f3a44;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "IBM Plex Sans", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 85% 0%, #dbefe8, transparent 40%),
+          radial-gradient(circle at 10% 100%, #ffefd7, transparent 35%),
+          var(--bg);
+      }
+
+      .frame {
+        width: min(1280px, 95%);
+        margin: 22px auto;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font: 700 30px/1.05 "Space Grotesk", sans-serif;
+      }
+
+      .topbar p {
+        margin: 5px 0 0;
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .btn {
+        border-radius: 999px;
+        border: 1px solid transparent;
+        padding: 10px 14px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+
+      .btn.mint {
+        background: var(--mint);
+        color: #fff;
+      }
+
+      .btn.dark {
+        background: var(--slate);
+        color: #fff;
+      }
+
+      .btn.ghost {
+        border-color: #99c7bf;
+        color: #145950;
+        background: #edfbf8;
+      }
+
+      .board {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: 260px minmax(0, 1fr) 280px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 14px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font: 700 18px/1.1 "Space Grotesk", sans-serif;
+      }
+
+      .block-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .block {
+        border: 1px solid #d8dde0;
+        border-radius: 12px;
+        padding: 10px;
+        background: #fbfdfd;
+      }
+
+      .block strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .block small {
+        color: #67717c;
+      }
+
+      .canvas {
+        position: relative;
+        min-height: 610px;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, #ecf0f2 1px, transparent 1px) 0 0 / 28px 28px,
+          linear-gradient(#ecf0f2 1px, transparent 1px) 0 0 / 28px 28px,
+          #f9fbfb;
+      }
+
+      .node {
+        position: absolute;
+        width: 208px;
+        border-radius: 14px;
+        padding: 10px 10px 11px;
+        border: 1px solid #cfd7da;
+        background: #fff;
+        box-shadow: 0 8px 20px rgba(23, 31, 36, 0.08);
+        transform: translateY(12px);
+        opacity: 0;
+        animation: pop 0.45s ease forwards;
+      }
+
+      .node small {
+        color: #63707d;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .node strong {
+        display: block;
+      }
+
+      .node.a {
+        left: 42px;
+        top: 44px;
+        animation-delay: 0.02s;
+      }
+
+      .node.b {
+        left: 324px;
+        top: 42px;
+        animation-delay: 0.09s;
+      }
+
+      .node.c {
+        left: 324px;
+        top: 230px;
+        animation-delay: 0.16s;
+      }
+
+      .node.d {
+        left: 620px;
+        top: 134px;
+        animation-delay: 0.23s;
+      }
+
+      .node.e {
+        left: 620px;
+        top: 330px;
+        animation-delay: 0.3s;
+      }
+
+      .line {
+        position: absolute;
+        background: #9dc5be;
+      }
+
+      .line.h1 {
+        left: 250px;
+        top: 95px;
+        width: 74px;
+        height: 2px;
+      }
+
+      .line.v1 {
+        left: 360px;
+        top: 95px;
+        width: 2px;
+        height: 170px;
+      }
+
+      .line.h2 {
+        left: 530px;
+        top: 190px;
+        width: 90px;
+        height: 2px;
+      }
+
+      .line.h3 {
+        left: 530px;
+        top: 386px;
+        width: 90px;
+        height: 2px;
+      }
+
+      .inspector .kv {
+        margin-bottom: 10px;
+        border: 1px solid #dae0e3;
+        border-radius: 11px;
+        padding: 10px;
+        background: #fbfdfd;
+      }
+
+      .inspector .kv .k {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #68737e;
+      }
+
+      .inspector .kv .v {
+        margin-top: 4px;
+        font-weight: 600;
+      }
+
+      .legend {
+        margin-top: 12px;
+        display: grid;
+        gap: 8px;
+      }
+
+      .pill {
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .pill.ok {
+        background: #dff3ed;
+        color: #0f5c52;
+      }
+
+      .pill.warn {
+        background: #fff0d9;
+        color: #835100;
+      }
+
+      @keyframes pop {
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 1110px) {
+        .board {
+          grid-template-columns: 1fr;
+        }
+
+        .canvas {
+          min-height: 520px;
+          overflow-x: auto;
+        }
+
+        .node {
+          width: 190px;
+        }
+
+        .node.d,
+        .node.e {
+          left: 560px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="frame">
+      <header class="topbar">
+        <div>
+          <h1>Concept B: Flow Canvas</h1>
+          <p>Graph-style builder for power users and team workflows.</p>
+        </div>
+        <div class="actions">
+          <a class="btn ghost" href="./index.html" style="text-decoration: none"
+            >Back</a
+          >
+          <button class="btn dark" type="button">Save draft</button>
+          <button class="btn mint" type="button">Publish workflow</button>
+        </div>
+      </header>
+
+      <section class="board">
+        <aside class="panel">
+          <h2>Blocks</h2>
+          <div class="block-list">
+            <div class="block">
+              <strong>Trigger</strong>
+              <small>Schedule, webhook, event listener</small>
+            </div>
+            <div class="block">
+              <strong>HTTP Request</strong>
+              <small>Pull JSON from external API</small>
+            </div>
+            <div class="block">
+              <strong>Branch</strong>
+              <small>if/else and threshold routing</small>
+            </div>
+            <div class="block">
+              <strong>AI Summarize</strong>
+              <small>Convert data into short status text</small>
+            </div>
+            <div class="block">
+              <strong>Send Output</strong>
+              <small>Email, Slack, WhatsApp</small>
+            </div>
+          </div>
+        </aside>
+
+        <article class="panel canvas">
+          <div class="line h1"></div>
+          <div class="line v1"></div>
+          <div class="line h2"></div>
+          <div class="line h3"></div>
+
+          <div class="node a">
+            <small>Trigger</small>
+            <strong>Weekday 07:15</strong>
+          </div>
+
+          <div class="node b">
+            <small>HTTP Request</small>
+            <strong>USDTRY feed</strong>
+          </div>
+
+          <div class="node c">
+            <small>HTTP Request</small>
+            <strong>IBB traffic score</strong>
+          </div>
+
+          <div class="node d">
+            <small>AI Summarize</small>
+            <strong>Build daily snapshot</strong>
+          </div>
+
+          <div class="node e">
+            <small>Send Output</small>
+            <strong>Email + WhatsApp</strong>
+          </div>
+        </article>
+
+        <aside class="panel inspector">
+          <h2>Inspector</h2>
+
+          <div class="kv">
+            <div class="k">Selected block</div>
+            <div class="v">AI Summarize</div>
+          </div>
+
+          <div class="kv">
+            <div class="k">Prompt mode</div>
+            <div class="v">Operational summary</div>
+          </div>
+
+          <div class="kv">
+            <div class="k">Output length</div>
+            <div class="v">120 words max</div>
+          </div>
+
+          <div class="kv">
+            <div class="k">Fallback action</div>
+            <div class="v">Send previous successful report</div>
+          </div>
+
+          <div class="legend">
+            <span class="pill ok">Pass rate simulation: 97%</span>
+            <span class="pill warn">Warning: one API has no retry policy</span>
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

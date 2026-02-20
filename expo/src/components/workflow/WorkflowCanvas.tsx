@@ -77,6 +77,47 @@ const getNodeDimensions = (type: NodeType) => {
     }
 };
 
+const truncateValue = (value: string, maxLength = 36): string => {
+    if (!value) return '';
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLength) return trimmed;
+    return `${trimmed.slice(0, maxLength - 1)}...`;
+};
+
+const summarizeNodeConfig = (node: WorkflowNode): string => {
+    const config = (node.config || {}) as Record<string, any>;
+    const variableName = typeof config.variableName === 'string' ? config.variableName.trim() : '';
+    const url = typeof config.url === 'string' ? config.url.trim() : '';
+
+    switch (node.type) {
+        case 'HTTP_REQUEST': {
+            const method = typeof config.method === 'string' ? config.method.toUpperCase() : 'GET';
+            return url ? `${method} ${truncateValue(url, 28)}` : method;
+        }
+        case 'WEB_AUTOMATION':
+        case 'BROWSER_SCRAPE':
+            return url ? truncateValue(url, 32) : 'Web source not set';
+        case 'EMAIL_SEND': {
+            const to = typeof config.to === 'string' ? config.to : '';
+            return to ? `to ${truncateValue(to, 28)}` : 'Recipient missing';
+        }
+        case 'WHATSAPP_SEND': {
+            const phone = typeof config.phone === 'string' ? config.phone : '';
+            return phone ? `to ${truncateValue(phone, 22)}` : 'Target missing';
+        }
+        case 'IF_ELSE': {
+            const conditions = Array.isArray(config.conditions) ? config.conditions.length : 0;
+            return conditions > 0 ? `${conditions} condition${conditions > 1 ? 's' : ''}` : 'No condition yet';
+        }
+        case 'SHOW_TEXT':
+            return typeof config.title === 'string' && config.title.trim() ? truncateValue(config.title, 30) : 'Preview text';
+        default:
+            if (variableName) return `var: ${truncateValue(variableName, 24)}`;
+            if (url) return truncateValue(url, 32);
+            return '';
+    }
+};
+
 interface WorkflowCanvasProps {
     workflow: Workflow;
     onWorkflowChange: (workflow: Workflow) => void;
@@ -410,6 +451,13 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
         }
     };
 
+    const connectionSourceNode = connectingFrom
+        ? workflow.nodes.find((n) => n.id === connectingFrom.nodeId) || null
+        : null;
+    const connectionSourceLabel = connectionSourceNode
+        ? (connectionSourceNode.label || NODE_REGISTRY[connectionSourceNode.type]?.name || 'Node')
+        : 'Node';
+
     return (
         <GestureDetector gesture={composedGesture}>
             <View
@@ -489,9 +537,14 @@ export const WorkflowCanvas: React.FC<WorkflowCanvasProps> = ({
                 {/* Minimal Connection Mode Indicator - No overlay to block touches */}
                 {connectingFrom && (
                     <View style={styles.connectionIndicator}>
-                        <Text style={styles.connectionText}>🔗 Bağlantı modu: girişe dokun veya boş alana dokunup node ekle</Text>
+                        <Text style={styles.connectionText}>
+                            Connecting from "{truncateValue(connectionSourceLabel, 24)}" ({connectingFrom.port})
+                        </Text>
+                        <Text style={styles.connectionSubText}>
+                            Tap a target input to connect, or tap empty canvas to quick-add a node.
+                        </Text>
                         <TouchableOpacity onPress={cancelConnection} style={styles.cancelBtn}>
-                            <Text style={styles.cancelText}>İptal</Text>
+                            <Text style={styles.cancelText}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -785,6 +838,9 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
         hasInputPort: true,
         outputPorts: ['default']
     };
+    const configSummary = summarizeNodeConfig(node);
+    const nodeTitle = node.label?.trim() || metadata.name;
+    const nodeSubtitle = configSummary || metadata.description;
 
     // Refs to keep latest props accessible in PanResponder closures
     const onMoveRef = useRef(onMove);
@@ -871,8 +927,8 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
                     )}
                 </View>
                 <View style={styles.textBox}>
-                    <Text style={[styles.nodeTitle, { color: colors.text }]} numberOfLines={1}>{metadata.name}</Text>
-                    <Text style={[styles.nodeSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>{node.label || metadata.description}</Text>
+                    <Text style={[styles.nodeTitle, { color: colors.text }]} numberOfLines={1}>{nodeTitle}</Text>
+                    <Text style={[styles.nodeSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>{nodeSubtitle}</Text>
                 </View>
 
                 {/* Status Indicator / Menu Trigger */}
@@ -931,7 +987,11 @@ const NodePorts: React.FC<NodePortsProps> = ({
                     activeOpacity={0.7}
                 >
                     <View style={[styles.portButton, styles.inputPortButton, isConnecting && styles.inputPortButtonActive]}>
-                        <Text style={[styles.portButtonText, isConnecting && styles.portButtonTextActive]}>⦿</Text>
+                        <Ionicons
+                            name="arrow-back"
+                            size={14}
+                            color={isConnecting ? '#FFFFFF' : '#4B5563'}
+                        />
                     </View>
                 </TouchableOpacity>
             )}
@@ -979,7 +1039,9 @@ const NodePorts: React.FC<NodePortsProps> = ({
                             port === 'true' && styles.portButtonTrue,
                             port === 'false' && styles.portButtonFalse,
                         ]}>
-                            <Text style={styles.portButtonText}>+</Text>
+                            <Text style={styles.portButtonText}>
+                                {port === 'true' ? 'T' : port === 'false' ? 'F' : '+'}
+                            </Text>
                         </View>
                     </TouchableOpacity>
                 ))}
@@ -1015,9 +1077,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#1E1E2E',
         padding: 12,
         borderRadius: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: 'rgba(129, 140, 248, 0.45)',
         shadowColor: '#000',
         elevation: 5,
         zIndex: 50, // Below ports (200) but above other UI
@@ -1028,15 +1089,29 @@ const styles = StyleSheet.create({
     },
     connectionText: {
         color: '#FFF',
-        fontWeight: 'bold',
-        flex: 1,
+        fontWeight: '700',
+        fontSize: 13,
+        marginBottom: 4,
+    },
+    connectionSubText: {
+        color: '#CBD5E1',
+        fontSize: 12,
+        lineHeight: 16,
+        paddingRight: 52,
     },
     cancelBtn: {
-        padding: 4,
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        paddingVertical: 4,
+        paddingHorizontal: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(239, 68, 68, 0.15)',
     },
     cancelText: {
         color: '#EF4444',
-        fontWeight: 'bold',
+        fontWeight: '700',
+        fontSize: 12,
     },
     controls: {
         position: 'absolute',
@@ -1118,7 +1193,7 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 4,
+        padding: 6,
         gap: 8,
     },
     iconBox: {
@@ -1142,7 +1217,7 @@ const styles = StyleSheet.create({
     },
     nodeSubtitle: {
         color: '#6B7280',
-        fontSize: 11,
+        fontSize: 10,
         marginTop: 2,
     },
     nodeMenu: {
@@ -1187,9 +1262,9 @@ const styles = StyleSheet.create({
     },
     // Büyük Port Butonları
     portButton: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 30,
+        height: 30,
+        borderRadius: 15,
         justifyContent: 'center',
         alignItems: 'center',
         shadowColor: '#000',
@@ -1199,9 +1274,9 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     inputPortButton: {
-        backgroundColor: '#E5E7EB',
+        backgroundColor: '#E2E8F0',
         borderWidth: 2,
-        borderColor: '#9CA3AF',
+        borderColor: '#94A3B8',
     },
     inputPortButtonActive: {
         backgroundColor: '#10B981',
@@ -1222,9 +1297,9 @@ const styles = StyleSheet.create({
     },
     portButtonText: {
         color: '#FFFFFF',
-        fontSize: 18,
+        fontSize: 13,
         fontWeight: 'bold',
-        lineHeight: 20,
+        lineHeight: 14,
     },
     portButtonTextActive: {
         color: '#FFFFFF',

@@ -7,12 +7,14 @@ web-build/
 /android
 /ios
 
-# Force inclusion of local module native code
-!/modules/**
-!/modules/**/android
+# Keep local module native code tracked
+!/modules/**/android/
 !/modules/**/android/**
-!/modules/**/ios
+!/modules/**/ios/
 !/modules/**/ios/**
+
+# Keep dependencies/build artifacts ignored under local modules
+/modules/**/node_modules/
 /modules/**/build/
 /modules/**/.gradle/
 /local.properties

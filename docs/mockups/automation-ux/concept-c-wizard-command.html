@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concept C - Wizard Command</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #fffaf0;
+        --text: #1f2428;
+        --muted: #606d79;
+        --line: #e1d6c4;
+        --panel: #ffffff;
+        --sun: #f2a32a;
+        --leaf: #1a8a6f;
+        --ink: #2f3f50;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 0 0, #ffe7c2, transparent 42%),
+          radial-gradient(circle at 100% 100%, #d9efe8, transparent 45%),
+          var(--bg);
+      }
+
+      .wrap {
+        width: min(1120px, 94%);
+        margin: 26px auto 38px;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 15px;
+      }
+
+      h1 {
+        margin: 0;
+        font: 700 34px/1.02 "Space Grotesk", sans-serif;
+        letter-spacing: -0.02em;
+      }
+
+      .top p {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .back {
+        text-decoration: none;
+        border-radius: 999px;
+        border: 1px solid #95c7bd;
+        background: #edfaf6;
+        color: #145f53;
+        padding: 10px 13px;
+        font-size: 14px;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .step {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: #fff;
+        padding: 10px 12px;
+        opacity: 0;
+        transform: translateY(10px);
+        animation: rise 0.45s ease forwards;
+      }
+
+      .step:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+
+      .step:nth-child(3) {
+        animation-delay: 0.16s;
+      }
+
+      .step strong {
+        display: block;
+      }
+
+      .step small {
+        color: #6a7680;
+      }
+
+      .step.active {
+        border-color: #e8ba7e;
+        background: #fff5e8;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+        gap: 12px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 16px;
+        background: var(--panel);
+        box-shadow: 0 12px 28px rgba(31, 36, 40, 0.08);
+      }
+
+      .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.09em;
+        color: #6f7a83;
+        margin-bottom: 8px;
+      }
+
+      .prompt {
+        border: 1px solid #d7dedf;
+        border-radius: 14px;
+        padding: 12px;
+        background: #fafdfc;
+        margin-bottom: 10px;
+      }
+
+      .prompt p {
+        margin: 0;
+        color: #2e3d4a;
+        line-height: 1.45;
+      }
+
+      .tokens {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+
+      .token {
+        font-size: 12px;
+        border: 1px solid #d3ddd9;
+        background: #f7fbfa;
+        color: #2e4f49;
+        border-radius: 999px;
+        padding: 7px 10px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .field {
+        border: 1px solid #d8d6d1;
+        border-radius: 12px;
+        padding: 10px;
+        background: #fffefb;
+      }
+
+      .field strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .field small {
+        color: #6d756f;
+      }
+
+      .actions {
+        margin-top: 14px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 11px 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .primary {
+        background: var(--leaf);
+        color: #fff;
+      }
+
+      .secondary {
+        background: #ffeecf;
+        color: #6b4700;
+      }
+
+      .summary {
+        display: grid;
+        gap: 10px;
+      }
+
+      .item {
+        border: 1px solid #dae2e1;
+        border-radius: 12px;
+        padding: 10px;
+        background: #fbfcfc;
+      }
+
+      .item .k {
+        color: #687680;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .item .v {
+        margin-top: 4px;
+        font-weight: 600;
+      }
+
+      .mini-flow {
+        margin-top: 6px;
+        border: 1px dashed #cdd9d6;
+        border-radius: 12px;
+        padding: 10px;
+        color: var(--ink);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      @keyframes rise {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 950px) {
+        .steps,
+        .layout,
+        .grid {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 28px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <div>
+          <h1>Concept C: Wizard Command</h1>
+          <p>Guided builder for fast setup with AI-assisted defaults.</p>
+        </div>
+        <a href="./index.html" class="back">Back to concepts</a>
+      </header>
+
+      <section class="steps">
+        <div class="step active">
+          <strong>Step 1: Goal</strong>
+          <small>Describe what this automation should do.</small>
+        </div>
+        <div class="step">
+          <strong>Step 2: Data</strong>
+          <small>Pick sources and refresh logic.</small>
+        </div>
+        <div class="step">
+          <strong>Step 3: Output</strong>
+          <small>Select channel, tone, and fallback.</small>
+        </div>
+      </section>
+
+      <section class="layout">
+        <article class="panel">
+          <div class="label">Command prompt</div>
+
+          <div class="prompt">
+            <p>
+              Every weekday at 07:15, collect USDTRY, weather, city traffic, and
+              top headlines. Build a short operations brief and send to WhatsApp
+              group and email. If one source fails, continue with remaining
+              sources and add warning line.
+            </p>
+          </div>
+
+          <div class="tokens">
+            <span class="token">Schedule: weekday 07:15</span>
+            <span class="token">Sources: 4</span>
+            <span class="token">Format: short brief</span>
+            <span class="token">Fallback: partial delivery</span>
+          </div>
+
+          <div class="grid">
+            <div class="field">
+              <strong>Run frequency</strong>
+              <small>Business days only</small>
+            </div>
+            <div class="field">
+              <strong>Time zone</strong>
+              <small>Europe/Istanbul</small>
+            </div>
+            <div class="field">
+              <strong>AI style</strong>
+              <small>Neutral, concise, no hype text</small>
+            </div>
+            <div class="field">
+              <strong>Error policy</strong>
+              <small>Retry x2 then continue with warning</small>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary" type="button">Generate flow</button>
+            <button class="secondary" type="button">Try another prompt</button>
+          </div>
+        </article>
+
+        <aside class="panel summary">
+          <div class="item">
+            <div class="k">Estimated setup</div>
+            <div class="v">3 minutes</div>
+          </div>
+          <div class="item">
+            <div class="k">Generated nodes</div>
+            <div class="v">7 blocks</div>
+          </div>
+          <div class="item">
+            <div class="k">Delivery channels</div>
+            <div class="v">WhatsApp and Email</div>
+          </div>
+          <div class="item">
+            <div class="k">Risk</div>
+            <div class="v">One feed has no SLA metadata</div>
+          </div>
+          <div class="mini-flow">
+            Trigger -> Pull data -> Validate -> Summarize -> Deliver -> Log
+          </div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

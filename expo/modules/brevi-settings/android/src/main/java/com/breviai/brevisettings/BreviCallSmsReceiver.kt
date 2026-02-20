@@ -3,12 +3,9 @@ package com.breviai.brevisettings
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.Bundle
 import android.telephony.SmsMessage
 import android.telephony.TelephonyManager
 import android.util.Log
-import expo.modules.kotlin.modules.Module
-import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * BroadcastReceiver for detecting incoming calls and SMS messages.
