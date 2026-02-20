@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, SPACING, FONTS } from '../constants/theme';
 import { ShortcutTemplate } from '../data/seed_templates';
+import { useApp } from '../context/AppContext';
 
 interface TemplateCardProps {
     template: ShortcutTemplate;
@@ -16,7 +17,11 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
     onPress,
     isDark = true
 }) => {
+    const { language } = useApp();
     const theme = isDark ? COLORS.dark : COLORS.light;
+    const localizedTitle = language === 'en' && template.title_en ? template.title_en : template.title;
+    const localizedDescription = language === 'en' && template.description_en ? template.description_en : template.description;
+    const keywordSource = `${template.title} ${template.title_en || ''}`.toLowerCase();
 
     // Get colors/icon based on category or random
     const getMeta = () => {
@@ -29,19 +34,18 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
             };
         }
 
-        const title = template.title.toLowerCase();
-        if (title.includes('battery')) return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', icon: 'battery-charging' };
-        if (title.includes('morning')) return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', icon: 'sunny' };
-        if (title.includes('insta')) return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', icon: 'logo-instagram' };
-        if (title.includes('wifi')) return { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: 'wifi' };
-        if (title.includes('movie')) return { color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', icon: 'film' };
-        if (title.includes('email') || title.includes('summar')) return { color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', icon: 'mail-open' };
+        if (keywordSource.includes('battery')) return { color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', icon: 'battery-charging' };
+        if (keywordSource.includes('morning')) return { color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)', icon: 'sunny' };
+        if (keywordSource.includes('insta')) return { color: '#a855f7', bg: 'rgba(168, 85, 247, 0.1)', icon: 'logo-instagram' };
+        if (keywordSource.includes('wifi')) return { color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: 'wifi' };
+        if (keywordSource.includes('movie')) return { color: '#ec4899', bg: 'rgba(236, 72, 153, 0.1)', icon: 'film' };
+        if (keywordSource.includes('email') || keywordSource.includes('summar')) return { color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', icon: 'mail-open' };
 
         return { color: theme.primary, bg: `${theme.primary}15`, icon: 'flash' };
     };
 
     const meta = getMeta();
-    const isAI = template.tags?.includes('ai') || template.title.toLowerCase().includes('summary') || template.title.toLowerCase().includes('generate');
+    const isAI = template.tags?.includes('ai') || keywordSource.includes('summary') || keywordSource.includes('generate');
 
     return (
         <TouchableOpacity
@@ -60,7 +64,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
 
             <View style={styles.content}>
                 <Text style={[styles.title, { color: theme.text }]} numberOfLines={2}>
-                    {template.title}
+                    {localizedTitle}
                 </Text>
 
                 {isAI && (
@@ -71,7 +75,7 @@ export const TemplateCard: React.FC<TemplateCardProps> = ({
                 )}
 
                 <Text style={[styles.description, { color: theme.textSecondary }]} numberOfLines={3}>
-                    {template.description}
+                    {localizedDescription}
                 </Text>
             </View>
         </TouchableOpacity>

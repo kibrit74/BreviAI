@@ -30,6 +30,52 @@ LogBox.ignoreLogs(['Warning: ...']);
 // IMMEDIATELY hide splash - don't wait for anything
 SplashScreen.preventAutoHideAsync().catch(() => { });
 
+type AppLanguage = 'tr' | 'en';
+
+const BOOT_TEXT: Record<
+    AppLanguage,
+    {
+        notificationPermissionTitle: string;
+        notificationPermissionMessage: string;
+        laterButton: string;
+        openSettingsButton: string;
+        connectionSuccessTitle: string;
+        connectionSuccessMessage: (latency: number) => string;
+        connectionErrorTitle: string;
+        connectionErrorMessage: (error: string) => string;
+        criticalErrorTitle: string;
+        criticalErrorMessage: (error: string) => string;
+        loadingError: string;
+    }
+> = {
+    tr: {
+        notificationPermissionTitle: 'Bildirim Erişimi Gerekli',
+        notificationPermissionMessage: "WhatsApp ve SMS tetikleyicilerinin çalışması için 'Bildirim Erişim' izni gereklidir.",
+        laterButton: 'Daha Sonra',
+        openSettingsButton: 'Ayarları Aç',
+        connectionSuccessTitle: 'Bağlantı Başarılı',
+        connectionSuccessMessage: (latency: number) => `Sunucuya başarıyla bağlanıldı. (${latency}ms)`,
+        connectionErrorTitle: 'Bağlantı Hatası',
+        connectionErrorMessage: (error: string) => `Sunucuya bağlanılamadı. Hata: ${error}\nLütfen internet bağlantınızı kontrol edin.`,
+        criticalErrorTitle: 'Kritik Hata',
+        criticalErrorMessage: (error: string) => `Bağlantı testi sırasında beklenmeyen bir hata oluştu: ${error}`,
+        loadingError: 'Yükleme Hatası',
+    },
+    en: {
+        notificationPermissionTitle: 'Notification Access Required',
+        notificationPermissionMessage: "Notification access is required for WhatsApp and SMS triggers to work.",
+        laterButton: 'Later',
+        openSettingsButton: 'Open Settings',
+        connectionSuccessTitle: 'Connection Successful',
+        connectionSuccessMessage: (latency: number) => `Connected to the server successfully. (${latency}ms)`,
+        connectionErrorTitle: 'Connection Error',
+        connectionErrorMessage: (error: string) => `Could not connect to the server. Error: ${error}\nPlease check your internet connection.`,
+        criticalErrorTitle: 'Critical Error',
+        criticalErrorMessage: (error: string) => `An unexpected error occurred during the connection test: ${error}`,
+        loadingError: 'Loading Error',
+    },
+};
+
 export default function App() {
     const [appIsReady, setAppIsReady] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,6 +90,7 @@ export default function App() {
 
         async function prepare() {
             console.log("App: Beginning boot process...");
+            let bootText = BOOT_TEXT.tr;
             try {
                 // Load fonts first - critical for UI
                 console.log("App: Loading fonts...");
@@ -59,10 +106,13 @@ export default function App() {
                         AsyncStorage.getItem('user_debug_mode')
                     ]);
 
+                    const resolvedLanguage: AppLanguage = language === 'en' ? 'en' : 'tr';
+                    bootText = BOOT_TEXT[resolvedLanguage];
+
                     if (isMounted) {
                         setInitialState({
                             theme: (theme as 'dark' | 'light') || 'dark',
-                            language: (language as 'tr' | 'en') || 'tr',
+                            language: resolvedLanguage,
                             debug: debug === 'true'
                         });
                     }
@@ -106,12 +156,12 @@ export default function App() {
                     if (hasNotifPerm === false) { // Explicit check since it might be undefined/null on iOS or error
                         console.log("App: Notification Permission missing. Prompting user...");
                         Alert.alert(
-                            "Bildirim Erişimi Gerekli",
-                            "WhatsApp ve SMS tetikleyicilerinin çalışması için 'Bildirim Erişim' izni gereklidir.",
+                            bootText.notificationPermissionTitle,
+                            bootText.notificationPermissionMessage,
                             [
-                                { text: "Daha Sonra", style: 'cancel' },
+                                { text: bootText.laterButton, style: 'cancel' },
                                 {
-                                    text: "Ayarları Aç",
+                                    text: bootText.openSettingsButton,
                                     onPress: async () => {
                                         BreviSettingsManager?.requestNotificationListenerAccess();
                                     }
@@ -131,14 +181,14 @@ export default function App() {
                     const conn = await apiService.testConnection();
                     if (conn.success) {
                         console.log(`App: Backend Connection SUCCESS (Latency: ${conn.latency}ms)`);
-                        Alert.alert("Bağlantı Başarılı", `Sunucuya başarıyla bağlanıldı. (${conn.latency}ms)`);
+                        Alert.alert(bootText.connectionSuccessTitle, bootText.connectionSuccessMessage(conn.latency));
                     } else {
                         console.warn("App: Connection Error:", conn.error);
-                        Alert.alert("Bağlantı Hatası", `Sunucuya bağlanılamadı. Hata: ${conn.error}\nLütfen internet bağlantınızı kontrol edin.`);
+                        Alert.alert(bootText.connectionErrorTitle, bootText.connectionErrorMessage(conn.error || 'unknown'));
                     }
                 } catch (e) {
                     console.error("App: Connection Test Exception:", e);
-                    Alert.alert("Kritik Hata", "Bağlantı testi sırasında beklenmeyen bir hata oluştu: " + String(e));
+                    Alert.alert(bootText.criticalErrorTitle, bootText.criticalErrorMessage(String(e)));
                 }
 
             } catch (e) {
@@ -181,11 +231,12 @@ export default function App() {
 
     // Show error screen if there's a critical error
     if (loadError) {
+        const loadingErrorTitle = initialState.language === 'en' ? BOOT_TEXT.en.loadingError : BOOT_TEXT.tr.loadingError;
         return (
             <SafeAreaProvider>
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827', padding: 20 }}>
                     <Text style={{ color: '#ef4444', fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
-                        Yükleme Hatası
+                        {loadingErrorTitle}
                     </Text>
                     <Text style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center' }}>
                         {loadError}

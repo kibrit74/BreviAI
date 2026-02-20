@@ -140,7 +140,7 @@ export default function ShortcutPickerModal({
                         {item.name}
                     </Text>
                     <Text style={[styles.shortcutPrompt, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {item.steps.length} adÄ±m
+                        {item.steps.length} {t('stepsButtons')}
                     </Text>
                 </View>
                 {isSelected && (
@@ -162,7 +162,7 @@ export default function ShortcutPickerModal({
                     {/* Header */}
                     <View style={[styles.header, { borderBottomColor: colors.border }]}>
                         <Text style={[styles.title, { color: colors.text }]}>
-                            {t('selectShortcut') || 'Otomasyon SeÃ§'}
+                            {t('selectShortcut')}
                         </Text>
                         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                             <Ionicons name="close" size={24} color={colors.text} />
@@ -178,10 +178,10 @@ export default function ShortcutPickerModal({
                         <View style={styles.emptyContainer}>
                             <Ionicons name="cube-outline" size={48} color={colors.textSecondary} />
                             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                {t('noShortcutsYet') || 'HenÃ¼z kayÄ±tlÄ± otomasyon yok'}
+                                {t('noShortcutsYet')}
                             </Text>
                             <Text style={[styles.emptyHint, { color: colors.textSecondary }]}>
-                                Ã–nce bir otomasyon oluÅŸturun
+                                {t('createShortcutHint')}
                             </Text>
                         </View>
                     ) : (

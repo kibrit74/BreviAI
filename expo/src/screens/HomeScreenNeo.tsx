@@ -43,21 +43,21 @@ export default function HomeScreenNeo({ navigation }: any) {
                 setShortcuts(activeWf.map(w => ({
                     id: w.id,
                     title: w.name,
-                    description: w.description || '09:00 - Her gün',
+                    description: w.description || t('activeAutomationFallback'),
                     icon: w.icon || 'flash',
                 })));
             } else {
                 // Mock items for the "try" request if empty
                 setShortcuts([
-                    { id: '1', title: 'Günlük Rapor Özeti', description: '09:00 - Her gün', icon: 'mail' },
-                    { id: '2', title: 'Toplantı Hazırlığı', description: 'Etkinlikten 15dk önce', icon: 'calendar' }
+                    { id: '1', title: t('homeMockDailyReport'), description: t('homeMockDailyTime'), icon: 'mail' },
+                    { id: '2', title: t('homeMockMeetingPrep'), description: t('homeMockBeforeEvent'), icon: 'calendar' }
                 ]);
             }
 
         } catch (e) {
             console.error(e);
         }
-    }, []);
+    }, [t]);
 
     useFocusEffect(
         useCallback(() => {
@@ -103,8 +103,8 @@ export default function HomeScreenNeo({ navigation }: any) {
                 <View style={styles.heroSection}>
                     <NeoOrb onPress={() => navigation.navigate('WorkflowBuilder', { autoOpenAI: true })} />
                     <View style={styles.heroTextContainer}>
-                        <Text style={[styles.heroTitle, { color: colors.text }]}>Konuşmak için Dokun</Text>
-                        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>"Hey BreviAI, notlarımı özetle"</Text>
+                        <Text style={[styles.heroTitle, { color: colors.text }]}>{t('tapToSpeak')}</Text>
+                        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>{t('voiceExample')}</Text>
                     </View>
                 </View>
 
@@ -116,7 +116,7 @@ export default function HomeScreenNeo({ navigation }: any) {
                         </View>
                         <View>
                             <Text style={[styles.statValue, { color: colors.text }]}>{stats.automationsRun}</Text>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Çalışan Otomasyonlar</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('automationsRun')}</Text>
                         </View>
                     </GlassPanel>
 
@@ -127,18 +127,18 @@ export default function HomeScreenNeo({ navigation }: any) {
                         <View>
                             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                                 <Text style={[styles.statValue, { color: colors.text }]}>{stats.timeSaved}</Text>
-                                <Text style={[styles.statUnit, { color: colors.text }]}>dk</Text>
+                                <Text style={[styles.statUnit, { color: colors.text }]}>{t('minutesShort')}</Text>
                             </View>
-                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Kazanılan Zaman</Text>
+                            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{t('timeSaved')}</Text>
                         </View>
                     </GlassPanel>
                 </View>
 
                 {/* Active Automations */}
                 <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Aktif Otomasyonlar</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('activeShortcuts')}</Text>
                     <TouchableOpacity onPress={() => navigation.navigate('Workflows')} style={styles.seeAllBtn}>
-                        <Text style={[styles.seeAllText, { color: colors.primary }]}>Tümünü Gör</Text>
+                        <Text style={[styles.seeAllText, { color: colors.primary }]}>{t('viewAll')}</Text>
                         <Ionicons name="chevron-forward" size={14} color={colors.primary} />
                     </TouchableOpacity>
                 </View>

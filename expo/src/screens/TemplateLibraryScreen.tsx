@@ -156,14 +156,25 @@ export default function TemplateLibraryScreen({ navigation }: any) {
     // Filter Logic
     const filteredTemplates = useMemo(() => {
         return templates.filter(item => {
-            const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                item.description.toLowerCase().includes(searchQuery.toLowerCase());
+            const searchText = [
+                item.title,
+                item.title_en,
+                item.description,
+                item.description_en,
+                ...(item.tags || [])
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            const matchesSearch = searchText.includes(searchQuery.toLowerCase());
+
+            const keywordSource = `${item.title} ${item.title_en || ''}`.toLowerCase();
             const matchesCategory = selectedCategory === 'All' ||
                 (item.tags && item.tags.some(tag => tag.toLowerCase() === selectedCategory.toLowerCase())) ||
                 // Fallback categorization based on name/description if tags missing
-                (selectedCategory === 'System' && (item.title.includes('Battery') || item.title.includes('WiFi'))) ||
-                (selectedCategory === 'Social' && (item.title.includes('Insta') || item.title.includes('Message'))) ||
-                (selectedCategory === 'Productivity' && (item.title.includes('Meeting') || item.title.includes('Email')));
+                (selectedCategory === 'System' && (keywordSource.includes('battery') || keywordSource.includes('wifi'))) ||
+                (selectedCategory === 'Social' && (keywordSource.includes('insta') || keywordSource.includes('message'))) ||
+                (selectedCategory === 'Productivity' && (keywordSource.includes('meeting') || keywordSource.includes('email')));
 
             return matchesSearch && matchesCategory;
         });
