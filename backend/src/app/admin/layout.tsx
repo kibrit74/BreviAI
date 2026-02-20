@@ -18,58 +18,118 @@ export default function AdminLayout({
     const [configError, setConfigError] = useState('');
 
     useEffect(() => {
+        let subscription: { unsubscribe: () => void } | null = null;
+        let cancelled = false;
+
+        const safeSetLoading = (value: boolean) => {
+            if (!cancelled) setLoading(value);
+        };
+
+        const safeSetAuthenticated = (value: boolean) => {
+            if (!cancelled) setAuthenticated(value);
+        };
+
+        const safeSetConfigError = (value: string) => {
+            if (!cancelled) setConfigError(value);
+        };
+
+        const getSessionWithTimeout = async (timeoutMs = 5000) => {
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Auth check timeout')), timeoutMs);
+            });
+            return Promise.race([supabase.auth.getSession(), timeoutPromise]);
+        };
+
         if (!isSupabaseConfigured) {
-            setAuthenticated(false);
-            setConfigError(supabaseConfigError || 'Supabase configuration missing.');
+            safeSetAuthenticated(false);
+            safeSetConfigError(supabaseConfigError || 'Supabase configuration missing.');
             if (pathname !== '/admin/login') {
                 router.push('/admin/login');
             }
-            setLoading(false);
+            safeSetLoading(false);
             return;
         }
 
-        let subscription: { unsubscribe: () => void } | null = null;
+        // Login page should always render form; do not block on auth check here.
+        if (pathname === '/admin/login') {
+            safeSetLoading(false);
+            safeSetAuthenticated(false);
+
+            supabase.auth.getSession()
+                .then(({ data: { session } }) => {
+                    if (!cancelled && session) {
+                        router.replace('/admin');
+                    }
+                })
+                .catch((error) => {
+                    console.error('Login route auth precheck failed:', error);
+                    safeSetConfigError('Authentication service is temporarily unavailable.');
+                });
+
+            try {
+                const authListener = supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_OUT') {
+                        safeSetAuthenticated(false);
+                        return;
+                    }
+                    if (session) {
+                        safeSetAuthenticated(true);
+                        router.replace('/admin');
+                    }
+                });
+                subscription = authListener.data.subscription;
+            } catch (error) {
+                console.error('Auth listener init failed on login route:', error);
+            }
+
+            return () => {
+                cancelled = true;
+                if (subscription) {
+                    subscription.unsubscribe();
+                }
+            };
+        }
 
         const checkAuth = async () => {
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                const sessionResult = await getSessionWithTimeout();
+                const { data: { session } } = sessionResult as Awaited<ReturnType<typeof supabase.auth.getSession>>;
 
                 if (!session) {
-                    if (pathname !== '/admin/login') {
-                        router.push('/admin/login');
-                    }
-                    setAuthenticated(false);
+                    router.push('/admin/login');
+                    safeSetAuthenticated(false);
                 } else {
-                    setAuthenticated(true);
-                    if (pathname === '/admin/login') {
-                        router.push('/admin');
-                    }
+                    safeSetAuthenticated(true);
                 }
             } catch (error) {
                 console.error('Admin auth check failed:', error);
-                setAuthenticated(false);
-                setConfigError('Authentication check failed. Verify Supabase settings.');
-                if (pathname !== '/admin/login') {
-                    router.push('/admin/login');
-                }
+                safeSetAuthenticated(false);
+                safeSetConfigError('Authentication check failed. Verify Supabase settings.');
+                router.push('/admin/login');
             } finally {
-                setLoading(false);
+                safeSetLoading(false);
             }
         };
 
         checkAuth();
 
-        const authListener = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_OUT') {
-                setAuthenticated(false);
-                router.push('/admin/login');
-            } else if (session) {
-                setAuthenticated(true);
-            }
-        });
-        subscription = authListener.data.subscription;
+        try {
+            const authListener = supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_OUT') {
+                    safeSetAuthenticated(false);
+                    router.push('/admin/login');
+                } else if (session) {
+                    safeSetAuthenticated(true);
+                }
+            });
+            subscription = authListener.data.subscription;
+        } catch (error) {
+            console.error('Auth listener init failed:', error);
+            safeSetConfigError('Authentication listener failed to initialize.');
+        }
 
         return () => {
+            cancelled = true;
             if (subscription) {
                 subscription.unsubscribe();
             }
