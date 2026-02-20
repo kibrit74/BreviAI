@@ -13,8 +13,7 @@ import javax.mail.Folder
 import javax.mail.Session
 import javax.mail.Message
 import javax.mail.internet.MimeMultipart
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+
 
 import android.appwidget.AppWidgetManager
 
@@ -604,28 +603,27 @@ class BreviSettingsModule : Module() {
 
     // ==== IMAP EMAIL FETCHING ====
     AsyncFunction("fetchEmails") { host: String, port: Int, user: String, pass: String, maxCount: Int ->
-      withContext(Dispatchers.IO) {
-          val props = Properties()
-          props["mail.store.protocol"] = "imaps"
-          props["mail.imaps.host"] = host
-          props["mail.imaps.port"] = port.toString()
-          props["mail.imaps.ssl.enable"] = "true"
+        val props = Properties()
+        props["mail.store.protocol"] = "imaps"
+        props["mail.imaps.host"] = host
+        props["mail.imaps.port"] = port.toString()
+        props["mail.imaps.ssl.enable"] = "true"
 
-          val session = Session.getDefaultInstance(props)
-          val store = session.getStore("imaps")
-          store.connect(host, user, pass)
+        val session = Session.getDefaultInstance(props)
+        val store = session.getStore("imaps")
+        store.connect(host, user, pass)
 
-          val inbox = store.getFolder("INBOX")
-          inbox.open(Folder.READ_ONLY)
+        val inbox = store.getFolder("INBOX")
+        inbox.open(Folder.READ_ONLY)
 
-          val messages = inbox.messages
-          val total = messages.size
-          val start = Math.max(0, total - maxCount)
-          val recentMessages = inbox.getMessages(start + 1, total)
+        val messages = inbox.messages
+        val total = messages.size
+        val start = Math.max(0, total - maxCount)
+        val recentMessages = inbox.getMessages(start + 1, total)
 
-          val results = mutableListOf<Map<String, String>>()
+        val results = mutableListOf<Map<String, String>>()
 
-          for (i in recentMessages.indices.reversed()) {
+        for (i in recentMessages.indices.reversed()) {
             val msg = recentMessages[i]
             val subject = msg.subject ?: "(No Subject)"
             val from = msg.from?.joinToString { it.toString() } ?: "(Unknown)"
@@ -638,17 +636,16 @@ class BreviSettingsModule : Module() {
             }
 
             results.add(mapOf(
-              "subject" to subject,
-              "from" to from,
-              "body" to content.take(500)
+                "subject" to subject,
+                "from" to from,
+                "body" to content.take(500)
             ))
-          }
+        }
 
-          inbox.close(false)
-          store.close()
+        inbox.close(false)
+        store.close()
 
-          results
-      }
+        return@AsyncFunction results
     }
 
     } // end of ModuleDefinition
