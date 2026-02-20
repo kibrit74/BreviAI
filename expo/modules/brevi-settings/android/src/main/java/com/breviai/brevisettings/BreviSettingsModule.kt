@@ -572,8 +572,6 @@ class BreviSettingsModule : Module() {
     AsyncFunction("executeWidgetWorkflow") { shortcutId: String, promise: expo.modules.kotlin.Promise ->
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // This should integrate with WorkflowEngine
-                // For now, we'll open the app with the shortcut ID
                 val context = appContext.reactContext
                 if (context == null) {
                     withContext(Dispatchers.Main) {
@@ -581,13 +579,16 @@ class BreviSettingsModule : Module() {
                     }
                     return@launch
                 }
-                val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                intent?.apply {
-                    putExtra("shortcut_id", shortcutId)
-                    putExtra("source", "widget")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+                val executeIntent = Intent().setClassName(
+                    context,
+                    "com.breviai.app.WorkflowExecutionReceiver"
+                ).apply {
+                    action = "com.breviai.app.EXECUTE_WORKFLOW"
+                    putExtra("workflowId", shortcutId)
+                    putExtra("_triggerType", "widget")
                 }
-                context.startActivity(intent)
+                context.sendBroadcast(executeIntent)
                 
                 withContext(Dispatchers.Main) {
                     promise.resolve(true)

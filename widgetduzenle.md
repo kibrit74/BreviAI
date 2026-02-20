@@ -96,3 +96,9 @@ Kapsam: `expo/src` + `expo/android` + `expo/modules/brevi-settings`
 - [x] Resize callback eklendi (`onAppWidgetOptionsChanged`).
 - [x] AsyncFunction context-null promise asılı kalma sorunu duzeltildi (`CONTEXT_ERROR` reject).
 - [x] Test verisi seed islemi sadece development moduna cekildi.
+
+## Son Eklenen Duzeltmeler (2026-02-20)
+
+- [x] Widget workflow calistirma akisi app acmadan headless broadcast olarak duzeltildi (`executeWidgetWorkflow`).
+- [x] Widget workflow action icin `openBreviAI` fallback kaldirildi (app acma yerine dogrudan hata doner).
+- [x] Legacy widget button payload uyumlulugu eklendi (`shortcutId` / `workflowId` / `actionPayload` destekleri).

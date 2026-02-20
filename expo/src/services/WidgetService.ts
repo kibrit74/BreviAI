@@ -345,17 +345,10 @@ export class WidgetService {
             executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
           };
         }
+        throw new Error('Native widget workflow execution returned false');
       }
 
-      if (this.nativeWidgetManager?.openBreviAI) {
-        await this.invokeOpenBreviAI({ shortcutId, source: 'widget' });
-        return {
-          success: true,
-          executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
-        };
-      }
-
-      throw new Error('Native widget workflow bridge not available');
+      throw new Error('Native widget workflow bridge is not available');
     } catch (error: any) {
       return {
         success: false,
