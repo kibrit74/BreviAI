@@ -53,6 +53,16 @@ function getRateLimitConfig(pathname: string) {
 }
 
 export function middleware(request: NextRequest) {
+    const pathname = request.nextUrl.pathname;
+
+    // Keep admin login independent from /admin layout auth checks.
+    // This avoids blank login page when client-side auth bootstrap fails.
+    if (pathname === '/admin/login' || pathname === '/admin/login/') {
+        const rewriteUrl = request.nextUrl.clone();
+        rewriteUrl.pathname = '/_admin-login';
+        return NextResponse.rewrite(rewriteUrl);
+    }
+
     const corsHeaders = buildCorsHeaders(request);
 
     // Handle preflight requests
@@ -64,10 +74,10 @@ export function middleware(request: NextRequest) {
     }
 
     // Skip rate-limit for health checks
-    if (!request.nextUrl.pathname.startsWith('/api/health')) {
+    if (!pathname.startsWith('/api/health')) {
         const ip = getClientIp(request);
-        const cfg = getRateLimitConfig(request.nextUrl.pathname);
-        const key = `mw:${request.nextUrl.pathname}:${ip}`;
+        const cfg = getRateLimitConfig(pathname);
+        const key = `mw:${pathname}:${ip}`;
         const result = checkRateLimit({
             key,
             limit: cfg.limit,
@@ -104,5 +114,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: '/api/:path*',
+    matcher: ['/api/:path*', '/admin/login/:path*'],
 };

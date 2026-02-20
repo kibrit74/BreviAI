@@ -18,6 +18,12 @@ export default function AdminLayout({
     const [configError, setConfigError] = useState('');
 
     useEffect(() => {
+        if (pathname === '/admin/login') {
+            setLoading(false);
+            setAuthenticated(false);
+            return;
+        }
+
         let subscription: { unsubscribe: () => void } | null = null;
         let cancelled = false;
 
@@ -48,46 +54,6 @@ export default function AdminLayout({
             }
             safeSetLoading(false);
             return;
-        }
-
-        // Login page should always render form; do not block on auth check here.
-        if (pathname === '/admin/login') {
-            safeSetLoading(false);
-            safeSetAuthenticated(false);
-
-            supabase.auth.getSession()
-                .then(({ data: { session } }) => {
-                    if (!cancelled && session) {
-                        router.replace('/admin');
-                    }
-                })
-                .catch((error) => {
-                    console.error('Login route auth precheck failed:', error);
-                    safeSetConfigError('Authentication service is temporarily unavailable.');
-                });
-
-            try {
-                const authListener = supabase.auth.onAuthStateChange((event, session) => {
-                    if (event === 'SIGNED_OUT') {
-                        safeSetAuthenticated(false);
-                        return;
-                    }
-                    if (session) {
-                        safeSetAuthenticated(true);
-                        router.replace('/admin');
-                    }
-                });
-                subscription = authListener.data.subscription;
-            } catch (error) {
-                console.error('Auth listener init failed on login route:', error);
-            }
-
-            return () => {
-                cancelled = true;
-                if (subscription) {
-                    subscription.unsubscribe();
-                }
-            };
         }
 
         const checkAuth = async () => {
@@ -135,6 +101,27 @@ export default function AdminLayout({
             }
         };
     }, [pathname, router]);
+
+    if (pathname === '/admin/login') {
+        return (
+            <div style={{ minHeight: '100vh' }}>
+                {configError && (
+                    <div style={{
+                        margin: '1rem auto 0',
+                        maxWidth: '900px',
+                        padding: '0.75rem 1rem',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        borderRadius: '8px',
+                        color: '#fecaca',
+                        background: 'rgba(127, 29, 29, 0.25)',
+                    }}>
+                        {configError}
+                    </div>
+                )}
+                {children}
+            </div>
+        );
+    }
 
     if (loading) {
         return (
