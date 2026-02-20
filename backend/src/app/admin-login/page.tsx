@@ -74,7 +74,7 @@ export default function StandaloneAdminLoginPage() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className={styles.input}
-                            placeholder="••••••••"
+                            placeholder="********"
                         />
                     </div>
 

@@ -59,7 +59,7 @@ export function middleware(request: NextRequest) {
     // This avoids blank login page when client-side auth bootstrap fails.
     if (pathname === '/admin/login' || pathname === '/admin/login/') {
         const rewriteUrl = request.nextUrl.clone();
-        rewriteUrl.pathname = '/_admin-login';
+        rewriteUrl.pathname = '/admin-login';
         return NextResponse.rewrite(rewriteUrl);
     }
 
