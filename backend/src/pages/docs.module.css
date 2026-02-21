@@ -524,3 +524,76 @@
         padding: 2rem;
     }
 }
+
+/* MOCKUP UI */
+.mockupWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px dashed rgba(139, 92, 246, 0.4);
+    border-radius: 16px;
+    margin: 2rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.mockupNode {
+    background: #1E293B;
+    border: 1px solid #334155;
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #F8FAFC;
+    font-weight: 600;
+    z-index: 2;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s ease;
+}
+
+.mockupNode:hover {
+    transform: translateY(-5px);
+}
+
+.mockupIcon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.triggerIcon { background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); }
+.actionIcon { background: rgba(59, 130, 246, 0.2); color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.4); }
+
+.mockupConnection {
+    height: 4px;
+    width: 80px;
+    background: linear-gradient(90deg, #10B981, #3B82F6);
+    position: relative;
+    border-radius: 4px;
+    z-index: 1;
+}
+
+.mockupPulse {
+    position: absolute;
+    top: -3px;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #fff, 0 0 20px #8B5CF6;
+    animation: flowPulse 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes flowPulse {
+    0% { left: 0; opacity: 1; transform: scale(1); }
+    50% { transform: scale(1.5); }
+    100% { left: 100%; opacity: 0; transform: scale(0.5); }
+}

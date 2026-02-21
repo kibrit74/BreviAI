@@ -1,0 +1,93 @@
+<svg width="400" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+
+    <!-- Node Gradient (Trigger) -->
+    <linearGradient id="trigger-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Node Gradient (Action) -->
+    <linearGradient id="action-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#2563EB" stop-opacity="0.95" />
+    </linearGradient>
+
+    <!-- Glow Effect -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="drop-shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.4" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="800" rx="30" ry="30" fill="url(#bg-grad)" stroke="#334155" stroke-width="4"/>
+  
+  <!-- Header -->
+  <text x="200" y="60" fill="#F8FAFC" font-family="'Inter', sans-serif" font-size="18" font-weight="bold" text-anchor="middle">İş Akışı (Workflow)</text>
+  <path d="M 20 80 L 380 80" stroke="#334155" stroke-width="1" />
+
+  <!-- Connection Line -->
+  <path d="M 200 240 C 200 320, 200 320, 200 400" fill="transparent" stroke="#10B981" stroke-width="4" filter="url(#glow)" />
+  
+  <!-- Arrow on Connection -->
+  <polygon points="195,385 205,385 200,395" fill="#10B981" />
+
+  <!-- Node 1: Webhook Trigger -->
+  <g transform="translate(60, 140)" filter="url(#drop-shadow)">
+    <!-- Node Body -->
+    <rect width="280" height="100" rx="16" ry="16" fill="url(#trigger-grad)" stroke="#34D399" stroke-width="1.5" />
+    
+    <!-- Icon Placeholder -->
+    <circle cx="40" cy="50" r="20" fill="#064E3B" opacity="0.6"/>
+    <path d="M 33 50 L 40 43 L 47 50 M 40 43 L 40 57" stroke="#34D399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    
+    <!-- Texts -->
+    <text x="75" y="45" fill="#FFFFFF" font-family="'Inter', sans-serif" font-size="16" font-weight="bold">Webhook (Tetikleyici)</text>
+    <text x="75" y="65" fill="#D1FAE5" font-family="'Inter', sans-serif" font-size="12">Dışarıdan veri geldiğinde çalışır</text>
+    <text x="75" y="82" fill="#A7F3D0" font-family="'Inter', sans-serif" font-size="10" opacity="0.8">POST: /webhook/12345</text>
+    
+    <!-- Output Port -->
+    <circle cx="140" cy="100" r="8" fill="#1E293B" stroke="#34D399" stroke-width="2.5" />
+  </g>
+
+  <!-- Node 2: WhatsApp Send -->
+  <g transform="translate(60, 400)" filter="url(#drop-shadow)">
+    <!-- Node Body -->
+    <rect width="280" height="100" rx="16" ry="16" fill="url(#action-grad)" stroke="#60A5FA" stroke-width="1.5" />
+    
+    <!-- Icon Placeholder -->
+    <circle cx="40" cy="50" r="20" fill="#1E3A8A" opacity="0.6"/>
+    <path d="M 30 50 C 30 40, 50 40, 50 50 C 50 60, 40 60, 30 60 L 25 65 L 30 55" stroke="#93C5FD" stroke-width="2" stroke-linejoin="round" fill="none"/>
+    
+    <!-- Texts -->
+    <text x="75" y="45" fill="#FFFFFF" font-family="'Inter', sans-serif" font-size="16" font-weight="bold">WhatsApp Mesajı (Aksiyon)</text>
+    <text x="75" y="65" fill="#DBEAFE" font-family="'Inter', sans-serif" font-size="12">Belirtilen numaraya mesaj atar</text>
+    <text x="75" y="82" fill="#BFDBFE" font-family="'Inter', sans-serif" font-size="10" opacity="0.8">To: +905321234567 | Msg: {{body.text}}</text>
+    
+    <!-- Input Port -->
+    <circle cx="140" cy="0" r="8" fill="#1E293B" stroke="#60A5FA" stroke-width="2.5" />
+  </g>
+
+  <!-- Add Node Button -->
+  <g transform="translate(170, 560)">
+    <circle cx="30" cy="30" r="24" fill="#334155" stroke="#475569" stroke-width="2" stroke-dasharray="4" />
+    <path d="M 30 18 L 30 42 M 18 30 L 42 30" stroke="#94A3B8" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Bottom Navigation Bar Placeholder -->
+  <path d="M 20 730 L 380 730" stroke="#334155" stroke-width="1" />
+  <rect x="130" y="750" width="140" height="5" rx="2.5" fill="#64748B"/>
+</svg>

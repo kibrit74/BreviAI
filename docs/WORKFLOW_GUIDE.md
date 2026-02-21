@@ -102,6 +102,14 @@ graph LR
 *   **Özellikler Paneli:** Seçili düğümün ayarlarını yapılandırdığınız alan.
 *   **Çalıştır (Execute):** İş akışını test etmek için kullanılan buton.
 
+### Arayüz Görünümü (Mockup)
+Aşağıdaki görselde, BreviAI mobil uygulamasında bir **Webhook** tetikleyicisinin nasıl **WhatsApp Mesaj Gönder** düğümüne bağlandığını görebilirsiniz:
+
+<p align="center">
+  <img src="mockups/simple-automation-mockup.svg" width="300" alt="Webhook WhatsApp Mockup" />
+</p>
+*(Bir dış servisten gelen POST isteğinin yakalanıp, bir telefon numarasına iletilmesi)*
+
 ---
 
 ## 3. Düğüm Referansı
@@ -683,3 +691,26 @@ Otomasyonlarınızı profesyonel, hatasız ve yönetilebilir hale getirmek için
 
 **4. Değişken Bulunamadı**
 *   **Çözüm:** Bir düğümün çıktısını (`{{nodeName.data}}`) kullanmadan önce, o düğümün akışta *daha önce* çalıştığından emin olun.
+
+---
+
+## 7. Daha Fazla Kaynak ve Öğrenme Rehberi
+
+Otomasyon dünyası sınırsız bir denizdir. Daha karmaşık akışlar kurmak, API entegrasyonlarını anlamak ve BreviAI'ı tam potansiyeliyle kullanmak için aşağıdaki kaynaklardan yararlanabilirsiniz:
+
+### 📖 Temel Otomasyon ve Mantık Kavramları
+*   **JSON Öğrenin:** Tüm veri akışı JSON (JavaScript Object Notation) üzerinden gerçekleşir. `{"anahtar": "değer"}` mantığını kavramak, veri ayıklamak için şarttır. [W3Schools JSON Tutorial](https://www.w3schools.com/js/js_json_intro.asp)
+*   **Regex (Düzenli İfadeler):** SMS, bildirim veya metin içeriğinden belirli kelime öbeklerini çıkarmak için eşsiz bir araçtır. Pratik yapmak için: [Regex101](https://regex101.com/)
+*   **Cron Formatı:** Zamanlanmış görevlerin ne zaman çalışacağını belirten yapıdır. İfadeleri test etmek ve Türkçesini görmek için [Crontab Guru](https://crontab.guru/) kullanın.
+
+### 🔗 Benzer Platformların Toplulukları ve Dokümanları
+BreviAI altyapısı ve mantığı n8n, Make (Integromat) ve Zapier gibi dünyaca ünlü otomasyon araçlarına benzer. Bu platformların sunduğu eğitimler sistemin çalışma prensibini daha iyi kavramanızı sağlayacaktır:
+1.  [n8n Docs & Tutorials](https://docs.n8n.io/): Açık kaynaklı n8n platformunun harika eğitimleri vardır. Node-bazlı veri aktarımı aynı mantıkla çalışır.
+2.  [Make (Integromat) Academy](https://academy.make.com/): Otomasyon vizyonunuzu geliştirecek başlangıç seviyesi akademi.
+
+### 💬 Topluluk Desteği (Community)
+Bir yerde takılırsanız, ilham arıyorsanız veya yaptığınız harika bir akışı paylaşmak istiyorsanız:
+*   **Discord / Telegram:** Gelecek sürümlerde açılacak resmi topluluk kanallarına katılarak diğer otomasyon geliştiricileri ile tanışabilirsiniz.
+*   **Şablonlar (Templates):** Uygulama içindeki **"Keşfet"** (Templates) sekmesinde, diğer kullanıcıların paylaştığı hazır akışları tek tıkla hesabınıza kopyalayıp parametrelerini değiştirerek kullanmaya başlayabilirsiniz.
+
+> **💡 İpucu (Pro-Tip):** *Bir şeyi otomatize etmeye başlamadan önce, manuel olarak yaparkenki tüm adımları kağıda yazın. Uygulama değiştirdiğiniz her adım bir düğüm, aradaki bilgi aktarımı ise veridir.* 🚀

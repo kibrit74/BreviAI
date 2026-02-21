@@ -39,6 +39,36 @@ const STATIC_SECTIONS = {
                     <li><strong>Eylemler (Actions):</strong> Bir iş yapan düğümlerdir (Örn: HTTP Request, Send Email, Google Sheets Read).</li>
                     <li><strong>Mantık (Logic):</strong> Akışın yönünü değiştiren düğümlerdir (Örn: IF, Switch, Code).</li>
                 </ul>
+
+                <hr className={styles.divider} />
+                
+                <h3>Arayüz Görünümü (Mockup)</h3>
+                <p>Aşağıdaki interaktif örnekte, bir <strong>Webhook</strong> tetikleyicisinin nasıl <strong>WhatsApp Mesaj Gönder</strong> düğümüne bağlandığını görebilirsiniz:</p>
+
+                <div className={styles.mockupWrapper}>
+                    <div className={styles.mockupNode}>
+                        <div className={`${styles.mockupIcon} ${styles.triggerIcon}`}>🪝</div>
+                        <div>
+                            <div style={{ fontSize: '0.9rem' }}>Webhook</div>
+                            <div style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 400 }}>Tetikleyici</div>
+                        </div>
+                    </div>
+
+                    <div className={styles.mockupConnection}>
+                        <div className={styles.mockupPulse}></div>
+                    </div>
+
+                    <div className={styles.mockupNode}>
+                        <div className={`${styles.mockupIcon} ${styles.actionIcon}`}>💬</div>
+                        <div>
+                            <div style={{ fontSize: '0.9rem' }}>WhatsApp</div>
+                            <div style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 400 }}>Aksiyon</div>
+                        </div>
+                    </div>
+                </div>
+                <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>
+                    (Bir dış servisten gelen verinin yakalanıp, bir telefon numarasına iletilmesini temsil eder.)
+                </p>
             </>
         )
     },
@@ -527,6 +557,67 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
                 </div>
             </>
         )
+    },
+    resources: {
+        title: "Kaynaklar ve Öğrenme",
+        icon: "🎓",
+        content: (
+            <>
+                <h2>Daha Fazla Kaynak ve Öğrenme Rehberi</h2>
+                <p>Otomasyon dünyası muazzam bir esnekliğe sahiptir. Daha karmaşık akışlar kurmak, dış API'lerle entegrasyonları anlamak ve BreviAI'ı tam potansiyeliyle kullanmak için aşağıdaki dış kaynaklardan ve ipuçlarından faydalanabilirsiniz:</p>
+
+                <hr className={styles.divider} />
+
+                <h3>📖 Temel Mantık ve Karşılaştırma Kavramları</h3>
+                
+                <div className={styles.faqItem}>
+                    <h3>JSON (JavaScript Object Notation)</h3>
+                    <p>
+                        Otomasyon araçlarında düğümler arası veri alışverişinin evrensel dilidir. Bir düğümün ne tür bir veri çıkardığını anlamak için mutlaka JSON objelerinin ve dizilerinin <code>{`[ { "key": "value" } ]`}</code> yapısını bilmelisiniz. <br/>
+                        <a href="https://www.w3schools.com/js/js_json_intro.asp" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>W3Schools JSON Eğitimi</a>
+                    </p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>Düzenli İfadeler (Regex)</h3>
+                    <p>
+                        Gelen uzun bir metin veya e-posta içerisinden sadece bir "Sipariş Kodu" veya "Telefon Numarasını" cımbızla çekmek isterseniz Regex kullanmalısınız. BreviAI içerisinde "Notification Trigger" ve "Code" düğümlerinde çok sık kullanılır. <br/>
+                        <a href="https://regex101.com/" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>Regex101 Pratik ve Test Aracı</a>
+                    </p>
+                </div>
+
+                <div className={styles.faqItem}>
+                    <h3>Cron Formatları</h3>
+                    <p>
+                        Schedule/Cron tetikleyicilerde "Her Pazartesi saat 09:00" demek için <code>{`0 9 * * 1`}</code> yazmanız gerekir. Bu zamanlama yapısını insan diline çeviren ve test etmenizi sağlayan araçlar mevcuttur. <br/>
+                        <a href="https://crontab.guru/" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>Crontab.guru Hesaplayıcı</a>
+                    </p>
+                </div>
+
+                <hr className={styles.divider} />
+
+                <h3>🔗 Benzer Platformların Eğitimleri</h3>
+                <p>BreviAI'nin nod tabanlı (node-based) görsel programlama altyapısı, dünya çapındaki büyük otomasyon platformlarıyla (n8n, Make, Zapier) neredeyse aynı mantık üzerine kuruludur. Bu platformların sunduğu ücretsiz eğitim videolarını ve akademilerini izlemek, BreviAI'de de ufkunu açacaktır:</p>
+                
+                <ul>
+                    <li><strong>n8n Dokümantasyonu & Eğitim Kanalı:</strong> Verilerin diziler halinde (array of objects) nasıl işlendiğini anlamak için harika bir kaynaktır.</li>
+                    <li><strong>Make.com Academy:</strong> Otomasyon vizyonunuzu, "Hangi süreçler otomatize edilebilir?" sorusunun cevabını vererek genişletir.</li>
+                </ul>
+
+                <hr className={styles.divider} />
+
+                <h3>💬 Topluluk Desteği (Community)</h3>
+                <p>Bir yerde takılırsanız veya kurduğunuz harika bir akışı başkalarıyla paylaşmak isterseniz:</p>
+                <ul>
+                    <li><strong>Discord / Telegram Kanalları:</strong> Diğer BreviAI kullanıcılarıyla (Maker'lar) iletişimde kalın, tecrübelerinizi paylaşın.</li>
+                    <li><strong>Hazır Şablonlar (Templates):</strong> Uygulama içindeki <strong>"Keşfet" (Templates)</strong> sekmesinden başkalarının ürettiği örnek senaryoları (Örn: "Google Play Yorumlarına AI ile Cevap Verme") kendi hesabınıza kopyalayabilirsiniz.</li>
+                </ul>
+                
+                <div className={styles.alertTip}>
+                    <strong>💡 İpucu (Pro-Tip):</strong> Sisteme girmeden önce, bir süreci insan gözüyle (manuel olarak) nasıl yaptığınızı kağıda dökünüz. Tıkladığınız her bir düğme bir "Action", aradaki bekleme sürünüz bir "Wait", kopyaladığınız her metin ise aktarılan "JSON Data"ya karşılık gelir. 🚀
+                </div>
+            </>
+        )
     }
 };
 
@@ -605,6 +696,10 @@ export default function DocsPage() {
                         <button className={`${styles.nodeItem} ${currentSection === 'api' ? styles.activeNode : ''}`}
                             onClick={() => setCurrentSection('api')}>
                             Geliştirici (API)
+                        </button>
+                        <button className={`${styles.nodeItem} ${currentSection === 'resources' ? styles.activeNode : ''}`}
+                            onClick={() => setCurrentSection('resources')}>
+                            Kaynaklar & Öğrenme
                         </button>
                     </div>
                 </div>
