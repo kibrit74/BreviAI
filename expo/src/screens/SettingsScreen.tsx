@@ -15,6 +15,15 @@ const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
 const WHATSAPP_CONNECT_USER_STORAGE_KEY = 'whatsapp_connect_user_id';
 const WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY = 'whatsapp_connect_status_url';
 const WHATSAPP_AUTH_KEY = 'breviai-secret-password';
+const WA_CONNECT_PENDING_STATUSES = new Set([
+    'initializing',
+    'loading',
+    'authenticated',
+    'qr_pending',
+    'pairing_code_pending',
+    'not_started',
+    'disconnected',
+]);
 
 function generateWhatsAppSessionId(): string {
     return `device_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
@@ -193,6 +202,7 @@ export default function SettingsScreen({ navigation }: any) {
     const ensureWhatsAppConnect = React.useCallback(async (baseUrlInput?: string) => {
         const baseUrl = normalizeWaBaseUrl(baseUrlInput);
         const userId = await getOrCreateWhatsAppConnectUserId();
+        const normalizedPhone = String(waPhoneNumber || '').replace(/[^\d]/g, '');
 
         const response = await fetch(`${baseUrl}/whatsapp/connect/start`, {
             method: 'POST',
@@ -202,7 +212,7 @@ export default function SettingsScreen({ navigation }: any) {
                 'Bypass-Tunnel-Reminder': 'true',
                 'ngrok-skip-browser-warning': 'true'
             },
-            body: JSON.stringify({ userId, phone: waPhoneNumber || undefined })
+            body: JSON.stringify({ userId, phone: normalizedPhone || undefined })
         });
 
         const text = await response.text();
@@ -316,11 +326,23 @@ export default function SettingsScreen({ navigation }: any) {
     // Poll if QR is pending
     React.useEffect(() => {
         let interval: NodeJS.Timeout;
-        if ((waStatus?.qrCode || waStatus?.pairingCode || waStatus?.status === 'pairing_code_pending' || waStatus?.status === 'initializing') && !waStatus?.ready && expandedSections['accounts']) {
+        const currentStatus = String(waStatus?.status || '').toLowerCase();
+        const shouldPoll =
+            expandedSections['accounts'] &&
+            !waStatus?.ready &&
+            currentStatus !== 'error' &&
+            (
+                Boolean(waStatus?.qrCode) ||
+                Boolean(waStatus?.pairingCode) ||
+                WA_CONNECT_PENDING_STATUSES.has(currentStatus) ||
+                waPhoneSubmitted
+            );
+
+        if (shouldPoll) {
             interval = setInterval(checkWhatsAppStatus, 3000);
         }
         return () => clearInterval(interval);
-    }, [waStatus?.qrCode, waStatus?.pairingCode, waStatus?.ready, waStatus?.status, expandedSections['accounts']]);
+    }, [waStatus?.qrCode, waStatus?.pairingCode, waStatus?.ready, waStatus?.status, waPhoneSubmitted, expandedSections['accounts']]);
 
 
     const toggleSection = (sectionId: string) => {
