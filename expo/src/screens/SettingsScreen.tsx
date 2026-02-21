@@ -122,12 +122,13 @@ export default function SettingsScreen({ navigation }: any) {
 
 
     // WhatsApp State
-    const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; user?: any } | null>(null);
+    const [waStatus, setWaStatus] = React.useState<{ status: string; ready: boolean; qrCode?: string; pairingCode?: string; user?: any } | null>(null);
     const [isWaLoading, setIsWaLoading] = React.useState(false);
     const [waBackendUrl, setWaBackendUrl] = React.useState('http://136.109.124.154:3001');
     const [waSessionId, setWaSessionId] = React.useState('');
     const [waConnectUrl, setWaConnectUrl] = React.useState('');
     const [waStatusUrl, setWaStatusUrl] = React.useState('');
+    const [waPhoneNumber, setWaPhoneNumber] = React.useState('');
 
     // Cron Job Management State
     const [cronJobs, setCronJobs] = React.useState<any[]>([]);
@@ -200,7 +201,7 @@ export default function SettingsScreen({ navigation }: any) {
                 'Bypass-Tunnel-Reminder': 'true',
                 'ngrok-skip-browser-warning': 'true'
             },
-            body: JSON.stringify({ userId })
+            body: JSON.stringify({ userId, phone: waPhoneNumber || undefined })
         });
 
         const text = await response.text();
@@ -235,7 +236,7 @@ export default function SettingsScreen({ navigation }: any) {
         if (nextConnectUrl) setWaConnectUrl(nextConnectUrl);
 
         return data;
-    }, [normalizeWaBaseUrl, waSessionId]);
+    }, [normalizeWaBaseUrl, waSessionId, waPhoneNumber]);
 
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
@@ -314,11 +315,11 @@ export default function SettingsScreen({ navigation }: any) {
     // Poll if QR is pending
     React.useEffect(() => {
         let interval: NodeJS.Timeout;
-        if (waStatus?.qrCode && !waStatus.ready && expandedSections['accounts']) {
+        if ((waStatus?.qrCode || waStatus?.pairingCode || waStatus?.status === 'pairing_code_pending' || waStatus?.status === 'initializing') && !waStatus?.ready && expandedSections['accounts']) {
             interval = setInterval(checkWhatsAppStatus, 3000);
         }
         return () => clearInterval(interval);
-    }, [waStatus?.qrCode, waStatus?.ready, expandedSections['accounts']]);
+    }, [waStatus?.qrCode, waStatus?.pairingCode, waStatus?.ready, waStatus?.status, expandedSections['accounts']]);
 
 
     const toggleSection = (sectionId: string) => {
@@ -962,24 +963,69 @@ export default function SettingsScreen({ navigation }: any) {
                                 </View>
                             ) : (
                                 <View style={{ alignItems: 'center', padding: 16, backgroundColor: activeColors.background, borderRadius: 12 }}>
-                                    {waStatus.qrCode ? (
-                                        <Image
-                                            source={{ uri: waStatus.qrCode }}
-                                            style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 16 }}
-                                        />
+                                    {(waStatus as any)?.pairingCode ? (
+                                        /* ── Pairing Code Display ── */
+                                        <View style={{ alignItems: 'center', width: '100%' }}>
+                                            <Ionicons name="key-outline" size={36} color="#25D366" style={{ marginBottom: 12 }} />
+                                            <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 8, fontSize: 16 }}>Eşleştirme Kodu</Text>
+                                            <View style={{ backgroundColor: '#25D366' + '15', borderWidth: 2, borderColor: '#25D366', borderRadius: 16, paddingVertical: 16, paddingHorizontal: 32, marginBottom: 16 }}>
+                                                <Text style={{ fontSize: 32, fontWeight: '900', letterSpacing: 6, color: '#25D366', textAlign: 'center', fontFamily: 'monospace' }}>
+                                                    {String((waStatus as any).pairingCode).slice(0, 4) + '-' + String((waStatus as any).pairingCode).slice(4)}
+                                                </Text>
+                                            </View>
+                                            <Text style={{ color: activeColors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 }}>
+                                                1. 📱 WhatsApp'ı açın{'\n'}
+                                                2. ⚙️ Ayarlar {'>'} Bağlı Cihazlar{'\n'}
+                                                3. 🔗 "Cihaz Bağla" {'>'} "Telefon numarası ile bağla"{'\n'}
+                                                4. ✏️ Yukarıdaki 8 haneli kodu girin
+                                            </Text>
+                                        </View>
+                                    ) : !waPhoneNumber ? (
+                                        /* ── Phone Number Input ── */
+                                        <View style={{ alignItems: 'center', width: '100%' }}>
+                                            <Ionicons name="phone-portrait-outline" size={36} color="#25D366" style={{ marginBottom: 12 }} />
+                                            <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 4, fontSize: 16 }}>WhatsApp Numaranızı Girin</Text>
+                                            <Text style={{ color: activeColors.textSecondary, fontSize: 12, marginBottom: 16, textAlign: 'center' }}>
+                                                Ülke kodu ile birlikte (örn: 905331234567)
+                                            </Text>
+                                            <TextInput
+                                                style={{ width: '100%', backgroundColor: activeColors.card, color: activeColors.text, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, fontSize: 18, textAlign: 'center', letterSpacing: 2, borderWidth: 1, borderColor: activeColors.border, fontFamily: 'monospace' }}
+                                                placeholder="905XXXXXXXXX"
+                                                placeholderTextColor={activeColors.textSecondary}
+                                                keyboardType="phone-pad"
+                                                value={waPhoneNumber}
+                                                onChangeText={setWaPhoneNumber}
+                                                maxLength={15}
+                                            />
+                                            <TouchableOpacity
+                                                style={{ backgroundColor: '#25D366', paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12, marginTop: 16, width: '100%', alignItems: 'center', shadowColor: '#25D366', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                                                onPress={async () => {
+                                                    if (waPhoneNumber.replace(/\D/g, '').length < 10) {
+                                                        Alert.alert('Hata', 'Lütfen geçerli bir telefon numarası girin.');
+                                                        return;
+                                                    }
+                                                    checkWhatsAppStatus();
+                                                }}
+                                            >
+                                                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>🔗 Eşleştirme Kodu Al</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : waStatus?.qrCode ? (
+                                        /* ── QR Code Fallback ── */
+                                        <View style={{ alignItems: 'center' }}>
+                                            <Image
+                                                source={{ uri: waStatus.qrCode }}
+                                                style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 16 }}
+                                            />
+                                            <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 6, fontSize: 16 }}>QR Kodu Taratın</Text>
+                                        </View>
                                     ) : (
+                                        /* ── Loading state ── */
                                         <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
                                             <ActivityIndicator size="large" color="#25D366" />
-                                            <Text style={{ marginTop: 16, color: activeColors.textSecondary, fontWeight: '500' }}>QR Kod Hazırlanıyor...</Text>
+                                            <Text style={{ marginTop: 16, color: activeColors.textSecondary, fontWeight: '500' }}>Eşleştirme kodu alınıyor...</Text>
                                         </View>
                                     )}
-
-                                    <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 6, fontSize: 16 }}>Cihazı Bağlayın</Text>
-                                    <Text style={{ color: activeColors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 }}>
-                                        1. 📱 Telefonunuzda WhatsApp'ı açın{'\n'}
-                                        2. ⚙️ Ayarlar {'>'} Bağlı Cihazlar menüsüne gidin{'\n'}
-                                        3. 📷 Cihaz Bağla diyerek bu kodu taratın
-                                    </Text>
                                 </View>
                             )}
                         </View>

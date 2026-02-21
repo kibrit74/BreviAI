@@ -242,6 +242,8 @@ function getOrCreateSession(sessionId) {
         client: null,
         ready: false,
         qrCode: null,
+        pairingPhone: null,
+        pairingCode: null,
         status: 'initializing',
         messagesSent: 0,
         lastError: null,
@@ -262,13 +264,14 @@ function initSessionClient(session) {
     session.status = 'initializing';
     session.ready = false;
     session.qrCode = null;
+    session.pairingCode = null;
     session.lastError = null;
     session.updatedAt = Date.now();
 
     console.log(`[WhatsApp][${session.sessionId}] Initializing client...`);
     if (chromePath) console.log(`[WhatsApp][${session.sessionId}] Using Chrome:`, chromePath);
 
-    const client = new Client({
+    const clientOptions = {
         authStrategy: new LocalAuth({
             clientId: `breviai-${session.sessionId}`,
             dataPath: './.wwebjs_auth/'
@@ -285,11 +288,19 @@ function initSessionClient(session) {
                 '--disable-gpu'
             ]
         }
-    });
+    };
+
+    if (session.pairingPhone) {
+        clientOptions.pairWithPhoneNumber = { phoneNumber: session.pairingPhone };
+    }
+
+    const client = new Client(clientOptions);
 
     session.client = client;
 
     client.on('qr', async (qr) => {
+        if (session.pairingPhone) return;
+
         try {
             session.qrCode = await qrcode.toDataURL(qr);
             session.status = 'qr_pending';
@@ -301,9 +312,17 @@ function initSessionClient(session) {
         }
     });
 
+    client.on('code', (code) => {
+        session.pairingCode = code;
+        session.status = 'pairing_code_pending';
+        session.updatedAt = Date.now();
+        console.log(`[WhatsApp][${session.sessionId}] Pairing code generated: ${code}`);
+    });
+
     client.on('authenticated', () => {
         session.status = 'authenticated';
         session.qrCode = null;
+        session.pairingCode = null;
         session.updatedAt = Date.now();
         console.log(`[WhatsApp][${session.sessionId}] Authenticated`);
     });
@@ -313,6 +332,7 @@ function initSessionClient(session) {
         session.status = 'auth_failed';
         session.lastError = `Auth failed: ${msg}`;
         session.qrCode = null;
+        session.pairingCode = null;
         session.updatedAt = Date.now();
         session.initializing = false;
         console.error(`[WhatsApp][${session.sessionId}] Auth failed:`, msg);
@@ -328,6 +348,7 @@ function initSessionClient(session) {
         session.ready = true;
         session.status = 'ready';
         session.qrCode = null;
+        session.pairingCode = null;
         session.user = {
             name: client.info?.pushname,
             number: client.info?.wid?.user
@@ -484,12 +505,18 @@ router.post('/connect/start', (req, res) => {
     try {
         const rawUserId = req.body?.userId || req.query.userId || req.headers['x-user-id'];
         const userId = sanitizeUserId(rawUserId);
+        const phone = req.body?.phone ? String(req.body.phone).replace(/[^\d]/g, '') : null;
         if (!userId) {
             return res.status(400).json({ error: 'userId required' });
         }
 
         const sessionId = getOrCreateSessionIdForUser(userId);
         const session = getOrCreateSession(sessionId);
+
+        if (phone && !session.ready) {
+            session.pairingPhone = phone;
+        }
+
         const token = createConnectToken({ userId, sessionId });
         const baseUrl = getPublicBaseUrl(req);
 
@@ -557,6 +584,7 @@ router.get('/connect/status', (req, res) => {
             status: session.status,
             ready: session.ready,
             qrCode: session.qrCode,
+            pairingCode: session.pairingCode,
             user: session.ready ? session.user : null,
             lastError: session.lastError,
             messagesSent: session.messagesSent,
@@ -579,6 +607,7 @@ router.get('/status', (req, res) => {
             status: session.status,
             ready: session.ready,
             qrCode: session.qrCode,
+            pairingCode: session.pairingCode,
             user: session.ready ? session.user : null,
             messagesSent: session.messagesSent,
             lastError: session.lastError,
