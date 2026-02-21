@@ -1157,9 +1157,31 @@ export default function SettingsScreen({ navigation }: any) {
                                             </TouchableOpacity>
                                             <TouchableOpacity
                                                 style={{ backgroundColor: activeColors.card, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: activeColors.border }}
-                                                onPress={checkWhatsAppStatus}
+                                                onPress={async () => {
+                                                    try {
+                                                        setIsWaLoading(true);
+                                                        // Disconnect current session first
+                                                        const baseUrl = normalizeWaBaseUrl();
+                                                        const userId = await getOrCreateWhatsAppConnectUserId();
+                                                        try {
+                                                            await fetch(`${baseUrl}/whatsapp/disconnect`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json', 'x-auth-key': WHATSAPP_AUTH_KEY },
+                                                                body: JSON.stringify({ userId }),
+                                                            });
+                                                        } catch (_) { }
+                                                        // Reset and reconnect with phone
+                                                        setWaStatus(null);
+                                                        lastLegacyPairAttemptRef.current = 0;
+                                                        await checkWhatsAppStatus();
+                                                    } catch (err: any) {
+                                                        Alert.alert('Hata', err?.message || 'Tekrar denenemedi');
+                                                    } finally {
+                                                        setIsWaLoading(false);
+                                                    }
+                                                }}
                                             >
-                                                <Text style={{ color: activeColors.text, fontWeight: '600', fontSize: 14 }}>Kodu Tekrar Dene</Text>
+                                                <Text style={{ color: activeColors.text, fontWeight: '600', fontSize: 14 }}>🔄 Kodu Tekrar Dene</Text>
                                             </TouchableOpacity>
                                         </View>
                                     ) : !waPhoneSubmitted ? (
