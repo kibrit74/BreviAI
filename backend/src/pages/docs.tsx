@@ -17,6 +17,29 @@ function getIcon(type: string) {
     return CATS[type]?.icon || '📦';
 }
 
+const MiniMockup = ({ nodes }: { nodes: { icon: string, name: string, type: 'trigger' | 'action' | 'logic' }[] }) => {
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'rgba(0,0,0,0.15)', padding: '1rem', borderRadius: '12px', marginTop: '1rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+            {nodes.map((n, i) => (
+                <React.Fragment key={i}>
+                    <div className={styles.mockupNode} style={{ padding: '0.5rem 0.75rem', transform: 'none' }}>
+                        <div className={`${styles.mockupIcon} ${n.type === 'trigger' ? styles.triggerIcon : n.type === 'logic' ? styles.logicIcon : styles.actionIcon}`} style={{ width: 24, height: 24, fontSize: '0.9rem' }}>{n.icon}</div>
+                        <div>
+                            <div style={{ fontSize: '0.75rem' }}>{n.name}</div>
+                            <div style={{ fontSize: '0.6rem', color: '#9CA3AF', fontWeight: 400 }}>{n.type === 'trigger' ? 'Tetikleyici' : n.type === 'logic' ? 'Mantık' : 'Aksiyon'}</div>
+                        </div>
+                    </div>
+                    {i < nodes.length - 1 && (
+                        <div className={styles.mockupConnection} style={{ width: 25, height: 2 }}>
+                            <div className={styles.mockupPulse} style={{ width: 6, height: 6, top: -2 }}></div>
+                        </div>
+                    )}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+};
+
 // --- Content Data (Extracted from WORKFLOW_GUIDE.md) ---
 const STATIC_SECTIONS = {
     getting_started: {
@@ -41,7 +64,7 @@ const STATIC_SECTIONS = {
                 </ul>
 
                 <hr className={styles.divider} />
-                
+
                 <h3>Arayüz Görünümü (Mockup)</h3>
                 <p>Aşağıdaki interaktif örnekte, bir <strong>Webhook</strong> tetikleyicisinin nasıl <strong>WhatsApp Mesaj Gönder</strong> düğümüne bağlandığını görebilirsiniz:</p>
 
@@ -167,6 +190,13 @@ return {
                         <li><strong>AI Agent:</strong> Haber metnini 2 cümlelik özet haline getir.</li>
                         <li><strong>WhatsApp Send:</strong> Özeti ve linki telefonunuza gönder.</li>
                     </ul>
+                    <MiniMockup nodes={[
+                        { icon: '⏱️', name: 'Cron', type: 'trigger' },
+                        { icon: '🌐', name: 'HTTP', type: 'action' },
+                        { icon: '🔁', name: 'Loop', type: 'logic' },
+                        { icon: '🤖', name: 'AI Agent', type: 'action' },
+                        { icon: '💬', name: 'WhatsApp', type: 'action' }
+                    ]} />
                 </div>
 
                 <div className={styles.exampleCard}>
@@ -180,6 +210,12 @@ return {
                         <li><strong>True:</strong> <strong>App Push</strong> ile "BTC Yükseldi: {`{{price}}`}" bildirimi gönder.</li>
                         <li><strong>False:</strong> Hiçbir şey yapma (Akışı bitir).</li>
                     </ul>
+                    <MiniMockup nodes={[
+                        { icon: '⏱️', name: 'Cron', type: 'trigger' },
+                        { icon: '🌐', name: 'HTTP', type: 'action' },
+                        { icon: '🔀', name: 'IF', type: 'logic' },
+                        { icon: '🔔', name: 'App Push', type: 'action' }
+                    ]} />
                 </div>
 
                 <div className={styles.exampleCard}>
@@ -194,6 +230,12 @@ return {
                         <li><strong>Gmail Send:</strong> PDF'i ekleyip müşteriye "Siparişiniz Alındı" maili at.</li>
                         <li><strong>SMS Send:</strong> Yöneticiye "Yeni Sipariş: {`{{amount}} TL`} - {`{{customerName}}`}" mesajı at.</li>
                     </ul>
+                    <MiniMockup nodes={[
+                        { icon: '🪝', name: 'Webhook', type: 'trigger' },
+                        { icon: '☁️', name: 'G. Drive', type: 'action' },
+                        { icon: '📄', name: 'PDF', type: 'action' },
+                        { icon: '✉️', name: 'Gmail', type: 'action' }
+                    ]} />
                 </div>
 
                 <div className={styles.exampleCard}>
@@ -209,6 +251,12 @@ return {
                         <li><strong>Case "Spotify":</strong> Spotify üzerinden çalma listesi başlat.</li>
                         <li><strong>Speak Text:</strong> Sonucu sesli olarak kullanıcıya söyle ("Toplantınız eklendi efendim").</li>
                     </ul>
+                    <MiniMockup nodes={[
+                        { icon: '🎙️', name: 'Voice', type: 'trigger' },
+                        { icon: '🤖', name: 'AI Router', type: 'logic' },
+                        { icon: '🔀', name: 'Switch', type: 'logic' },
+                        { icon: '🔊', name: 'Speak', type: 'action' }
+                    ]} />
                 </div>
 
                 <div className={styles.exampleCard}>
@@ -221,6 +269,12 @@ return {
                         <li><strong>Image Generator:</strong> Konuya uygun yüksek kaliteli bir görsel oluştur (SDXL/DALL-E).</li>
                         <li><strong>Instagram Share:</strong> Oluşan resmi ve metni profilinizde paylaşın.</li>
                     </ul>
+                    <MiniMockup nodes={[
+                        { icon: '✋', name: 'Manual', type: 'trigger' },
+                        { icon: '✍️', name: 'AI Writer', type: 'action' },
+                        { icon: '🎨', name: 'Image Gen', type: 'action' },
+                        { icon: '📸', name: 'Instagram', type: 'action' }
+                    ]} />
                 </div>
             </>
         )
@@ -569,11 +623,11 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
                 <hr className={styles.divider} />
 
                 <h3>📖 Temel Mantık ve Karşılaştırma Kavramları</h3>
-                
+
                 <div className={styles.faqItem}>
                     <h3>JSON (JavaScript Object Notation)</h3>
                     <p>
-                        Otomasyon araçlarında düğümler arası veri alışverişinin evrensel dilidir. Bir düğümün ne tür bir veri çıkardığını anlamak için mutlaka JSON objelerinin ve dizilerinin <code>{`[ { "key": "value" } ]`}</code> yapısını bilmelisiniz. <br/>
+                        Otomasyon araçlarında düğümler arası veri alışverişinin evrensel dilidir. Bir düğümün ne tür bir veri çıkardığını anlamak için mutlaka JSON objelerinin ve dizilerinin <code>{`[ { "key": "value" } ]`}</code> yapısını bilmelisiniz. <br />
                         <a href="https://www.w3schools.com/js/js_json_intro.asp" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>W3Schools JSON Eğitimi</a>
                     </p>
                 </div>
@@ -581,7 +635,7 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
                 <div className={styles.faqItem}>
                     <h3>Düzenli İfadeler (Regex)</h3>
                     <p>
-                        Gelen uzun bir metin veya e-posta içerisinden sadece bir "Sipariş Kodu" veya "Telefon Numarasını" cımbızla çekmek isterseniz Regex kullanmalısınız. BreviAI içerisinde "Notification Trigger" ve "Code" düğümlerinde çok sık kullanılır. <br/>
+                        Gelen uzun bir metin veya e-posta içerisinden sadece bir "Sipariş Kodu" veya "Telefon Numarasını" cımbızla çekmek isterseniz Regex kullanmalısınız. BreviAI içerisinde "Notification Trigger" ve "Code" düğümlerinde çok sık kullanılır. <br />
                         <a href="https://regex101.com/" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>Regex101 Pratik ve Test Aracı</a>
                     </p>
                 </div>
@@ -589,7 +643,7 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
                 <div className={styles.faqItem}>
                     <h3>Cron Formatları</h3>
                     <p>
-                        Schedule/Cron tetikleyicilerde "Her Pazartesi saat 09:00" demek için <code>{`0 9 * * 1`}</code> yazmanız gerekir. Bu zamanlama yapısını insan diline çeviren ve test etmenizi sağlayan araçlar mevcuttur. <br/>
+                        Schedule/Cron tetikleyicilerde "Her Pazartesi saat 09:00" demek için <code>{`0 9 * * 1`}</code> yazmanız gerekir. Bu zamanlama yapısını insan diline çeviren ve test etmenizi sağlayan araçlar mevcuttur. <br />
                         <a href="https://crontab.guru/" target="_blank" rel="noreferrer" style={{ color: '#8B5CF6', textDecoration: 'underline' }}>Crontab.guru Hesaplayıcı</a>
                     </p>
                 </div>
@@ -598,7 +652,7 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
 
                 <h3>🔗 Benzer Platformların Eğitimleri</h3>
                 <p>BreviAI'nin nod tabanlı (node-based) görsel programlama altyapısı, dünya çapındaki büyük otomasyon platformlarıyla (n8n, Make, Zapier) neredeyse aynı mantık üzerine kuruludur. Bu platformların sunduğu ücretsiz eğitim videolarını ve akademilerini izlemek, BreviAI'de de ufkunu açacaktır:</p>
-                
+
                 <ul>
                     <li><strong>n8n Dokümantasyonu & Eğitim Kanalı:</strong> Verilerin diziler halinde (array of objects) nasıl işlendiğini anlamak için harika bir kaynaktır.</li>
                     <li><strong>Make.com Academy:</strong> Otomasyon vizyonunuzu, "Hangi süreçler otomatize edilebilir?" sorusunun cevabını vererek genişletir.</li>
@@ -612,7 +666,7 @@ await axios.post('https://api.breviai.com/webhook/xyz', {
                     <li><strong>Discord / Telegram Kanalları:</strong> Diğer BreviAI kullanıcılarıyla (Maker'lar) iletişimde kalın, tecrübelerinizi paylaşın.</li>
                     <li><strong>Hazır Şablonlar (Templates):</strong> Uygulama içindeki <strong>"Keşfet" (Templates)</strong> sekmesinden başkalarının ürettiği örnek senaryoları (Örn: "Google Play Yorumlarına AI ile Cevap Verme") kendi hesabınıza kopyalayabilirsiniz.</li>
                 </ul>
-                
+
                 <div className={styles.alertTip}>
                     <strong>💡 İpucu (Pro-Tip):</strong> Sisteme girmeden önce, bir süreci insan gözüyle (manuel olarak) nasıl yaptığınızı kağıda dökünüz. Tıkladığınız her bir düğme bir "Action", aradaki bekleme sürünüz bir "Wait", kopyaladığınız her metin ise aktarılan "JSON Data"ya karşılık gelir. 🚀
                 </div>
