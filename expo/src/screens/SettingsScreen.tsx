@@ -1125,12 +1125,49 @@ export default function SettingsScreen({ navigation }: any) {
                                                     {String((waStatus as any).pairingCode).slice(0, 4) + '-' + String((waStatus as any).pairingCode).slice(4)}
                                                 </Text>
                                             </View>
-                                            <Text style={{ color: activeColors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10 }}>
+                                            <Text style={{ color: activeColors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10, marginBottom: 16 }}>
                                                 1. 📱 WhatsApp'ı açın{'\n'}
                                                 2. ⚙️ Ayarlar {'>'} Bağlı Cihazlar{'\n'}
                                                 3. 🔗 "Cihaz Bağla" {'>'} "Telefon numarası ile bağla"{'\n'}
                                                 4. ✏️ Yukarıdaki 8 haneli kodu girin
                                             </Text>
+                                            <TouchableOpacity
+                                                style={{ backgroundColor: activeColors.card, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: activeColors.border }}
+                                                onPress={async () => {
+                                                    try {
+                                                        const baseUrl = normalizeWaBaseUrl();
+                                                        const userId = await getOrCreateWhatsAppConnectUserId();
+                                                        try {
+                                                            await fetch(`${baseUrl}/whatsapp/disconnect`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json', 'x-auth-key': WHATSAPP_AUTH_KEY },
+                                                                body: JSON.stringify({ userId }),
+                                                            });
+                                                        } catch (_) { }
+
+                                                        const response = await fetch(`${baseUrl}/whatsapp/connect/start`, {
+                                                            method: 'POST',
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'x-auth-key': WHATSAPP_AUTH_KEY,
+                                                            },
+                                                            body: JSON.stringify({ userId }) // Send WITHOUT phone parameter
+                                                        });
+
+                                                        const startData = await response.json();
+                                                        const qrUrl = String(startData?.connectUrl || '').trim();
+                                                        if (!qrUrl) throw new Error('QR bağlantı linki oluşturulamadı');
+                                                        Linking.openURL(qrUrl);
+                                                    } catch (err: any) {
+                                                        Alert.alert('Hata', err?.message || 'QR linki açılamadı');
+                                                    }
+                                                }}
+                                            >
+                                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                    <Ionicons name="qr-code-outline" size={20} color={activeColors.text} style={{ marginRight: 8 }} />
+                                                    <Text style={{ color: activeColors.text, fontWeight: '600', fontSize: 14 }}>Alternatif: QR İle Bağlan</Text>
+                                                </View>
+                                            </TouchableOpacity>
                                         </View>
                                     ) : (waPhoneSubmitted && ((waStatus as any)?.qrCode || String((waStatus as any)?.status || '').toLowerCase() === 'qr_pending')) ? (
                                         /* QR fallback when backend does not emit pairing code */

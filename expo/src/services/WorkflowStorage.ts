@@ -179,6 +179,12 @@ export class WorkflowStorage {
                 telegramPollingService.refreshPolling();
             } catch (e) { }
 
+            // Start/stop WhatsApp backend polling for WHATSAPP_TRIGGER
+            try {
+                const { whatsappPollingService } = require('./WhatsAppPollingService');
+                whatsappPollingService.refreshPolling();
+            } catch (e) { }
+
             // Sync with Native Triggers (WhatsApp, Call, SMS, etc.)
             try {
                 const { triggerNativeService } = require('./TriggerNativeService');

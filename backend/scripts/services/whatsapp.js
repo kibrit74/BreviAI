@@ -22,6 +22,10 @@ const USER_SESSIONS_FILE = path.join(DATA_DIR, 'wa-user-sessions.json');
 const userToSession = new Map();
 const sessionToUser = new Map();
 
+// ── Incoming Message Queue (for mobile app polling) ──
+const MAX_PENDING_MESSAGES = 200;
+const pendingMessages = [];
+
 const possibleChromePaths = [
     '/usr/bin/google-chrome-stable',
     '/usr/bin/google-chrome',
@@ -407,9 +411,34 @@ function initSessionClient(session) {
 
     client.on('message', async (msg) => {
         try {
+            // Push to in-memory queue for mobile app polling
+            const fromRaw = String(msg.from || '');
+            const senderPhone = fromRaw.replace('@c.us', '').replace('@g.us', '').replace(/[^\d]/g, '');
+            const isGroup = fromRaw.endsWith('@g.us');
+            const pendingMsg = {
+                id: `wa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                sessionId: session.sessionId,
+                from: fromRaw,
+                senderPhone,
+                notifyName: msg._data?.notifyName || '',
+                body: msg.body || '',
+                timestamp: msg.timestamp ? msg.timestamp * 1000 : Date.now(),
+                hasMedia: !!msg.hasMedia,
+                type: msg.type || 'chat',
+                isGroup,
+                groupName: isGroup ? (msg._data?.chat?.name || '') : '',
+                consumed: false,
+            };
+            pendingMessages.push(pendingMsg);
+            // Trim queue if too large
+            while (pendingMessages.length > MAX_PENDING_MESSAGES) {
+                pendingMessages.shift();
+            }
+            console.log(`[WhatsApp][${session.sessionId}] Message queued from ${senderPhone} (${pendingMsg.notifyName})`);
+
             await webhookService.sendWhatsAppMessage(msg, session.sessionId);
         } catch (e) {
-            console.error(`[WhatsApp][${session.sessionId}] Webhook error:`, e.message);
+            console.error(`[WhatsApp][${session.sessionId}] Webhook/queue error:`, e.message);
         }
     });
 
@@ -774,6 +803,66 @@ router.get('/qr', (req, res) => {
         `));
     } catch (err) {
         res.status(400).send(htmlPage(`<div class="card"><h1>Hata</h1><p>${err.message}</p></div>`));
+    }
+});
+
+// ── Polling endpoint: mobile app fetches new incoming messages ──
+router.get('/messages/pending', (req, res) => {
+    try {
+        if (!hasInternalAuth(req)) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const since = Number(req.query.since || 0);
+        const limit = Math.min(Number(req.query.limit || 50), 100);
+        const sessionFilter = (req.query.sessionId || req.headers['x-session-id'] || '').trim();
+
+        let messages = pendingMessages.filter(m => {
+            if (m.consumed) return false;
+            if (m.timestamp <= since) return false;
+            if (sessionFilter && m.sessionId !== sessionFilter) return false;
+            return true;
+        });
+
+        // Sort oldest first
+        messages.sort((a, b) => a.timestamp - b.timestamp);
+        messages = messages.slice(0, limit);
+
+        // Mark as consumed
+        const consumedIds = new Set(messages.map(m => m.id));
+        for (const m of pendingMessages) {
+            if (consumedIds.has(m.id)) m.consumed = true;
+        }
+
+        // Cleanup old consumed messages (older than 5 minutes)
+        const cutoff = Date.now() - 5 * 60 * 1000;
+        let i = 0;
+        while (i < pendingMessages.length) {
+            if (pendingMessages[i].consumed && pendingMessages[i].timestamp < cutoff) {
+                pendingMessages.splice(i, 1);
+            } else {
+                i++;
+            }
+        }
+
+        res.json({
+            success: true,
+            count: messages.length,
+            messages: messages.map(m => ({
+                id: m.id,
+                sessionId: m.sessionId,
+                senderPhone: m.senderPhone,
+                notifyName: m.notifyName,
+                body: m.body,
+                timestamp: m.timestamp,
+                hasMedia: m.hasMedia,
+                type: m.type,
+                isGroup: m.isGroup,
+                groupName: m.groupName,
+            })),
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -20,7 +20,15 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
             // Use pollOnce() and AWAIT IT to ensure task stays alive during fetch
             await telegramPollingService.pollOnce();
         } catch (e) {
-            console.warn('[BackgroundService] Polling error:', e);
+            console.warn('[BackgroundService] Telegram polling error:', e);
+        }
+
+        // Trigger WhatsApp backend polling check
+        try {
+            const { whatsappPollingService } = require('./WhatsAppPollingService');
+            await whatsappPollingService.pollOnce();
+        } catch (e) {
+            console.warn('[BackgroundService] WhatsApp polling error:', e);
         }
     }
 });
