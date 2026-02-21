@@ -139,6 +139,7 @@ export default function SettingsScreen({ navigation }: any) {
     const [waStatusUrl, setWaStatusUrl] = React.useState('');
     const [waPhoneNumber, setWaPhoneNumber] = React.useState('');
     const [waPhoneSubmitted, setWaPhoneSubmitted] = React.useState(false);
+    const lastLegacyPairAttemptRef = React.useRef(0);
 
     // Cron Job Management State
     const [cronJobs, setCronJobs] = React.useState<any[]>([]);
@@ -249,6 +250,52 @@ export default function SettingsScreen({ navigation }: any) {
         return data;
     }, [normalizeWaBaseUrl, waSessionId, waPhoneNumber]);
 
+    const requestLegacyPairingCode = React.useCallback(async (baseUrlInput?: string) => {
+        const baseUrl = normalizeWaBaseUrl(baseUrlInput);
+        const normalizedPhone = String(waPhoneNumber || '').replace(/[^\d]/g, '');
+        if (normalizedPhone.length < 10) return null;
+
+        const endpoints = [`${baseUrl}/pair`, `${baseUrl}/whatsapp/pair`];
+        for (const endpoint of endpoints) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-key': WHATSAPP_AUTH_KEY,
+                        'Bypass-Tunnel-Reminder': 'true',
+                        'ngrok-skip-browser-warning': 'true',
+                    },
+                    body: JSON.stringify({
+                        phoneNumber: normalizedPhone,
+                        phone: normalizedPhone,
+                    }),
+                });
+
+                const text = await response.text();
+                if (!text || text.trim().startsWith('<!doctype html') || text.includes('accounts.google.com')) {
+                    continue;
+                }
+
+                let data: any;
+                try {
+                    data = JSON.parse(text);
+                } catch {
+                    continue;
+                }
+
+                const pairingCode = String(data?.pairingCode || data?.code || '').trim();
+                if (response.ok && !data?.error && pairingCode) {
+                    return { pairingCode, data };
+                }
+            } catch {
+                // Try next endpoint variant.
+            }
+        }
+
+        return null;
+    }, [normalizeWaBaseUrl, waPhoneNumber]);
+
     const checkWhatsAppStatus = async () => {
         setIsWaLoading(true);
         try {
@@ -258,7 +305,7 @@ export default function SettingsScreen({ navigation }: any) {
             if (!statusTarget) throw new Error('Status URL alinamadi');
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+            const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
             const response = await fetch(statusTarget, {
                 headers: {
@@ -296,7 +343,25 @@ export default function SettingsScreen({ navigation }: any) {
                     setWaStatusUrl(nextStatusUrl);
                     await AsyncStorage.setItem(WHATSAPP_CONNECT_STATUS_URL_STORAGE_KEY, nextStatusUrl);
                 }
-                setWaStatus(data);
+                let nextStatusData = data;
+                const currentStatus = String(data?.status || '').toLowerCase();
+                const hasPairingCode = String(data?.pairingCode || '').trim().length > 0;
+                if (!data?.ready && waPhoneSubmitted && !hasPairingCode && WA_CONNECT_PENDING_STATUSES.has(currentStatus)) {
+                    const now = Date.now();
+                    if (now - lastLegacyPairAttemptRef.current > 12000) {
+                        lastLegacyPairAttemptRef.current = now;
+                        const legacyPair = await requestLegacyPairingCode(url);
+                        if (legacyPair?.pairingCode) {
+                            nextStatusData = {
+                                ...data,
+                                pairingCode: legacyPair.pairingCode,
+                                status: 'pairing_code_pending',
+                            };
+                        }
+                    }
+                }
+
+                setWaStatus(nextStatusData);
             } catch (jsonError) {
                 console.warn('WA Status JSON Error:', text.substring(0, 100)); // Log first 100 chars
                 setWaStatus({ status: 'error', ready: false });
@@ -309,6 +374,28 @@ export default function SettingsScreen({ navigation }: any) {
                     'Baglanti Hatasi: Cloud Shell Korumasi',
                     'Cloud Shell onizleme korumasi aktif. Port 3001 icin dis erisim ayarini kontrol edin veya sabit sunucu URL kullanin.'
                 );
+            }
+
+            // Legacy backend fallback: try direct /pair endpoint even if connect/start flow fails.
+            if (waPhoneSubmitted) {
+                try {
+                    const legacyPair = await requestLegacyPairingCode(normalizeWaBaseUrl());
+                    if (legacyPair?.pairingCode) {
+                        setWaStatus({
+                            status: 'pairing_code_pending',
+                            ready: false,
+                            pairingCode: legacyPair.pairingCode,
+                        });
+                        return;
+                    }
+                } catch {
+                    // continue to generic error handling
+                }
+            }
+
+            if (errMessage.toLowerCase().includes('abort')) {
+                setWaStatus(prev => prev || { status: 'initializing', ready: false });
+                return;
             }
             setWaStatus({ status: 'error', ready: false });
         } finally {
@@ -1009,6 +1096,7 @@ export default function SettingsScreen({ navigation }: any) {
                                                                 setWaStatus(null);
                                                                 setWaPhoneNumber('');
                                                                 setWaPhoneSubmitted(false);
+                                                                lastLegacyPairAttemptRef.current = 0;
                                                                 Alert.alert('✅ Bağlantı Kesildi', 'WhatsApp bağlantısı başarıyla sonlandırıldı.');
                                                             } catch (err: any) {
                                                                 Alert.alert('Hata', err?.message || 'Bağlantı kesilemedi');
@@ -1044,6 +1132,36 @@ export default function SettingsScreen({ navigation }: any) {
                                                 4. ✏️ Yukarıdaki 8 haneli kodu girin
                                             </Text>
                                         </View>
+                                    ) : (waPhoneSubmitted && ((waStatus as any)?.qrCode || String((waStatus as any)?.status || '').toLowerCase() === 'qr_pending')) ? (
+                                        /* QR fallback when backend does not emit pairing code */
+                                        <View style={{ alignItems: 'center', width: '100%' }}>
+                                            <Ionicons name="qr-code-outline" size={36} color="#25D366" style={{ marginBottom: 12 }} />
+                                            <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 8, fontSize: 16 }}>QR ile Baglan</Text>
+                                            <Text style={{ color: activeColors.textSecondary, fontSize: 13, textAlign: 'center', lineHeight: 20, paddingHorizontal: 10, marginBottom: 16 }}>
+                                                Bu sunucu su anda eslestirme kodu yerine QR oturumu donduruyor. QR ekranini tarayicida acip baglanabilirsiniz.
+                                            </Text>
+                                            <TouchableOpacity
+                                                style={{ backgroundColor: '#25D366', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 12, alignItems: 'center', width: '100%', marginBottom: 10 }}
+                                                onPress={async () => {
+                                                    try {
+                                                        const startData = await ensureWhatsAppConnect();
+                                                        const qrUrl = String(startData?.connectUrl || waConnectUrl || '').trim();
+                                                        if (!qrUrl) throw new Error('QR baglanti linki olusturulamadi');
+                                                        Linking.openURL(qrUrl);
+                                                    } catch (err: any) {
+                                                        Alert.alert('Hata', err?.message || 'QR linki acilamadi');
+                                                    }
+                                                }}
+                                            >
+                                                <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>QR Ekranini Ac</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                style={{ backgroundColor: activeColors.card, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: activeColors.border }}
+                                                onPress={checkWhatsAppStatus}
+                                            >
+                                                <Text style={{ color: activeColors.text, fontWeight: '600', fontSize: 14 }}>Kodu Tekrar Dene</Text>
+                                            </TouchableOpacity>
+                                        </View>
                                     ) : !waPhoneSubmitted ? (
                                         /* ── Phone Number Input ── */
                                         <View style={{ alignItems: 'center', width: '100%' }}>
@@ -1068,6 +1186,7 @@ export default function SettingsScreen({ navigation }: any) {
                                                         Alert.alert('Hata', 'Lütfen geçerli bir telefon numarası girin.');
                                                         return;
                                                     }
+                                                    lastLegacyPairAttemptRef.current = 0;
                                                     setWaPhoneSubmitted(true);
                                                     checkWhatsAppStatus();
                                                 }}

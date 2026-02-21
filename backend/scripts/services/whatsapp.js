@@ -226,7 +226,7 @@ function getAuthPathForSession(sessionId) {
     return path.resolve('./.wwebjs_auth/', `session-breviai-${id}`);
 }
 
-function getOrCreateSession(sessionId) {
+function getOrCreateSession(sessionId, { skipInit = false } = {}) {
     const id = sanitizeSessionId(sessionId);
     if (!id) {
         throw new Error(`Invalid sessionId. ${SESSION_ID_HELP}`);
@@ -254,7 +254,9 @@ function getOrCreateSession(sessionId) {
     };
 
     sessions.set(id, session);
-    initSessionClient(session);
+    if (!skipInit) {
+        initSessionClient(session);
+    }
     return session;
 }
 
@@ -295,11 +297,37 @@ function initSessionClient(session) {
     }
 
     const client = new Client(clientOptions);
+    let pairingRequestInFlight = false;
+
+    const requestPairingCodeIfNeeded = async (source) => {
+        if (!session.pairingPhone || session.ready || session.pairingCode || pairingRequestInFlight) return;
+        if (typeof client.requestPairingCode !== 'function') return;
+
+        pairingRequestInFlight = true;
+        try {
+            const code = await client.requestPairingCode(session.pairingPhone);
+            if (code) {
+                session.pairingCode = code;
+                session.status = 'pairing_code_pending';
+                session.updatedAt = Date.now();
+                console.log(`[WhatsApp][${session.sessionId}] Pairing code requested (${source}): ${code}`);
+            }
+        } catch (err) {
+            session.lastError = `Pairing code request failed: ${err.message}`;
+            session.updatedAt = Date.now();
+            console.warn(`[WhatsApp][${session.sessionId}] Pairing code request failed (${source}):`, err.message);
+        } finally {
+            pairingRequestInFlight = false;
+        }
+    };
 
     session.client = client;
 
     client.on('qr', async (qr) => {
-        if (session.pairingPhone) return;
+        if (session.pairingPhone) {
+            void requestPairingCodeIfNeeded('qr_event');
+            return;
+        }
 
         try {
             session.qrCode = await qrcode.toDataURL(qr);
@@ -342,6 +370,7 @@ function initSessionClient(session) {
         session.status = 'loading';
         session.updatedAt = Date.now();
         console.log(`[WhatsApp][${session.sessionId}] Loading ${percent}% - ${message}`);
+        void requestPairingCodeIfNeeded('loading_screen');
     });
 
     client.on('ready', () => {
@@ -391,6 +420,13 @@ function initSessionClient(session) {
         session.updatedAt = Date.now();
         console.error(`[WhatsApp][${session.sessionId}] Initialization failed:`, err.message);
     });
+
+    // Fallback for builds where code event is not emitted automatically with pairWithPhoneNumber.
+    if (session.pairingPhone) {
+        setTimeout(() => {
+            void requestPairingCodeIfNeeded('post_init_fallback');
+        }, 4000);
+    }
 }
 
 async function sendMessage(phone, message, sessionId) {
@@ -559,13 +595,24 @@ router.post('/connect/start', async (req, res) => {
         }
 
         const sessionId = getOrCreateSessionIdForUser(userId);
-        const session = getOrCreateSession(sessionId);
+        const isNewSession = !sessions.has(sessionId);
 
-        // If phone provided and session not ready, restart client with pairing code support
-        if (phone && !session.ready && session.pairingPhone !== phone) {
+        let session;
+
+        if (phone && isNewSession) {
+            // New session with phone: create session WITHOUT auto-init,
+            // set pairingPhone, THEN init with phone from the start.
+            session = getOrCreateSession(sessionId, { skipInit: true });
+            session.pairingPhone = phone;
+            initSessionClient(session);
+        } else {
+            session = getOrCreateSession(sessionId);
+        }
+
+        // Existing session: if phone changed and not yet ready, restart with new phone
+        if (phone && !isNewSession && !session.ready && session.pairingPhone !== phone) {
             session.pairingPhone = phone;
             session.pairingCode = null;
-            // Destroy existing client and reinitialize with pairWithPhoneNumber option
             if (session.client) {
                 try { await session.client.destroy(); } catch (_) { }
                 session.client = null;
@@ -573,6 +620,8 @@ router.post('/connect/start', async (req, res) => {
             session.initializing = false;
             initSessionClient(session);
         }
+
+        console.log(`[WhatsApp][${sessionId}] /connect/start — phone: ${phone || 'none'}, status: ${session.status}, pairingPhone: ${session.pairingPhone || 'none'}`);
 
         const token = createConnectToken({ userId, sessionId });
         const baseUrl = getPublicBaseUrl(req);
@@ -775,4 +824,3 @@ module.exports = {
         return session.client;
     }
 };
-
