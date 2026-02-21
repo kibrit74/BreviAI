@@ -549,7 +549,7 @@ router.get('/sessions', (req, res) => {
     });
 });
 
-router.post('/connect/start', (req, res) => {
+router.post('/connect/start', async (req, res) => {
     try {
         const rawUserId = req.body?.userId || req.query.userId || req.headers['x-user-id'];
         const userId = sanitizeUserId(rawUserId);
@@ -561,8 +561,17 @@ router.post('/connect/start', (req, res) => {
         const sessionId = getOrCreateSessionIdForUser(userId);
         const session = getOrCreateSession(sessionId);
 
-        if (phone && !session.ready) {
+        // If phone provided and session not ready, restart client with pairing code support
+        if (phone && !session.ready && session.pairingPhone !== phone) {
             session.pairingPhone = phone;
+            session.pairingCode = null;
+            // Destroy existing client and reinitialize with pairWithPhoneNumber option
+            if (session.client) {
+                try { await session.client.destroy(); } catch (_) { }
+                session.client = null;
+            }
+            session.initializing = false;
+            initSessionClient(session);
         }
 
         const token = createConnectToken({ userId, sessionId });

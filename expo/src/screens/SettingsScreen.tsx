@@ -129,6 +129,7 @@ export default function SettingsScreen({ navigation }: any) {
     const [waConnectUrl, setWaConnectUrl] = React.useState('');
     const [waStatusUrl, setWaStatusUrl] = React.useState('');
     const [waPhoneNumber, setWaPhoneNumber] = React.useState('');
+    const [waPhoneSubmitted, setWaPhoneSubmitted] = React.useState(false);
 
     // Cron Job Management State
     const [cronJobs, setCronJobs] = React.useState<any[]>([]);
@@ -985,6 +986,7 @@ export default function SettingsScreen({ navigation }: any) {
                                                                 });
                                                                 setWaStatus(null);
                                                                 setWaPhoneNumber('');
+                                                                setWaPhoneSubmitted(false);
                                                                 Alert.alert('✅ Bağlantı Kesildi', 'WhatsApp bağlantısı başarıyla sonlandırıldı.');
                                                             } catch (err: any) {
                                                                 Alert.alert('Hata', err?.message || 'Bağlantı kesilemedi');
@@ -1020,7 +1022,7 @@ export default function SettingsScreen({ navigation }: any) {
                                                 4. ✏️ Yukarıdaki 8 haneli kodu girin
                                             </Text>
                                         </View>
-                                    ) : !waPhoneNumber ? (
+                                    ) : !waPhoneSubmitted ? (
                                         /* ── Phone Number Input ── */
                                         <View style={{ alignItems: 'center', width: '100%' }}>
                                             <Ionicons name="phone-portrait-outline" size={36} color="#25D366" style={{ marginBottom: 12 }} />
@@ -1044,6 +1046,7 @@ export default function SettingsScreen({ navigation }: any) {
                                                         Alert.alert('Hata', 'Lütfen geçerli bir telefon numarası girin.');
                                                         return;
                                                     }
+                                                    setWaPhoneSubmitted(true);
                                                     checkWhatsAppStatus();
                                                 }}
                                             >
