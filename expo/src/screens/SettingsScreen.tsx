@@ -960,6 +960,46 @@ export default function SettingsScreen({ navigation }: any) {
                                         <Ionicons name="send" size={18} color="white" />
                                         <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 14 }}>Test Mesajı Gönder</Text>
                                     </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        style={{ backgroundColor: activeColors.card, padding: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 10, borderWidth: 1, borderColor: '#FF4444' + '40' }}
+                                        onPress={() => {
+                                            Alert.alert(
+                                                'Bağlantıyı Kes',
+                                                'WhatsApp bağlantısını kesmek istediğinize emin misiniz?',
+                                                [
+                                                    { text: 'İptal', style: 'cancel' },
+                                                    {
+                                                        text: 'Kes', style: 'destructive', onPress: async () => {
+                                                            try {
+                                                                setIsWaLoading(true);
+                                                                const baseUrl = normalizeWaBaseUrl();
+                                                                const userId = await getOrCreateWhatsAppConnectUserId();
+                                                                await fetch(`${baseUrl}/whatsapp/disconnect`, {
+                                                                    method: 'POST',
+                                                                    headers: {
+                                                                        'Content-Type': 'application/json',
+                                                                        'x-auth-key': WHATSAPP_AUTH_KEY,
+                                                                    },
+                                                                    body: JSON.stringify({ userId }),
+                                                                });
+                                                                setWaStatus(null);
+                                                                setWaPhoneNumber('');
+                                                                Alert.alert('✅ Bağlantı Kesildi', 'WhatsApp bağlantısı başarıyla sonlandırıldı.');
+                                                            } catch (err: any) {
+                                                                Alert.alert('Hata', err?.message || 'Bağlantı kesilemedi');
+                                                            } finally {
+                                                                setIsWaLoading(false);
+                                                            }
+                                                        }
+                                                    },
+                                                ]
+                                            );
+                                        }}
+                                    >
+                                        <Ionicons name="log-out-outline" size={18} color="#FF4444" />
+                                        <Text style={{ color: '#FF4444', fontWeight: '600', fontSize: 14 }}>Bağlantıyı Kes</Text>
+                                    </TouchableOpacity>
                                 </View>
                             ) : (
                                 <View style={{ alignItems: 'center', padding: 16, backgroundColor: activeColors.background, borderRadius: 12 }}>
@@ -1009,15 +1049,6 @@ export default function SettingsScreen({ navigation }: any) {
                                             >
                                                 <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 15 }}>🔗 Eşleştirme Kodu Al</Text>
                                             </TouchableOpacity>
-                                        </View>
-                                    ) : waStatus?.qrCode ? (
-                                        /* ── QR Code Fallback ── */
-                                        <View style={{ alignItems: 'center' }}>
-                                            <Image
-                                                source={{ uri: waStatus.qrCode }}
-                                                style={{ width: 200, height: 200, borderRadius: 12, marginBottom: 16 }}
-                                            />
-                                            <Text style={{ color: activeColors.text, fontWeight: 'bold', marginBottom: 6, fontSize: 16 }}>QR Kodu Taratın</Text>
                                         </View>
                                     ) : (
                                         /* ── Loading state ── */
