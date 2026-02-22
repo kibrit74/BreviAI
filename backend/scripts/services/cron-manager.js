@@ -224,8 +224,43 @@ class CronManager {
                 const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3000';
                 const SECRET = process.env.APP_SECRET || '';
                 const results = [];
+                const variables = {};
+
+                function replaceVars(obj, vars) {
+                    if (typeof obj === 'string') {
+                        let str = obj;
+                        const now = new Date();
+                        str = str.replace(/\{\{_date\}\}/g, now.toLocaleDateString('tr-TR'));
+                        str = str.replace(/\{\{_time\}\}/g, now.toLocaleTimeString('tr-TR'));
+
+                        return str.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+                            const keys = varName.split('.');
+                            let val = vars;
+                            for (const k of keys) {
+                                if (val && typeof val === 'object') { val = val[k]; }
+                                else { val = undefined; break; }
+                            }
+                            if (val !== undefined) {
+                                return typeof val === 'object' ? JSON.stringify(val) : String(val);
+                            }
+                            return match;
+                        });
+                    } else if (Array.isArray(obj)) {
+                        return obj.map(item => replaceVars(item, vars));
+                    } else if (obj !== null && typeof obj === 'object') {
+                        const newObj = {};
+                        for (const [k, v] of Object.entries(obj)) {
+                            newObj[k] = replaceVars(v, vars);
+                        }
+                        return newObj;
+                    }
+                    return obj;
+                }
+
                 for (const step of (action.steps || [])) {
                     console.log(`[Cron] Multi-MCP step: ${step.tool}`);
+                    const resolvedArgs = replaceVars(step.args || {}, variables);
+
                     const stepResp = await fetchMulti(`${BASE_URL}/api/mcp`, {
                         method: 'POST',
                         headers: {
@@ -235,12 +270,41 @@ class CronManager {
                         body: JSON.stringify({
                             action: 'call_tool',
                             toolName: step.tool,
-                            args: step.args || {},
+                            args: resolvedArgs,
                         }),
                     });
-                    results.push({ tool: step.tool, result: await stepResp.json() });
+
+                    const stepResult = await stepResp.json();
+                    results.push({ tool: step.tool, result: stepResult });
+
+                    let textValue = '';
+                    if (stepResult.content && stepResult.content.length > 0) {
+                        const textContent = stepResult.content.find(c => c.type === 'text');
+                        if (textContent) textValue = textContent.text;
+                        else {
+                            const jsonContent = stepResult.content.find(c => c.type === 'json');
+                            if (jsonContent) textValue = JSON.stringify(jsonContent.json);
+                        }
+                    } else if (stepResult.result && stepResult.result.content) {
+                        const contentArr = stepResult.result.content;
+                        const textContent = contentArr.find(c => c.type === 'text');
+                        if (textContent) textValue = textContent.text;
+                    } else if (typeof stepResult.result === 'string') {
+                        textValue = stepResult.result;
+                    }
+
+                    const varName = resolvedArgs.variableName || step.id;
+                    if (varName) {
+                        variables[varName] = textValue;
+                    }
+                    if (step.tool === 'breviai.google.calendar_list') {
+                        variables['events'] = textValue || 'Etkinlik yok';
+                    }
+                    if (step.tool === 'breviai.google.gmail_read') {
+                        variables['emails'] = textValue || 'Mail yok';
+                    }
                 }
-                return { steps: results };
+                return { steps: results, variables };
             }
 
             default:
