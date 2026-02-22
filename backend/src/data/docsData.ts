@@ -11,6 +11,7 @@ export const CATS: Record<string, { color: string; icon: string; label: string }
   device: { color: '#EF4444', icon: '📱', label: 'Cihaz & Sensörler' },
   memory: { color: '#6366F1', icon: '🧠', label: 'Hafıza (RAG)' },
   files: { color: '#F59E0B', icon: '📂', label: 'Dosya & Veri' },
+  mcp: { color: '#8B5CF6', icon: '🔌', label: 'MCP Araçları' },
 };
 
 export const NODES = [
@@ -942,6 +943,78 @@ export const NODES = [
     ],
     usecases: [
       { title: 'Şarj Dolunca Uyar', flow: ['Cron 5dk', 'Battery Level', 'IF level > 90', 'Speak "Şarj doldu"'], desc: 'Pil sağlığı için tam dolmadan uyar.' },
+    ]
+  },
+
+  // ─── MCP (Model Context Protocol) ───
+  {
+    id: 'MCP_OVERVIEW',
+    title: 'MCP Araçları (Genel Bakış)',
+    type: 'mcp',
+    summary: '31 MCP aracıyla Google, Microsoft, Notion, Slack, Jira, Trello, Asana, Airtable, Zapier ve GitHub entegrasyonu.',
+    tags: ['mcp', 'entegrasyon', 'api', 'google', 'microsoft', 'notion', 'slack', 'jira', 'trello'],
+    overview: [
+      { type: 'section', title: '🔌 MCP Nedir?', body: 'Model Context Protocol (MCP), AI asistanların dış servislerle doğrudan etkileşim kurmasını sağlayan standart bir protokoldür. BreviAI\'daki AGENT_AI node\'u bu araçları otomatik olarak kullanabilir.' },
+      { type: 'section', title: '📦 Mevcut Entegrasyonlar', body: '<strong>Google (7 araç):</strong> Sheets oku/yaz, Gmail oku, Drive listele, Calendar listele/oluştur, Meet oluştur<br><br><strong>Microsoft (9 araç):</strong> Outlook oku/gönder, Calendar listele/oluştur, OneDrive listele/ara, Excel oku/yaz, Teams toplantı<br><br><strong>İş Yönetimi (12 araç):</strong> Notion ara/sayfa oluştur, Slack mesaj/kanallar, Trello kart listele/oluştur, Jira issue ara/oluştur, Asana görev listele/oluştur, Airtable kayıt oku, Zapier webhook<br><br><strong>Diğer (3 araç):</strong> GitHub repo listele, Web arama, Şablon listele' },
+      { type: 'tip', title: 'Nasıl Kullanılır?', body: 'MCP araçları AGENT_AI node\'u tarafından otomatik çağrılır. Kullanıcı "Jira\'da issue oluştur" veya "Slack\'e mesaj at" dediğinde agent ilgili MCP aracını kendisi seçer ve çalıştırır.' },
+      { type: 'warn', title: 'Kimlik Doğrulama', body: 'Her MCP aracı bir access token veya API key gerektirir. Google ve Microsoft araçları için <strong>Ayarlar → Hesaplar</strong> üzerinden OAuth ile giriş yapın. Diğer servisler için API anahtarlarınızı girin.' },
+    ],
+    params: [],
+    output: { schema: `{ "tool": "breviai.google.calendar_list", "result": { "events": [...] } }`, desc: 'Her MCP aracının çıktısı araç tipine göre değişir.' },
+    examples: [
+      { title: 'Takvim Sorgula', code: 'AGENT_AI Prompt:\n"Yarınki toplantılarımı listele"\n\n→ Agent otomatik çağırır:\nbreviai.google.calendar_list', explanation: 'Agent kullanıcı isteğini analiz edip doğru MCP aracını seçer.' },
+      { title: 'Slack Bildirim', code: 'AGENT_AI Prompt:\n"Slack\'teki #general kanalına proje durumunu bildir"\n\n→ Agent çağırır:\nbreviai.slack.send_message', explanation: 'Agent mesajı oluşturup Slack kanalına gönderir.' },
+    ],
+    usecases: [
+      { title: 'Sabah Brifingi', flow: ['Cron 09:00', 'Agent (Calendar+Mail+Hava)', 'Speak Text', 'WhatsApp'], desc: 'Her sabah takvim, mail ve hava durumunu MCP ile çekip sesli bildirir.' },
+      { title: 'Proje Yönetimi', flow: ['Manual Trigger', 'Agent (Jira+Notion+Slack)', 'Show Text'], desc: 'Jira görevlerini çek, Notion\'a kaydet, Slack\'e bildir.' },
+    ]
+  },
+  {
+    id: 'MCP_BUSINESS',
+    title: 'MCP İş Yönetimi Araçları',
+    type: 'mcp',
+    summary: 'Notion, Slack, Trello, Jira, Asana, Airtable ve Zapier MCP entegrasyonları.',
+    tags: ['mcp', 'notion', 'slack', 'trello', 'jira', 'asana', 'airtable', 'zapier'],
+    overview: [
+      { type: 'section', title: '🏢 İş Araçları', body: '<strong>Notion:</strong> Sayfa/DB arama, yeni sayfa oluşturma<br><strong>Slack:</strong> Kanal mesajı gönderme, kanal listesi<br><strong>Trello:</strong> Board kartlarını listeleme, kart oluşturma<br><strong>Jira:</strong> JQL ile issue arama, yeni issue oluşturma<br><strong>Asana:</strong> Proje görevlerini listeleme, görev oluşturma<br><strong>Airtable:</strong> Base tablodan kayıt okuma<br><strong>Zapier:</strong> Catch Hook tetikleme (JSON payload)' },
+      { type: 'tip', title: 'API Anahtarları', body: 'Her servisin kendi API anahtarı gerektirir:<br>• <strong>Notion:</strong> Internal Integration Token<br>• <strong>Slack:</strong> Bot User OAuth Token (xoxb-...)<br>• <strong>Trello:</strong> API Key + Token<br>• <strong>Jira:</strong> Email + API Token<br>• <strong>Asana:</strong> Personal Access Token<br>• <strong>Airtable:</strong> Personal Access Token' },
+    ],
+    params: [
+      { name: 'Tool Name', type: 'String', required: true, desc: 'Çağrılacak MCP aracı. Örn: breviai.jira.create_issue' },
+      { name: 'Args', type: 'JSON', required: true, desc: 'Araca gönderilecek parametreler.' },
+    ],
+    output: { schema: `{ "tool": "breviai.jira.create_issue", "result": { "key": "PROJ-123", "url": "..." } }`, desc: 'Oluşturulan kayıt bilgisi.' },
+    examples: [
+      { title: 'Jira Issue Oluştur', code: 'Tool: breviai.jira.create_issue\nArgs: {\n  domain: "sirket.atlassian.net",\n  project: "PROJ",\n  summary: "Login butonu çalışmıyor",\n  issueType: "Bug"\n}', explanation: 'Jira\'da yeni bir bug kaydı açar.' },
+      { title: 'Notion Sayfa Oluştur', code: 'Tool: breviai.notion.create_page\nArgs: {\n  parentPageId: "abc123",\n  title: "Toplantı Notları",\n  content: "{{ai_summary}}"\n}', explanation: 'Notion\'da yeni sayfa oluşturup içerik yazar.' },
+    ],
+    usecases: [
+      { title: 'Bug Takip', flow: ['WhatsApp Trigger', 'AI Analiz', 'Jira Create Issue', 'Slack Bildir'], desc: 'WhatsApp\'tan gelen bug raporunu Jira\'ya yaz, Slack\'ten bildir.' },
+    ]
+  },
+  {
+    id: 'MCP_SCHEDULED',
+    title: 'MCP Zamanlanmış Görevler',
+    type: 'mcp',
+    summary: 'Backend cron ile MCP araçlarını zamanlanmış olarak çalıştır — sunucu kapanmadıkça çalışır.',
+    tags: ['mcp', 'cron', 'zamanlanmış', 'schedule', 'backend', 'otomasyon'],
+    overview: [
+      { type: 'section', title: '⏰ Sunucu Tarafı Zamanlama', body: 'Backend cron-manager ile MCP araçlarını zamanlanmış olarak çalıştırabilirsiniz. Telefon kapalı olsa bile sunucu üzerinde çalışmaya devam eder. <code>mcp_call</code> (tek araç) ve <code>multi_mcp</code> (çoklu araç zinciri) action tipleri desteklenir.' },
+      { type: 'section', title: '📂 JSON Formatı', body: 'Otomasyon tanımları <code>automations/</code> klasörüne JSON olarak kayıt edilir. <code>schedule</code> alanında standart cron ifadesi kullanılır: <code>0 9 * * 1-5</code> (Hafta içi 09:00).' },
+      { type: 'tip', title: 'Cron İfade Örnekleri', body: '• <code>0 9 * * 1-5</code> → Hafta içi sabah 09:00<br>• <code>*/30 * * * *</code> → Her 30 dakikada bir<br>• <code>0 0 1 * *</code> → Her ayın ilk günü gece yarısı<br>• <code>0 18 * * 5</code> → Her Cuma 18:00' },
+    ],
+    params: [
+      { name: 'Schedule', type: 'Cron', required: true, desc: 'Cron ifadesi. Örn: 0 9 * * 1-5' },
+      { name: 'Action Type', type: 'Select', required: true, desc: 'mcp_call (tek araç) veya multi_mcp (zincir)' },
+      { name: 'Steps', type: 'JSON', required: true, desc: 'Çalıştırılacak MCP araç adımları.' },
+    ],
+    output: { schema: `{ "steps": [{ "tool": "breviai.google.calendar_list", "result": {...} }, { "tool": "whatsapp_send", "result": {...} }] }`, desc: 'Her adımın sonucu sırayla döner.' },
+    examples: [
+      { title: 'Sabah Brifingi', code: 'Schedule: 0 9 * * 1-5\nSteps:\n  1. Calendar List → Etkinlikleri çek\n  2. Gmail Read → Okunmamış mailler\n  3. Web Search → Hava durumu\n  4. WhatsApp Send → Özet gönder\n  5. Speak Text → Sesli brifing', explanation: 'Her sabah 09:00\'da çalışır, takvim+mail+hava durumu çekip WhatsApp\'tan ve sesli bildirir.' },
+    ],
+    usecases: [
+      { title: 'Akıllı Sabah Brifingi', flow: ['Cron 09:00', 'MCP Calendar', 'MCP Gmail', 'MCP Web Search', 'WhatsApp + Speak'], desc: 'Tam otomatik sabah brifingi: takvim, mail, hava durumu, döviz — sesli ve yazılı.' },
     ]
   },
 ];
