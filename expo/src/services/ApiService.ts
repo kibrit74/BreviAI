@@ -2,7 +2,7 @@
 import Constants from 'expo-constants';
 import { Platform, NativeModules } from 'react-native';
 import { debugLog } from './DebugLogger';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 // Always use production Vercel backend
 const API_BASE_URL = 'https://breviai.vercel.app';
@@ -208,39 +208,31 @@ INSTRUCTIONS:
         console.log('[ApiService] Transcribing audio:', uri);
         console.log('[ApiService] Using API URL:', API_BASE_URL);
 
+        // Ensure URI has file:// prefix for React Native
+        let fileUri = uri;
+        if (Platform.OS !== 'web' && !fileUri.startsWith('file://')) {
+            fileUri = 'file://' + fileUri;
+        }
+
         // 1. Validate file exists and check size (Vercel limit: ~4.5MB body)
         if (Platform.OS !== 'web') {
             try {
-                const fileInfo = await FileSystem.getInfoAsync(uri);
+                const fileInfo = await FileSystem.getInfoAsync(fileUri);
                 if (!fileInfo.exists) {
                     throw new Error('Ses dosyası bulunamadı. Lütfen tekrar kaydedin.');
                 }
                 const fileSizeMB = (fileInfo.size || 0) / (1024 * 1024);
                 console.log(`[ApiService] Audio file size: ${fileSizeMB.toFixed(2)} MB`);
                 if (fileSizeMB > 4) {
-                    throw new Error(`Ses dosyası çok büyük (${fileSizeMB.toFixed(1)} MB). Maksimum 4 MB olmalı. Daha kısa kayıt yapın.`);
+                    throw new Error(`Ses dosyası çok büyük (${fileSizeMB.toFixed(1)} MB). Maksimum 4 MB olmalı.`);
                 }
             } catch (fsError: any) {
                 if (fsError.message?.includes('Ses dosyas')) throw fsError;
-                console.warn('[ApiService] File info check failed:', fsError);
+                console.warn('[ApiService] File info check warning:', fsError.message);
             }
         }
 
-        // 2. Prepare FormData
-        const formData = new FormData();
-        if (Platform.OS === 'web') {
-            const blobResp = await fetch(uri);
-            const blob = await blobResp.blob();
-            formData.append('audio', blob, 'recording.m4a');
-        } else {
-            formData.append('audio', {
-                uri: uri,
-                name: 'recording.m4a',
-                type: 'audio/m4a',
-            } as any);
-        }
-
-        // 3. Send with timeout and retry
+        // 2. Upload using FileSystem.uploadAsync (more reliable than fetch FormData in RN)
         const MAX_RETRIES = 1;
         let lastError: Error | null = null;
 
@@ -248,42 +240,73 @@ INSTRUCTIONS:
             try {
                 if (attempt > 0) {
                     console.log(`[ApiService] Transcription retry #${attempt}`);
-                    await new Promise(r => setTimeout(r, 1000));
+                    await new Promise(r => setTimeout(r, 1500));
                 }
 
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
+                if (Platform.OS === 'web') {
+                    // Web: use standard fetch with FormData
+                    const formData = new FormData();
+                    const blobResp = await fetch(uri);
+                    const blob = await blobResp.blob();
+                    formData.append('audio', blob, 'recording.m4a');
 
-                const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
-                    signal: controller.signal,
-                    method: 'POST',
-                    headers: {
-                        'x-app-secret': this.headers['x-app-secret'],
-                    },
-                    body: formData,
-                }).finally(() => clearTimeout(timeoutId));
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-                console.log('[ApiService] Response status:', response.status);
-                const data = await response.json();
+                    const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
+                        signal: controller.signal,
+                        method: 'POST',
+                        headers: { 'x-app-secret': this.headers['x-app-secret'] },
+                        body: formData,
+                    }).finally(() => clearTimeout(timeoutId));
 
-                if (!response.ok) {
-                    throw new Error(data.error || `Sunucu hatası (${response.status})`);
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error || 'Transcription failed');
+                    return data.text || data.data?.text || '';
                 }
 
+                // Native: use FileSystem.uploadAsync (bypasses React Native fetch issues)
+                console.log('[ApiService] Using FileSystem.uploadAsync for native upload');
+                const uploadResult = await FileSystem.uploadAsync(
+                    `${API_BASE_URL}/api/transcribe`,
+                    fileUri,
+                    {
+                        httpMethod: 'POST',
+                        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                        fieldName: 'audio',
+                        mimeType: 'audio/m4a',
+                        headers: {
+                            'x-app-secret': this.headers['x-app-secret'],
+                        },
+                        parameters: {},
+                    }
+                );
+
+                console.log('[ApiService] Upload status:', uploadResult.status);
+
+                if (uploadResult.status < 200 || uploadResult.status >= 300) {
+                    let errorMsg = `Sunucu hatası (${uploadResult.status})`;
+                    try {
+                        const errData = JSON.parse(uploadResult.body);
+                        errorMsg = errData.error || errorMsg;
+                    } catch {}
+                    throw new Error(errorMsg);
+                }
+
+                const data = JSON.parse(uploadResult.body);
                 console.log('[ApiService] Transcription success, text:', data.text?.substring(0, 50));
                 return data.text || data.data?.text || '';
 
             } catch (error: any) {
                 lastError = error;
-                if (error?.name === 'AbortError') {
-                    lastError = new Error('Ses çevirme zaman aşımına uğradı. İnternet bağlantınızı kontrol edin.');
-                    break;
-                }
-                if (error?.message?.includes('Network request failed')) {
-                    console.warn(`[ApiService] Network failed attempt ${attempt}:`, error.message);
+                console.warn(`[ApiService] Transcription attempt ${attempt} failed:`, error.message);
+
+                if (error?.message?.includes('Network request failed') ||
+                    error?.message?.includes('network') ||
+                    error?.message?.includes('Could not connect')) {
                     continue; // Retry network failures
                 }
-                break;
+                break; // Don't retry other errors
             }
         }
 
