@@ -122,6 +122,8 @@ export async function GET(request: NextRequest) {
     // Attempt to seed if empty (non-blocking often better, but for simplicity here we await or fire-and-forget)
     // We'll await it to ensure first load works if empty
 
+    const category = request.nextUrl.searchParams.get('category');
+
     let query = supabase
         .from('templates')
         .select('*')
