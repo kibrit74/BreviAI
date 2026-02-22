@@ -1,0 +1,73 @@
+{
+    "id": "mcp-morning-brief",
+    "name": "☀️ Akıllı Sabah Brifingi",
+    "description": "Her iş günü sabah 09:00'da çalışır. Takvim, mail, hava durumu, döviz kuru kontrol eder. WhatsApp özet + sesli bildirim.",
+    "schedule": "0 9 * * 1-5",
+    "enabled": true,
+    "action": {
+        "type": "multi_mcp",
+        "steps": [
+            {
+                "id": "step-1-calendar",
+                "name": "📅 Bugünkü Etkinlikler",
+                "tool": "breviai.google.calendar_list",
+                "args": {
+                    "accessToken": "{{GOOGLE_ACCESS_TOKEN}}",
+                    "calendarId": "primary",
+                    "maxResults": 10
+                }
+            },
+            {
+                "id": "step-2-mail",
+                "name": " Okunmamış Mailler",
+                "tool": "breviai.google.gmail_read",
+                "args": {
+                    "accessToken": "{{GOOGLE_ACCESS_TOKEN}}",
+                    "query": "is:unread",
+                    "maxResults": 5
+                }
+            },
+            {
+                "id": "step-3-weather",
+                "name": "☁️ Hava Durumu",
+                "tool": "breviai.web_search",
+                "args": {
+                    "query": "{{CITY}} hava durumu bugün sıcaklık",
+                    "limit": 1
+                }
+            },
+            {
+                "id": "step-4-currency",
+                "name": "💱 Döviz Kuru",
+                "tool": "breviai.web_search",
+                "args": {
+                    "query": "dolar euro TL kuru bugün",
+                    "limit": 1
+                }
+            },
+            {
+                "id": "step-5-whatsapp",
+                "name": "📱 WhatsApp Özet",
+                "tool": "whatsapp_send",
+                "args": {
+                    "phone": "{{WHATSAPP_PHONE}}",
+                    "message": "☀️ *Günaydın! Sabah Brifingin Hazır:*\n\n📅 *Bugünkü Etkinlikler:*\n{{step-1-calendar.summary}}\n\n📧 *Okunmamış Mailler:*\n{{step-2-mail.summary}}\n\n☁️ *Hava Durumu:*\n{{step-3-weather.summary}}\n\n💱 *Döviz Kuru:*\n{{step-4-currency.summary}}\n\n_BreviAI Sabah Brifingi • {{_date}} {{_time}}_"
+                }
+            },
+            {
+                "id": "step-6-voice",
+                "name": "🔊 Sesli Brifing",
+                "tool": "speak_text",
+                "args": {
+                    "text": "Günaydın! İşte sabah brifingin. Bugün {{step-1-calendar.count}} toplantın ve {{step-2-mail.count}} okunmamış mailin var. Hava {{step-3-weather.temp}} derece, {{step-3-weather.condition}}. Dolar {{step-4-currency.usd}}, Euro {{step-4-currency.eur}} lira. İlk toplantın saat {{step-1-calendar.first_time}}'de: {{step-1-calendar.first_title}}. İyi günler!",
+                    "language": "tr-TR"
+                }
+            }
+        ]
+    },
+    "config_guide": {
+        "GOOGLE_ACCESS_TOKEN": "Ayarlar > Google ile Giriş Yap'tan alınan OAuth token",
+        "WHATSAPP_PHONE": "WhatsApp numarası (örn: 905551234567)",
+        "CITY": "Hava durumu için şehir adı (örn: İstanbul)"
+    }
+}

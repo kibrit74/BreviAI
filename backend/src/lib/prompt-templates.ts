@@ -112,17 +112,59 @@ ${API_DOCS}
 - LOOP: Döngü (config: { type: "count", count: 3 })
 - VARIABLE: Değişken (config: { operation: "set", name: "myVar", value: "test" })
 
+## MCP Araçları (Model Context Protocol)
+ÖNEMLİ: Aşağıdaki MCP araçları AGENT_AI node'u tarafından otomatik olarak kullanılabilir. Kullanıcı bu servislerle ilgili bir istek yaparsa AGENT_AI node'unu kur ve prompt'unda ilgili MCP aracını belirt.
+
+### MCP - Google Servisleri
+- breviai.google.sheets_read: Google Sheets'ten veri oku
+- breviai.google.sheets_write: Google Sheets'e veri yaz/ekle
+- breviai.google.gmail_read: Gmail mailleri oku
+- breviai.google.drive_list: Google Drive dosyalarını listele
+- breviai.google.calendar_list: Google Calendar etkinlik listele
+- breviai.google.calendar_create: Google Calendar etkinlik oluştur
+- breviai.google.meet_create: Google Meet toplantısı oluştur
+
+### MCP - Microsoft Servisleri
+- breviai.microsoft.outlook_read: Outlook mailleri oku
+- breviai.microsoft.outlook_send: Outlook'tan mail gönder
+- breviai.microsoft.calendar_list: Outlook takvim etkinlikleri listele
+- breviai.microsoft.calendar_create: Outlook'ta etkinlik oluştur
+- breviai.microsoft.onedrive_list: OneDrive dosya/klasör listele
+- breviai.microsoft.onedrive_search: OneDrive'da dosya ara
+- breviai.microsoft.excel_read: OneDrive Excel'den hücre oku
+- breviai.microsoft.excel_write: OneDrive Excel'e veri yaz
+- breviai.microsoft.teams_meeting: Teams toplantısı oluştur
+
+### MCP - İş Yönetimi
+- breviai.notion.search: Notion'da arama yap
+- breviai.notion.create_page: Notion'da sayfa oluştur
+- breviai.slack.send_message: Slack kanalına mesaj gönder
+- breviai.slack.list_channels: Slack kanallarını listele
+- breviai.trello.list_cards: Trello kartlarını listele
+- breviai.trello.create_card: Trello kartı oluştur
+- breviai.jira.search_issues: Jira'da issue ara (JQL)
+- breviai.jira.create_issue: Jira issue oluştur
+- breviai.asana.list_tasks: Asana görevlerini listele
+- breviai.asana.create_task: Asana görevi oluştur
+- breviai.airtable.list_records: Airtable kayıtlarını listele
+- breviai.zapier.trigger_webhook: Zapier webhook tetikle
+- breviai.github.repos_list: GitHub repolarını listele
+
 ## AI & Yapay Zeka
 - AGENT_AI: **🤖 Akıllı AI Agent (OTONOM ASİSTAN)**
   * **ÖZEL YETENEK:** Bu node sadece metin üretmez, DİĞER NODLARI KENDİ BAŞINA KULLANABİLİR!
   * **DOSYA ANALİZİ:** Eğer 'FILE_PICK' veya resim/belge nodundan sonra gelirse, dosyayı okuyup analiz edebilir (OCR, Özetleme, Veri Çekme).
-  * **Araçlar:** Takvim, Email, WhatsApp, SMS, UYAP, Web Arama, Dosya Okuma, **ZAMANLAYICI**, **BİLDİRİM TAKİBİ**, **HAREKET ALGILAMA**, **MANTIK (Loop/If/Switch)**
+  * **Araçlar:** Takvim, Email, WhatsApp, SMS, UYAP, Web Arama, Dosya Okuma, **ZAMANLAYICI**, **BİLDİRİM TAKİBİ**, **HAREKET ALGILAMA**, **MANTIK (Loop/If/Switch)**, **TÜM MCP ARAÇLARI** (Notion, Slack, Trello, Jira, Asana, Airtable, Zapier, GitHub, Teams, OneDrive, Excel)
+  * **MCP KULLANIMI:** Kullanıcı "Jira'da issue oluştur", "Notion'a kaydet", "Slack'e mesaj at", "Trello kartı ekle" gibi isteklerde bulunursa, AGENT_AI bu MCP araçlarını otomatik çağırabilir.
   * **NE ZAMAN KULLAN:**
     - "Dosyadaki tarihi bul ve mesaj at" (FILE_PICK -> AGENT)
     - "Yarınki duruşmalarımı listele" (AGENT tek başına yeter)
     - "Feneri aç" (Basit komutlar)
-    - "Her sabah 8'de...", "Sallayınca..." (Agent bunları ayarlayabilir)
-  * **DİKKAT:** Agent'tan sonra genelde sadece SHOW_TEXT eklenir. Agent 'send_whatsapp' gibi araçları kendisi çağırır, ayrıca node eklemeye gerek yoktur (ama görsel netlik için eklenebilir).
+    - "Her sabah 8'de..." (Agent bunları ayarlayabilir)
+    - "Jira'da bug oluştur" (AGENT MCP üzerinden yapar)
+    - "Notion'a toplantı notlarını kaydet" (AGENT MCP üzerinden yapar)
+    - "Slack'e bildirim gönder" (AGENT MCP üzerinden yapar)
+  * **DİKKAT:** Agent'tan sonra genelde sadece SHOW_TEXT eklenir. Agent 'send_whatsapp' gibi araçları ve MCP araçlarını kendisi çağırır, ayrıca node eklemeye gerek yoktur (ama görsel netlik için eklenebilir).
   * **Config:** { prompt: "İstek... (Dosya varsa: 'Ekteki dosyayı analiz et')", provider: "gemini", model: "gemini-2.0-flash-exp", variableName: "agentResponse" }
   
 - IMAGE_GENERATOR: Resim Üret (config: { prompt: "A cat", provider: "nanobana", variableName: "generatedImage" })
@@ -244,6 +286,23 @@ Bu senaryo için JSON Yapısı:
     { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
     { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "true" },
     { "id": "e3-5", "sourceNodeId": "3", "targetNodeId": "5", "sourcePort": "false" }
+  ]
+}
+
+## 6. MCP ASİSTANI + SESLİ YANIT (Örn: "Jira'dan görevlerimi getir ve sesli söyle", "Notion'a kaydet", "Slack'e bildir")
+Kullanıcı MCP servislerinden (Notion, Slack, Jira, Trello, Asana, Airtable, Zapier, Google, Microsoft) bahsederse, AGENT_AI node'u kur ve prompt'unda MCP araçlarını belirt. Sesli yanıt isteniyorsa SPEAK_TEXT ekle.
+{
+  "name": "MCP Sesli Asistan",
+  "nodes": [
+    { "id": "1", "type": "CHAT_INPUT_TRIGGER", "label": "Ne yapayım?", "config": { "prompt": "Ne yapmamı istersin?", "variableName": "userCommand" }, "position": { "x": 100, "y": 50 } },
+    { "id": "2", "type": "AGENT_AI", "label": "MCP Asistan", "config": { "prompt": "Sen MCP araçlarına erişimi olan kişisel asistansın. Notion, Slack, Jira, Trello, Asana, Airtable, Zapier, Google (Gmail, Calendar, Sheets, Drive, Meet), Microsoft (Outlook, Calendar, Excel, OneDrive, Teams) araçlarını kullanabilirsin.\\n\\nKullanıcı isteği: {{userCommand}}\\n\\nUygun MCP aracını çağır ve sonucu KISA özetle (sesli okunacak).", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "result" }, "position": { "x": 100, "y": 200 } },
+    { "id": "3", "type": "SPEAK_TEXT", "label": "Sesli Yanıt", "config": { "text": "{{result}}", "language": "tr-TR" }, "position": { "x": 100, "y": 400 } },
+    { "id": "4", "type": "SHOW_TEXT", "label": "Yazılı Sonuç", "config": { "content": "{{result}}" }, "position": { "x": 100, "y": 550 } }
+  ],
+  "edges": [
+    { "id": "e1-2", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+    { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+    { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" }
   ]
 }
 

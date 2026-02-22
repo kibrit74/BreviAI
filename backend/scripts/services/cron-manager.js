@@ -148,6 +148,57 @@ class CronManager {
                     throw err;
                 }
 
+            // ═══════════════════════════════════════════════════
+            // MCP Tool Actions (Model Context Protocol)
+            // ═══════════════════════════════════════════════════
+
+            case 'mcp_call': {
+                // { type: 'mcp_call', tool: 'breviai.slack.send_message', args: { token: '...', channel: '...', text: '...' } }
+                const fetchMcp = require('node-fetch');
+                const MCP_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+                const MCP_SECRET = process.env.APP_SECRET || '';
+                console.log(`[Cron] MCP call: ${action.tool}`);
+                const mcpResp = await fetchMcp(`${MCP_URL}/api/mcp`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-app-secret': MCP_SECRET,
+                    },
+                    body: JSON.stringify({
+                        action: 'call_tool',
+                        toolName: action.tool,
+                        args: action.args || {},
+                    }),
+                });
+                const mcpData = await mcpResp.json();
+                return { tool: action.tool, result: mcpData };
+            }
+
+            case 'multi_mcp': {
+                // { type: 'multi_mcp', steps: [ { tool: '...', args: {...} }, ... ] }
+                const fetchMulti = require('node-fetch');
+                const BASE_URL = process.env.BACKEND_URL || 'http://localhost:3000';
+                const SECRET = process.env.APP_SECRET || '';
+                const results = [];
+                for (const step of (action.steps || [])) {
+                    console.log(`[Cron] Multi-MCP step: ${step.tool}`);
+                    const stepResp = await fetchMulti(`${BASE_URL}/api/mcp`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-app-secret': SECRET,
+                        },
+                        body: JSON.stringify({
+                            action: 'call_tool',
+                            toolName: step.tool,
+                            args: step.args || {},
+                        }),
+                    });
+                    results.push({ tool: step.tool, result: await stepResp.json() });
+                }
+                return { steps: results };
+            }
+
             default:
                 throw new Error(`Unknown action type: ${action.type}`);
         }

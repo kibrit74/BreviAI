@@ -1175,5 +1175,90 @@ export const SEED_TEMPLATES: BaseTemplate[] = [
                 { "id": "e4", "sourceNodeId": "4", "targetNodeId": "5", "sourcePort": "default" }
             ]
         }
+    },
+    // ═══════════════════════════════════════════════════════════════
+    // 🦞 OPENCLAW-STYLE MCP ASSISTANT TEMPLATES
+    // ═══════════════════════════════════════════════════════════════
+    {
+        id: 'mcp-assistant-1',
+        title: '🦞 MCP Kişisel Asistan (Sesli)',
+        title_en: 'MCP Personal Assistant (Voice)',
+        description: 'OpenClaw tarzı kişisel AI asistan. Sesli yanıt verir. Notion, Slack, Jira, Trello, Asana, Google, Microsoft ve tüm MCP araçlarını kullanabilir.',
+        description_en: 'OpenClaw-style personal AI assistant with voice responses and full MCP tool access.',
+        category: 'AI',
+        author: 'BreviAI',
+        downloads: '25k+',
+        tags: ['mcp', 'assistant', 'voice', 'openclaw', 'notion', 'slack', 'jira', 'trello', 'asana', 'sesli'],
+        template_json: {
+            "name": "🦞 MCP Kişisel Asistan",
+            "description": "OpenClaw tarzı kişisel AI asistan. Sesli yanıt verir. Tüm MCP araçlarına erişebilir.",
+            "nodes": [
+                { "id": "1", "type": "CHAT_INPUT_TRIGGER", "label": "💬 Ne yapmamı istersin?", "data": { "prompt": "Ne yapmamı istersin? (Örn: 'Yarınki toplantılarımı listele', 'Jira'da bug aç', 'Slack'e bildir')", "variableName": "userCommand" }, "position": { "x": 100, "y": 50 } },
+                { "id": "2", "type": "AGENT_AI", "label": "🤖 MCP Asistan", "data": { "prompt": "Sen BreviAI platformundaki tam otonom kişisel asistansın — OpenClaw tarzında çalışırsın.\\n\\n## KİMLİĞİN\\nAdın: Brevi. Kullanıcının kişisel iş asistanısın. Sorulara cevap vermekle kalmaz, İŞ YAPAN bir asistansın.\\n\\n## ARAÇLARIN (MCP)\\nŞu araçları doğrudan kullanabilirsin:\\n- **Google:** Gmail oku/gönder, Calendar etkinlik listele/oluştur, Sheets oku/yaz, Drive listele, Meet oluştur\\n- **Microsoft:** Outlook oku/gönder, Calendar listele/oluştur, Excel oku/yaz, OneDrive listele/ara, Teams toplantı\\n- **İş Yönetimi:** Notion ara/sayfa oluştur, Slack mesaj gönder/kanallar, Trello kart listele/oluştur, Jira issue ara/oluştur, Asana görev listele/oluştur\\n- **Diğer:** Airtable kayıt oku, Zapier webhook tetikle, GitHub repo listele, Web arama\\n\\n## ÇALIŞMA PRENSİPLERİN\\n1. Kullanıcının isteğini analiz et\\n2. Hangi MCP aracını kullanman gerektiğine karar ver\\n3. Aracı çalıştır ve sonucu al\\n4. Sonucu kullanıcıya KISA ve NET şekilde özetle\\n5. Emin olmadığın bilgiyi 'ask_user' ile sor, UYDURMA\\n\\n## SESLİ YANIT\\nYanıtların sesli okunacak. Bu yüzden:\\n- Kısa ve doğal konuş\\n- Markdown/link kullanma\\n- Liste yerine akıcı cümleler kur\\n- 'Tamam, şunu yaptım...' gibi doğal başla\\n\\nKullanıcı isteği: {{userCommand}}", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "assistantResponse" }, "position": { "x": 100, "y": 200 } },
+                { "id": "3", "type": "SPEAK_TEXT", "label": "🔊 Sesli Yanıt", "data": { "text": "{{assistantResponse}}", "language": "tr-TR" }, "position": { "x": 100, "y": 400 } },
+                { "id": "4", "type": "SHOW_TEXT", "label": "📝 Yazılı Yanıt", "data": { "title": "🦞 Brevi Asistan", "content": "{{assistantResponse}}" }, "position": { "x": 100, "y": 550 } }
+            ],
+            "edges": [
+                { "id": "e1-2", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+                { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+                { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" }
+            ]
+        }
+    },
+    {
+        id: 'mcp-assistant-2',
+        title: '🎙️ Sesli Komuta Merkezi',
+        title_en: 'Voice Command Center',
+        description: 'Sesle komut ver, AI iş yapsın! Ses kaydını yazıya çevirir, AI analiz eder, MCP araçlarıyla işi yapar ve sonucu sesli bildirir.',
+        description_en: 'Voice-driven command center: record voice → transcribe → AI processes via MCP tools → speaks result.',
+        category: 'AI',
+        author: 'BreviAI',
+        downloads: '18k+',
+        tags: ['voice', 'mcp', 'speech', 'command', 'ses', 'komut'],
+        template_json: {
+            "name": "🎙️ Sesli Komuta Merkezi",
+            "description": "Sesle komut ver, AI iş yapsın! Ses → Yazı → AI → MCP → Sesli Sonuç",
+            "nodes": [
+                { "id": "1", "type": "MANUAL_TRIGGER", "label": "🎯 Başlat", "data": {}, "position": { "x": 100, "y": 50 } },
+                { "id": "2", "type": "AUDIO_RECORD", "label": "🎤 Sesini Kaydet", "data": { "duration": 15, "variableName": "audioUri" }, "position": { "x": 100, "y": 150 } },
+                { "id": "3", "type": "SPEECH_TO_TEXT", "label": "📝 Yazıya Çevir", "data": { "language": "tr-TR", "variableName": "voiceCommand" }, "position": { "x": 100, "y": 280 } },
+                { "id": "4", "type": "AGENT_AI", "label": "🤖 MCP Komutan", "data": { "prompt": "Sen sesli komutla çalışan bir iş asistanısın. Kullanıcı sesli komut verdi ve bu yazıya çevrildi:\\n\\nKOMUT: {{voiceCommand}}\\n\\n## ARAÇLARIN\\nGoogle (Gmail, Calendar, Sheets, Drive, Meet), Microsoft (Outlook, Calendar, Excel, OneDrive, Teams), Notion, Slack, Trello, Jira, Asana, Airtable, Zapier, GitHub entegrasyonlarını kullanabilirsin.\\n\\n## TALİMATLAR\\n1. Komutu analiz et ve en uygun MCP aracını seç\\n2. Aracı çalıştır\\n3. Sonucu 1-2 cümleyle özetle (sesli okunacak)\\n4. Emin değilsen ask_user ile sor\\n\\nYanıtını KISA tut — sesli okunacak.", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "commandResult" }, "position": { "x": 100, "y": 420 } },
+                { "id": "5", "type": "SPEAK_TEXT", "label": "🔊 Sonucu Söyle", "data": { "text": "{{commandResult}}", "language": "tr-TR" }, "position": { "x": 100, "y": 580 } },
+                { "id": "6", "type": "NOTIFICATION", "label": "📱 Bildirim", "data": { "title": "🎙️ Sesli Komut Sonucu", "message": "{{commandResult}}", "type": "push" }, "position": { "x": 100, "y": 700 } }
+            ],
+            "edges": [
+                { "id": "e1-2", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+                { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+                { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" },
+                { "id": "e4-5", "sourceNodeId": "4", "targetNodeId": "5", "sourcePort": "default" },
+                { "id": "e5-6", "sourceNodeId": "5", "targetNodeId": "6", "sourcePort": "default" }
+            ]
+        }
+    },
+    {
+        id: 'mcp-assistant-3',
+        title: '🔄 Çok Kanallı İş Akışı',
+        title_en: 'Multi-Channel Business Flow',
+        description: 'Sabah 09:00\'da çalışır. Takvimi, mailleri ve Jira görevlerini kontrol eder. Özeti Slack\'e yazar ve sesli bildirir.',
+        description_en: 'Runs at 09:00. Checks calendar, emails, Jira tasks. Posts summary to Slack and speaks it.',
+        category: 'Business',
+        author: 'BreviAI',
+        downloads: '20k+',
+        tags: ['multi-channel', 'slack', 'jira', 'calendar', 'voice', 'çok-kanal', 'sabah'],
+        template_json: {
+            "name": "🔄 Çok Kanallı Sabah Brifingi",
+            "description": "Sabah 09:00'da takvim + mail + Jira kontrol → Slack özet + sesli bildirim",
+            "nodes": [
+                { "id": "1", "type": "TIME_TRIGGER", "label": "⏰ Her Sabah 09:00", "data": { "hour": 9, "minute": 0, "repeat": true, "days": [1, 2, 3, 4, 5] }, "position": { "x": 100, "y": 50 } },
+                { "id": "2", "type": "AGENT_AI", "label": "🤖 Sabah Brifingi", "data": { "prompt": "Sen iş günü sabah brifingi hazırlayan bir asistansın. Şu adımları yap:\\n\\n1. **TAKVİM KONTROL:** Google Calendar veya Outlook Calendar'dan bugünkü etkinlikleri listele\\n2. **MAİL KONTROL:** Gmail veya Outlook'tan okunmamış önemli mailleri kontrol et\\n3. **GÖREV KONTROL:** Jira'dan bana atanmış açık issue'ları getir\\n4. **ÖZET HAZIRLA:** Hepsini güzel bir sabah brifingi olarak özetle\\n5. **SLACK'E GÖNDER:** Özeti Slack'teki #daily-standup kanalına gönder\\n\\nYanıtını sesli okunacak şekilde doğal ve kısa tut:\\n'Günaydın! Bugün 3 toplantın var, 2 okunmamış önemli mailin ve 5 açık Jira görevin var...' gibi.", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "morningBrief" }, "position": { "x": 100, "y": 200 } },
+                { "id": "3", "type": "SPEAK_TEXT", "label": "🔊 Brifingi Sesli Oku", "data": { "text": "{{morningBrief}}", "language": "tr-TR" }, "position": { "x": 100, "y": 400 } },
+                { "id": "4", "type": "NOTIFICATION", "label": "📱 Bildirim", "data": { "title": "☀️ Sabah Brifingi", "message": "{{morningBrief}}", "type": "push" }, "position": { "x": 100, "y": 550 } }
+            ],
+            "edges": [
+                { "id": "e1-2", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+                { "id": "e2-3", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+                { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" }
+            ]
+        }
     }
 ];
