@@ -4,14 +4,13 @@ import { Platform, NativeModules } from 'react-native';
 import { debugLog } from './DebugLogger';
 import * as FileSystem from 'expo-file-system/legacy';
 
-// Always use production Vercel backend
-const API_BASE_URL = 'https://breviai.vercel.app';
-console.log('[ApiService] Using Production URL:', API_BASE_URL);
+// Always use production Vercel backend as default
+let API_BASE_URL = 'https://breviai.vercel.app';
+console.log('[ApiService] Using Production URL:', await this.getBaseUrl());
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || '';
 if (!APP_SECRET) {
     console.warn('[ApiService] EXPO_PUBLIC_APP_SECRET is not set. Authenticated API requests may fail.');
 }
-
 import { WorkflowNode, WorkflowEdge } from '../types/workflow-types';
 import { SYSTEM_PROMPT_TURKISH } from '../constants/SystemPrompt';
 
@@ -73,6 +72,15 @@ export interface ShortcutStep {
 import { ShortcutTemplate } from '../types';
 
 class ApiService {
+    private async getBaseUrl(): Promise<string> {
+        try {
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            const url = await AsyncStorage.getItem('whatsapp_backend_url');
+            if (url) return url.trim().replace(/\/$/, '');
+        } catch (e) { }
+        return process.env.EXPO_PUBLIC_API_URL || 'http://136.109.124.154:3001';
+    }
+
     private headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -128,7 +136,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for complex AI generation
 
-            const response = await fetch(`${API_BASE_URL}/api/generate`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/generate`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -171,7 +179,7 @@ INSTRUCTIONS:
 
     async getTemplates(): Promise<ShortcutTemplate[]> {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/templates`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/templates`, {
                 method: 'GET',
                 headers: this.headers,
             });
@@ -190,7 +198,7 @@ INSTRUCTIONS:
 
     async sendFeedback(shortcutId: string, success: boolean, errorMessage?: string): Promise<void> {
         try {
-            await fetch(`${API_BASE_URL}/api/feedback`, {
+            await fetch(`${await this.getBaseUrl()}/api/feedback`, {
                 method: 'POST',
                 headers: this.headers,
                 body: JSON.stringify({
@@ -206,7 +214,7 @@ INSTRUCTIONS:
 
     async transcribeAudio(uri: string): Promise<string> {
         console.log('[ApiService] Transcribing audio:', uri);
-        console.log('[ApiService] Using API URL:', API_BASE_URL);
+        console.log('[ApiService] Using API URL:', await this.getBaseUrl());
 
         // Ensure URI has file:// prefix for React Native
         let fileUri = uri;
@@ -253,7 +261,7 @@ INSTRUCTIONS:
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
-                    const response = await fetch(`${API_BASE_URL}/api/transcribe`, {
+                    const response = await fetch(`${await this.getBaseUrl()}/api/transcribe`, {
                         signal: controller.signal,
                         method: 'POST',
                         headers: { 'x-app-secret': this.headers['x-app-secret'] },
@@ -268,7 +276,7 @@ INSTRUCTIONS:
                 // Native: use FileSystem.uploadAsync (bypasses React Native fetch issues)
                 console.log('[ApiService] Using FileSystem.uploadAsync for native upload');
                 const uploadResult = await FileSystem.uploadAsync(
-                    `${API_BASE_URL}/api/transcribe`,
+                    `${await this.getBaseUrl()}/api/transcribe`,
                     fileUri,
                     {
                         httpMethod: 'POST',
@@ -289,7 +297,7 @@ INSTRUCTIONS:
                     try {
                         const errData = JSON.parse(uploadResult.body);
                         errorMsg = errData.error || errorMsg;
-                    } catch {}
+                    } catch { }
                     throw new Error(errorMsg);
                 }
 
@@ -311,7 +319,7 @@ INSTRUCTIONS:
         }
 
         console.error('[ApiService] Transcription error after retries:', lastError);
-        console.error('[ApiService] Active API URL:', API_BASE_URL);
+        console.error('[ApiService] Active API URL:', await this.getBaseUrl());
         throw lastError || new Error('Ses çevirme başarısız oldu.');
     }
 
@@ -321,7 +329,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout (increased from 5s for slow networks)
 
-            const response = await fetch(`${API_BASE_URL}/api/health`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/health`, {
                 method: 'GET',
                 signal: controller.signal,
             }).finally(() => clearTimeout(timeoutId));
@@ -355,7 +363,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const response = await fetch(`${API_BASE_URL}/api/email/send`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/email/send`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -380,7 +388,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${API_BASE_URL}/api/google/sheets/read`;
+            const url = `${await this.getBaseUrl()}/api/google/sheets/read`;
             console.log(`[ApiService] calling readSheet: ${url}`);
 
             const response = await fetch(url, {
@@ -419,10 +427,10 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-            const url = `${API_BASE_URL}/api/email/read`;
+            const url = `${await this.getBaseUrl()}/api/email/read`;
             console.log(`[ApiService] calling readEmails: ${url}`);
 
-            const response = await fetch(`${API_BASE_URL}/api/email/read`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/email/read`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -506,7 +514,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${API_BASE_URL}/api/search`;
+            const url = `${await this.getBaseUrl()}/api/search`;
             console.log(`[ApiService] calling searchWeb: ${url}`);
 
             const response = await fetch(url, {
@@ -539,7 +547,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/mcp`, {
                 signal: controller.signal,
                 method: 'GET',
                 headers: this.headers,
@@ -563,7 +571,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
+            const response = await fetch(`${await this.getBaseUrl()}/api/mcp`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -637,7 +645,7 @@ If the goal is achieved, use 'finish'.
             const timeoutId = setTimeout(() => controller.abort(), 5000); // Fast timeout for backend
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/embedding`, {
+                const response = await fetch(`${await this.getBaseUrl()}/api/embedding`, {
                     signal: controller.signal,
                     method: 'POST',
                     headers: this.headers,
