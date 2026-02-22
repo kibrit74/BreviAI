@@ -32,9 +32,10 @@
             {
                 "id": "step-3-weather",
                 "name": "☁️ Hava Durumu",
-                "tool": "weather_get",
-                "nodeType": "WEATHER_GET",
+                "tool": "breviai.web_search",
+                "nodeType": "WEB_SEARCH",
                 "args": {
+                    "query": "İstanbul hava durumu bugün",
                     "variableName": "weather"
                 }
             },

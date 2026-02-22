@@ -8,6 +8,7 @@ import { Workflow, createWorkflow } from '../types/workflow-types';
 
 const WORKFLOWS_KEY = 'brevi_workflows';
 const ACTIVE_WORKFLOW_KEY = 'brevi_active_workflow';
+const DELETED_SEEDS_KEY = 'brevi_deleted_seeds'; // Track explicitly deleted seed/admin workflows
 
 export class WorkflowStorage {
     /**
@@ -72,6 +73,9 @@ export class WorkflowStorage {
         const workflows = await this.getAll();
         const filtered = workflows.filter(w => w.id !== id);
         await AsyncStorage.setItem(WORKFLOWS_KEY, JSON.stringify(filtered));
+
+        // Track deletion so seed/admin workflows don't get re-created
+        await this.markSeedAsDeleted(id);
 
         // Unregister Native Triggers
         try {
@@ -237,6 +241,34 @@ export class WorkflowStorage {
     }
 
     /**
+     * Mark a seed/admin workflow as deleted so it won't be re-created
+     */
+    static async markSeedAsDeleted(id: string): Promise<void> {
+        try {
+            const deletedIds = await this.getDeletedSeedIds();
+            if (!deletedIds.includes(id)) {
+                deletedIds.push(id);
+                await AsyncStorage.setItem(DELETED_SEEDS_KEY, JSON.stringify(deletedIds));
+                console.log(`[WorkflowStorage] Marked seed '${id}' as permanently deleted`);
+            }
+        } catch (e) {
+            console.warn('[WorkflowStorage] Failed to mark seed as deleted:', e);
+        }
+    }
+
+    /**
+     * Get list of explicitly deleted seed workflow IDs
+     */
+    static async getDeletedSeedIds(): Promise<string[]> {
+        try {
+            const data = await AsyncStorage.getItem(DELETED_SEEDS_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch {
+            return [];
+        }
+    }
+
+        /**
      * Seed test workflows for development/testing
      */
     static async seedTestWorkflows(): Promise<void> {
@@ -542,8 +574,13 @@ export class WorkflowStorage {
 
         const seedWorkflows = [workflow1, workflow2, workflow3, smsAnalyzerWorkflow];
 
+        const deletedSeedIds = await this.getDeletedSeedIds();
         const toSave = [];
         for (const wf of seedWorkflows) {
+            // Skip if user explicitly deleted this seed workflow
+            if (deletedSeedIds.includes(wf.id)) {
+                continue;
+            }
             const exists = await this.getById(wf.id);
             if (!exists) {
                 toSave.push(this.save(wf));

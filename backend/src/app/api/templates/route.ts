@@ -118,11 +118,9 @@ export async function GET(request: NextRequest) {
         });
     }
 
+    // Removed seedTemplatesIfNeeded auto-call to prevent overriding admin deletes
     // Attempt to seed if empty (non-blocking often better, but for simplicity here we await or fire-and-forget)
     // We'll await it to ensure first load works if empty
-    await seedTemplatesIfNeeded();
-
-    const category = request.nextUrl.searchParams.get('category');
 
     let query = supabase
         .from('templates')

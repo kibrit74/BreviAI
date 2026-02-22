@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 // CORS headers
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
