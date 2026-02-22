@@ -29,17 +29,61 @@ class CronManager {
         if (!fs.existsSync(JOBS_FILE)) {
             // Create default file if not exists
             fs.writeFileSync(JOBS_FILE, JSON.stringify([], null, 2));
-            return;
         }
 
         try {
             const data = fs.readFileSync(JOBS_FILE, 'utf8');
             const jobConfigs = JSON.parse(data);
 
-            console.log(`[Cron] Loading ${jobConfigs.length} jobs...`);
+            console.log(`[Cron] Loading ${jobConfigs.length} jobs from cron-jobs.json...`);
             jobConfigs.forEach(config => this.scheduleJob(config, false));
         } catch (err) {
             console.error('[Cron] Failed to load jobs:', err);
+        }
+
+        // Also auto-load JSON automation files from automations/ folder
+        this.loadAutomations();
+    }
+
+    loadAutomations() {
+        const AUTOMATIONS_DIR = path.join(__dirname, '../../automations');
+        if (!fs.existsSync(AUTOMATIONS_DIR)) {
+            console.log('[Cron] No automations/ folder found, skipping.');
+            return;
+        }
+
+        try {
+            const files = fs.readdirSync(AUTOMATIONS_DIR).filter(f => f.endsWith('.json'));
+            console.log(`[Cron] Found ${files.length} automation files in automations/`);
+
+            for (const file of files) {
+                try {
+                    const filePath = path.join(AUTOMATIONS_DIR, file);
+                    const raw = fs.readFileSync(filePath, 'utf8');
+                    const config = JSON.parse(raw);
+
+                    // Skip if already loaded or disabled
+                    if (this.jobs.has(config.id)) {
+                        console.log(`[Cron] Automation '${config.id}' already loaded, skipping.`);
+                        continue;
+                    }
+                    if (config.enabled === false) {
+                        console.log(`[Cron] Automation '${config.id}' is disabled, skipping.`);
+                        continue;
+                    }
+                    if (!config.schedule || !config.action) {
+                        console.log(`[Cron] Automation '${config.id}' missing schedule/action, skipping.`);
+                        continue;
+                    }
+
+                    console.log(`[Cron] Loading automation: ${config.name || config.id} (${file})`);
+                    this.scheduleJob(config, false); // false = don't save to cron-jobs.json
+                } catch (fileErr) {
+                    console.error(`[Cron] Failed to load automation ${file}:`, fileErr.message);
+                }
+            }
+        } catch (err) {
+            console.error('[Cron] Failed to read automations folder:', err);
         }
     }
 

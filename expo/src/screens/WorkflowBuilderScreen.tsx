@@ -261,6 +261,114 @@ export const WorkflowBuilderScreen: React.FC = () => {
                         });
                         console.log('[DEBUG] Workflow set with nodes:', migratedNodes.length, 'edges:', migratedEdges.length);
                         setHasChanges(true);
+                    } else if (template.template_json?.action?.steps) {
+                        // MCP automation format: convert action.steps to workflow nodes
+                        console.log('[DEBUG] Converting MCP automation steps to workflow nodes');
+                        const mcpSteps = template.template_json.action.steps;
+
+                        // MCP tool name → native node type mapping
+                        const toolToNodeType: Record<string, string> = {
+                            // Google
+                            'breviai.google.calendar_list': 'CALENDAR_READ',
+                            'breviai.google.calendar_create': 'CALENDAR_CREATE',
+                            'breviai.google.gmail_read': 'GMAIL_READ',
+                            'breviai.google.gmail_send': 'GMAIL_SEND',
+                            'breviai.google.sheets_read': 'SHEETS_READ',
+                            'breviai.google.sheets_write': 'SHEETS_WRITE',
+                            'breviai.google.drive_list': 'DRIVE_UPLOAD',
+                            'breviai.google.meet_create': 'CALENDAR_CREATE',
+                            // Web & Search
+                            'breviai.web_search': 'WEB_SEARCH',
+                            // Communication
+                            'whatsapp_send': 'WHATSAPP_SEND',
+                            'telegram_send': 'TELEGRAM_SEND',
+                            'slack_send': 'SLACK_SEND',
+                            'email_send': 'EMAIL_SEND',
+                            // Audio
+                            'speak_text': 'SPEAK_TEXT',
+                            // Weather
+                            'weather_get': 'WEATHER_GET',
+                            // Browser
+                            'browser_scrape': 'BROWSER_SCRAPE',
+                        };
+
+                        // Build MCP step → node config mappers
+                        const toolConfigMapper: Record<string, (args: any) => any> = {
+                            'breviai.google.calendar_list': (args: any) => ({
+                                type: 'today', maxEvents: args.maxResults || 5, variableName: 'events',
+                                calendarName: '', calendarSource: '',
+                            }),
+                            'breviai.google.gmail_read': (args: any) => ({
+                                variableName: 'emails', maxResults: args.maxResults || 5,
+                            }),
+                            'breviai.web_search': (args: any) => ({
+                                query: args.query || '', variableName: 'searchResults',
+                            }),
+                            'whatsapp_send': (args: any) => ({
+                                phoneNumber: args.phone || '', message: args.message || '',
+                                mode: 'backend' as const,
+                            }),
+                            'speak_text': (args: any) => ({
+                                text: args.text || '', language: args.language || 'tr-TR',
+                            }),
+                        };
+
+                        const convertedNodes: WorkflowNode[] = mcpSteps.map((step: any, idx: number) => {
+                            const nodeType = (toolToNodeType[step.tool] || 'AGENT_AI') as NodeType;
+                            const node = createNode(nodeType, { x: 100, y: 120 + idx * 130 });
+                            node.label = step.name || step.id || `Step ${idx + 1}`;
+
+                            // Use specific config mapper if available, else merge args
+                            const mapper = toolConfigMapper[step.tool];
+                            if (mapper) {
+                                node.config = { ...node.config, ...mapper(step.args || {}) } as any;
+                            } else {
+                                node.config = { ...node.config, ...(step.args || {}) } as any;
+                            }
+                            return node;
+                        });
+
+                        // Add TIME_TRIGGER if schedule exists
+                        if (template.template_json.schedule) {
+                            const trigger = createNode('TIME_TRIGGER' as NodeType, { x: 100, y: 0 });
+                            trigger.label = '⏰ Zamanlayıcı';
+                            // Parse cron: "0 9 * * 1-5" → hour=9, minute=0, days=[1,2,3,4,5]
+                            const cronParts = (template.template_json.schedule || '').split(' ');
+                            const minute = parseInt(cronParts[0], 10) || 0;
+                            const hour = parseInt(cronParts[1], 10) || 9;
+                            let days: number[] | undefined;
+                            if (cronParts[4] && cronParts[4] !== '*') {
+                                // Parse "1-5" or "0,1,2"
+                                const dayStr = cronParts[4];
+                                if (dayStr.includes('-')) {
+                                    const [start, end] = dayStr.split('-').map(Number);
+                                    days = [];
+                                    for (let d = start; d <= end; d++) days.push(d);
+                                } else {
+                                    days = dayStr.split(',').map(Number);
+                                }
+                            }
+                            trigger.config = {
+                                hour, minute, repeat: true,
+                                ...(days ? { days } : {}),
+                            } as any;
+                            convertedNodes.unshift(trigger);
+                            convertedNodes.forEach((n: WorkflowNode, i: number) => {
+                                n.position = { x: 100, y: i * 130 };
+                            });
+                        }
+
+                        const convertedEdges = convertedNodes.slice(0, -1).map((n: WorkflowNode, i: number) =>
+                            createEdge(n.id, convertedNodes[i + 1].id, 'default')
+                        );
+                        setWorkflow({
+                            ...createWorkflow(template.title || template.template_json.name || 'MCP Otomasyon'),
+                            description: template.description || template.template_json.description || '',
+                            nodes: convertedNodes,
+                            edges: convertedEdges,
+                        });
+                        console.log('[DEBUG] MCP workflow created with', convertedNodes.length, 'nodes');
+                        setHasChanges(true);
                     } else if (template.template_json?.steps) {
                         const converted = TemplateMigration.convertStepsToWorkflow(
                             template.template_json.steps,
@@ -1171,120 +1279,120 @@ export const WorkflowBuilderScreen: React.FC = () => {
                     <View style={styles.recipesCard}>
                         <Text style={styles.recipesTitle}>Ne yapmak istersin?</Text>
                         <ScrollView style={styles.recipesScroll} showsVerticalScrollIndicator={false}>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => setRecipeWizard({
-                                id: 'morning_weather',
-                                config: {
-                                    hour: '08',
-                                    minute: '00',
-                                    geofenceId: 'home',
-                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
-                                },
-                            })}
-                        >
-                            <Text style={styles.recipeItemTitle}>Sabah Hava Durumu</Text>
-                            <Text style={styles.recipeItemDesc}>Her gün 08:00'de hava durumunu göster.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => setRecipeWizard({
-                                id: 'arrive_home_wifi',
-                                config: {
-                                    hour: '08',
-                                    minute: '00',
-                                    geofenceId: 'home',
-                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
-                                },
-                            })}
-                        >
-                            <Text style={styles.recipeItemTitle}>Eve Gelince Wi-Fi Aç</Text>
-                            <Text style={styles.recipeItemDesc}>Eve girişte Wi-Fi ayarını açar.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => setRecipeWizard({
-                                id: 'news_rss',
-                                config: {
-                                    hour: '08',
-                                    minute: '00',
-                                    geofenceId: 'home',
-                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
-                                },
-                            })}
-                        >
-                            <Text style={styles.recipeItemTitle}>Haberleri Oku</Text>
-                            <Text style={styles.recipeItemDesc}>Güncel haberleri tek ekranda göster.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => setRecipeWizard({
-                                id: 'daily_reminder',
-                                config: {
-                                    hour: '09',
-                                    minute: '00',
-                                    geofenceId: 'home',
-                                    rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
-                                    reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
-                                },
-                            })}
-                        >
-                            <Text style={styles.recipeItemTitle}>Günlük Hatırlatma</Text>
-                            <Text style={styles.recipeItemDesc}>Her gün belirlediğin saatte bildirim göndersin.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('contact_search')}
-                        >
-                            <Text style={styles.recipeItemTitle}>Kişi Bul ve Göster</Text>
-                            <Text style={styles.recipeItemDesc}>İsim gir, rehberde ara, sonucu ekranda göster.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('quick_translate')}
-                        >
-                            <Text style={styles.recipeItemTitle}>Hızlı Çeviri</Text>
-                            <Text style={styles.recipeItemDesc}>Metni yaz, otomatik çevir, sonucu göster.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('business_card_to_contact')}
-                        >
-                            <Text style={styles.recipeItemTitle}>Kartviziti Rehbere Ekle</Text>
-                            <Text style={styles.recipeItemDesc}>Kartvizit fotoğrafı çek, Gemini ile oku, kişiyi kaydet.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('receipt_to_expense_json')}
-                        >
-                            <Text style={styles.recipeItemTitle}>Fişten Harcama Çıkar</Text>
-                            <Text style={styles.recipeItemDesc}>Fişi çek, tutar/tarih/işyeri bilgisini JSON olarak çıkar.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('note_to_summary')}
-                        >
-                            <Text style={styles.recipeItemTitle}>Notu Özetle</Text>
-                            <Text style={styles.recipeItemDesc}>Uzun metni özet, aksiyon ve risk başlıklarıyla toparla.</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.recipeItem}
-                            onPress={() => applyRecipe('whatsapp_ai_reply_confirm')}
-                        >
-                            <Text style={styles.recipeItemTitle}>WhatsApp AI Yanit (Onayli)</Text>
-                            <Text style={styles.recipeItemDesc}>Mesaji oku, AI yanit taslagi uretsin, gonder onayini sen ver.</Text>
-                        </TouchableOpacity>
-                        <View style={styles.recipesActions}>
-                            <TouchableOpacity style={styles.recipeSecondary} onPress={() => setHideRecipes(true)}>
-                                <Text style={styles.recipeSecondaryText}>Boş Başla</Text>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => setRecipeWizard({
+                                    id: 'morning_weather',
+                                    config: {
+                                        hour: '08',
+                                        minute: '00',
+                                        geofenceId: 'home',
+                                        rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                        reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
+                                    },
+                                })}
+                            >
+                                <Text style={styles.recipeItemTitle}>Sabah Hava Durumu</Text>
+                                <Text style={styles.recipeItemDesc}>Her gün 08:00'de hava durumunu göster.</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.recipePrimary} onPress={() => setShowAIModal(true)}>
-                                <Text style={styles.recipePrimaryText}>AI ile Oluştur</Text>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => setRecipeWizard({
+                                    id: 'arrive_home_wifi',
+                                    config: {
+                                        hour: '08',
+                                        minute: '00',
+                                        geofenceId: 'home',
+                                        rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                        reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
+                                    },
+                                })}
+                            >
+                                <Text style={styles.recipeItemTitle}>Eve Gelince Wi-Fi Aç</Text>
+                                <Text style={styles.recipeItemDesc}>Eve girişte Wi-Fi ayarını açar.</Text>
                             </TouchableOpacity>
-                        </View>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => setRecipeWizard({
+                                    id: 'news_rss',
+                                    config: {
+                                        hour: '08',
+                                        minute: '00',
+                                        geofenceId: 'home',
+                                        rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                        reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
+                                    },
+                                })}
+                            >
+                                <Text style={styles.recipeItemTitle}>Haberleri Oku</Text>
+                                <Text style={styles.recipeItemDesc}>Güncel haberleri tek ekranda göster.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => setRecipeWizard({
+                                    id: 'daily_reminder',
+                                    config: {
+                                        hour: '09',
+                                        minute: '00',
+                                        geofenceId: 'home',
+                                        rssUrl: 'https://news.google.com/rss?hl=tr&gl=TR&ceid=TR:tr',
+                                        reminderText: 'Hatırlatma: bugünkü öncelikli işini tamamla.',
+                                    },
+                                })}
+                            >
+                                <Text style={styles.recipeItemTitle}>Günlük Hatırlatma</Text>
+                                <Text style={styles.recipeItemDesc}>Her gün belirlediğin saatte bildirim göndersin.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('contact_search')}
+                            >
+                                <Text style={styles.recipeItemTitle}>Kişi Bul ve Göster</Text>
+                                <Text style={styles.recipeItemDesc}>İsim gir, rehberde ara, sonucu ekranda göster.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('quick_translate')}
+                            >
+                                <Text style={styles.recipeItemTitle}>Hızlı Çeviri</Text>
+                                <Text style={styles.recipeItemDesc}>Metni yaz, otomatik çevir, sonucu göster.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('business_card_to_contact')}
+                            >
+                                <Text style={styles.recipeItemTitle}>Kartviziti Rehbere Ekle</Text>
+                                <Text style={styles.recipeItemDesc}>Kartvizit fotoğrafı çek, Gemini ile oku, kişiyi kaydet.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('receipt_to_expense_json')}
+                            >
+                                <Text style={styles.recipeItemTitle}>Fişten Harcama Çıkar</Text>
+                                <Text style={styles.recipeItemDesc}>Fişi çek, tutar/tarih/işyeri bilgisini JSON olarak çıkar.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('note_to_summary')}
+                            >
+                                <Text style={styles.recipeItemTitle}>Notu Özetle</Text>
+                                <Text style={styles.recipeItemDesc}>Uzun metni özet, aksiyon ve risk başlıklarıyla toparla.</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.recipeItem}
+                                onPress={() => applyRecipe('whatsapp_ai_reply_confirm')}
+                            >
+                                <Text style={styles.recipeItemTitle}>WhatsApp AI Yanit (Onayli)</Text>
+                                <Text style={styles.recipeItemDesc}>Mesaji oku, AI yanit taslagi uretsin, gonder onayini sen ver.</Text>
+                            </TouchableOpacity>
+                            <View style={styles.recipesActions}>
+                                <TouchableOpacity style={styles.recipeSecondary} onPress={() => setHideRecipes(true)}>
+                                    <Text style={styles.recipeSecondaryText}>Boş Başla</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.recipePrimary} onPress={() => setShowAIModal(true)}>
+                                    <Text style={styles.recipePrimaryText}>AI ile Oluştur</Text>
+                                </TouchableOpacity>
+                            </View>
                         </ScrollView>
                     </View>
                 </View>
