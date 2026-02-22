@@ -145,11 +145,7 @@ class GoogleService {
 
             // Determine Backend URL based on environment
             // __DEV__ is true in development mode
-            let backendBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://136.109.124.154:3001';
-            try {
-                const url = await AsyncStorage.getItem('whatsapp_backend_url');
-                if (url) backendBaseUrl = url.trim().replace(/\/$/, '');
-            } catch (e) { }
+            let backendBaseUrl = 'https://breviai.vercel.app';
 
             if (__DEV__) {
                 // In local dev, use localhost (10.0.2.2 for Android Emulator)
