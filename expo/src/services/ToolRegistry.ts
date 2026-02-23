@@ -12,6 +12,7 @@ export interface ToolDefinition {
         required?: string[];
     };
     nodeType: string; // Map back to Workflow Node Type
+    mcpToolName?: string; // Backend MCP tool name (e.g. 'breviai.jira.create_issue')
     permissions?: {
         requiresConfirmation: boolean;
         isSensitive: boolean;
@@ -1471,6 +1472,235 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         },
         nodeType: 'CLEAR_MEMORY',
         permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    // MCP TOOLS — Backend üzerinden çalışan iş araçları
+    // ═══════════════════════════════════════════════════════════════
+
+    // --- TRELLO ---
+    {
+        name: 'mcp_trello_list',
+        description: 'Lists cards on a Trello board. Returns card names, descriptions, due dates, and labels.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                apiKey: { type: 'STRING', description: 'Trello API key' },
+                token: { type: 'STRING', description: 'Trello API token' },
+                boardId: { type: 'STRING', description: 'Board ID to list cards from' },
+                listId: { type: 'STRING', description: 'List ID to filter cards (optional)' }
+            },
+            required: ['apiKey', 'token', 'boardId']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.trello.list_cards',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_trello_create',
+        description: 'Creates a new card in a Trello list.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                apiKey: { type: 'STRING', description: 'Trello API key' },
+                token: { type: 'STRING', description: 'Trello API token' },
+                listId: { type: 'STRING', description: 'List ID to add card to' },
+                name: { type: 'STRING', description: 'Card name/title' },
+                desc: { type: 'STRING', description: 'Card description (optional)' },
+                due: { type: 'STRING', description: 'Due date in ISO format (optional)' }
+            },
+            required: ['apiKey', 'token', 'listId', 'name']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.trello.create_card',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- JIRA ---
+    {
+        name: 'mcp_jira_search',
+        description: 'Searches for issues in Jira using JQL query language.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                domain: { type: 'STRING', description: 'Jira domain, e.g. "mycompany.atlassian.net"' },
+                email: { type: 'STRING', description: 'Jira user email' },
+                apiToken: { type: 'STRING', description: 'Jira API token' },
+                jql: { type: 'STRING', description: 'JQL query, e.g. "project = DEV AND status = Open"' },
+                maxResults: { type: 'INTEGER', description: 'Max results (default: 10)' }
+            },
+            required: ['domain', 'email', 'apiToken', 'jql']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.jira.search_issues',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_jira_create',
+        description: 'Creates a new issue (Task, Bug, Story) in Jira.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                domain: { type: 'STRING', description: 'Jira domain' },
+                email: { type: 'STRING', description: 'Jira user email' },
+                apiToken: { type: 'STRING', description: 'Jira API token' },
+                projectKey: { type: 'STRING', description: 'Project key, e.g. "DEV"' },
+                summary: { type: 'STRING', description: 'Issue title' },
+                issueType: { type: 'STRING', description: 'Issue type: "Task", "Bug", "Story" (default: Task)' },
+                description: { type: 'STRING', description: 'Issue description (optional)' }
+            },
+            required: ['domain', 'email', 'apiToken', 'projectKey', 'summary']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.jira.create_issue',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- ASANA ---
+    {
+        name: 'mcp_asana_list',
+        description: 'Lists tasks in an Asana project.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Asana personal access token' },
+                projectId: { type: 'STRING', description: 'Asana project GID' },
+                limit: { type: 'INTEGER', description: 'Max number of tasks (default: 20)' }
+            },
+            required: ['token', 'projectId']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.asana.list_tasks',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_asana_create',
+        description: 'Creates a new task in an Asana project.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Asana personal access token' },
+                projectId: { type: 'STRING', description: 'Asana project GID' },
+                name: { type: 'STRING', description: 'Task name' },
+                notes: { type: 'STRING', description: 'Task description (optional)' },
+                dueOn: { type: 'STRING', description: 'Due date YYYY-MM-DD (optional)' }
+            },
+            required: ['token', 'projectId', 'name']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.asana.create_task',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- AIRTABLE ---
+    {
+        name: 'mcp_airtable_list',
+        description: 'Lists records from an Airtable base table.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Airtable personal access token' },
+                baseId: { type: 'STRING', description: 'Airtable base ID (e.g. appXXXXX)' },
+                tableName: { type: 'STRING', description: 'Table name' },
+                maxRecords: { type: 'INTEGER', description: 'Max records (default: 20)' },
+                filterFormula: { type: 'STRING', description: 'Airtable formula filter (optional)' }
+            },
+            required: ['token', 'baseId', 'tableName']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.airtable.list_records',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+
+    // --- ZAPIER ---
+    {
+        name: 'mcp_zapier_trigger',
+        description: 'Triggers a Zapier webhook (Catch Hook) by sending JSON data.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                webhookUrl: { type: 'STRING', description: 'Zapier Catch Hook webhook URL' },
+                data: { type: 'STRING', description: 'JSON stringified payload to send' }
+            },
+            required: ['webhookUrl', 'data']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.zapier.trigger_webhook',
+        permissions: { requiresConfirmation: true, isSensitive: false }
+    },
+
+    // --- GITHUB ---
+    {
+        name: 'mcp_github_repos',
+        description: 'Lists GitHub repositories for the authenticated user.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'GitHub personal access token' },
+                limit: { type: 'INTEGER', description: 'Max repos to list (default: 10)' }
+            },
+            required: ['token']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.github.repos_list',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+
+    // --- GOOGLE MEET ---
+    {
+        name: 'mcp_google_meet',
+        description: 'Creates a Google Meet meeting and returns the meeting link.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                summary: { type: 'STRING', description: 'Meeting title' },
+                startTime: { type: 'STRING', description: 'Start time in ISO format' },
+                endTime: { type: 'STRING', description: 'End time in ISO format' },
+                attendees: { type: 'STRING', description: 'Comma-separated attendee emails (optional)' }
+            },
+            required: ['accessToken', 'summary', 'startTime', 'endTime']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.meet_create',
+        permissions: { requiresConfirmation: true, isSensitive: false }
+    },
+
+    // --- MICROSOFT TEAMS ---
+    {
+        name: 'mcp_teams_meeting',
+        description: 'Creates a Microsoft Teams meeting and returns the join URL.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 access token' },
+                subject: { type: 'STRING', description: 'Meeting subject' },
+                startDateTime: { type: 'STRING', description: 'Start in ISO 8601' },
+                endDateTime: { type: 'STRING', description: 'End in ISO 8601' },
+                attendees: { type: 'STRING', description: 'Comma-separated attendee emails (optional)' }
+            },
+            required: ['accessToken', 'subject', 'startDateTime', 'endDateTime']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.teams_meeting',
+        permissions: { requiresConfirmation: true, isSensitive: false }
+    },
+
+    // --- SLACK CHANNELS ---
+    {
+        name: 'mcp_slack_channels',
+        description: 'Lists public channels in a Slack workspace. Use to find channel IDs for send_slack.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Slack Bot OAuth token (xoxb-...)' },
+                limit: { type: 'INTEGER', description: 'Max channels to list (default: 20)' }
+            },
+            required: ['token']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.slack.list_channels',
+        permissions: { requiresConfirmation: false, isSensitive: true }
     }
 ];
 

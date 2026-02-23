@@ -15,16 +15,25 @@ const NodeSchema = z.object({
     type: z.string(), // e.g. "MANUAL_TRIGGER", "HTTP_REQUEST"
     label: z.string().optional(),
     data: z.record(z.unknown()).optional(), // Config data
+    config: z.record(z.unknown()).optional(), // Newer templates use `config`
     position: PositionSchema.optional()
 });
 
 const EdgeSchema = z.object({
     id: z.string(),
-    source: z.string(),
-    target: z.string(),
+    // Legacy/AI format
+    source: z.string().optional(),
+    target: z.string().optional(),
     sourceHandle: z.string().optional(),
-    targetHandle: z.string().optional()
-});
+    targetHandle: z.string().optional(),
+    // Native BreviAI format
+    sourceNodeId: z.string().optional(),
+    targetNodeId: z.string().optional(),
+    sourcePort: z.string().optional(),
+}).refine(
+    edge => (!!edge.source && !!edge.target) || (!!edge.sourceNodeId && !!edge.targetNodeId),
+    { message: 'Edge must contain source/target or sourceNodeId/targetNodeId' }
+);
 
 // Main workflow schema
 export const ShortcutSchema = z.object({

@@ -260,6 +260,9 @@ record_audio, listen_speech, translate_text
 **🔄 MANTIK:**
 control_loop, control_if_else, control_switch, wait
 
+**🔌 MCP İŞ ARAÇLARI (Backend üzerinden):**
+mcp_trello_list, mcp_trello_create, mcp_jira_search, mcp_jira_create, mcp_asana_list, mcp_asana_create, mcp_airtable_list, mcp_zapier_trigger, mcp_github_repos, mcp_google_meet, mcp_teams_meeting, mcp_slack_channels
+
 ═══════════════════════════════════════════════════════════════
 💡 AKILLI DAVRANIŞLAR
 ═══════════════════════════════════════════════════════════════

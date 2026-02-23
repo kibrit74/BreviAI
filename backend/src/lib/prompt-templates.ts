@@ -113,7 +113,13 @@ ${API_DOCS}
 - VARIABLE: Değişken (config: { operation: "set", name: "myVar", value: "test" })
 
 ## MCP Araçları (Model Context Protocol)
-ÖNEMLİ: Aşağıdaki MCP araçları AGENT_AI node'u tarafından otomatik olarak kullanılabilir. Kullanıcı bu servislerle ilgili bir istek yaparsa AGENT_AI node'unu kur ve prompt'unda ilgili MCP aracını belirt.
+ÖNEMLİ: MCP araçları İKİ ŞEKİLDE kullanılabilir:
+1. **MCP_TOOL node'u (ÖNERİLEN):** Basit, tekrarlayan işler için. AI token harcamaz, hızlı ve deterministik.
+2. **AGENT_AI node'u:** Karmaşık, karar gerektiren işler için. AI düşünür ve en uygun MCP aracını seçer.
+
+### MCP_TOOL Node (Doğrudan Backend Çağrısı) 🔌
+- config: { "toolName": "breviai.jira.create_issue", "params": {"domain": "...", "email": "...", "apiToken": "...", "projectKey": "DEV", "summary": "{{hata}}"}, "variableName": "result" }
+- NOT: Basit "Jira issue oluştur", "Trello kart ekle" gibi tek işlem isteklerinde MCP_TOOL kullan. AGENT_AI gereksiz yere AI token harcar.
 
 ### MCP - Google Servisleri
 - breviai.google.sheets_read: Google Sheets'ten veri oku

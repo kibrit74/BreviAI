@@ -209,6 +209,34 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
 **SHOW_MENU** (Kullanıcıya Seçenek Sun)
 - config: {"title": "Seç", "options": ["A", "B"], "variableName": "secim"}
 
+## 8. MCP İŞ ARAÇLARI (Backend Business Tools) 🔌
+**MCP_TOOL** (Harici İş Servisi Çağır)
+- Açıklama: Backend MCP servislerini doğrudan çağırır. AI gerektirmez, hızlı ve deterministik.
+- config: {
+    "toolName": "breviai.jira.create_issue",
+    "params": {"domain": "...", "email": "...", "apiToken": "...", "projectKey": "DEV", "summary": "{{hata}}"},
+    "variableName": "jiraResult"
+  }
+- Kullanılabilir toolName'ler:
+  | toolName | Açıklama |
+  |----------|----------|
+  | breviai.trello.list_cards | Trello kartlarını listele |
+  | breviai.trello.create_card | Trello kartı oluştur |
+  | breviai.jira.search_issues | Jira issue ara (JQL) |
+  | breviai.jira.create_issue | Jira issue oluştur |
+  | breviai.asana.list_tasks | Asana görevlerini listele |
+  | breviai.asana.create_task | Asana görev oluştur |
+  | breviai.airtable.list_records | Airtable kayıtları oku |
+  | breviai.zapier.trigger_webhook | Zapier webhook tetikle |
+  | breviai.github.repos_list | GitHub repoları listele |
+  | breviai.google.meet_create | Google Meet toplantısı oluştur |
+  | breviai.microsoft.teams_meeting | Teams toplantısı oluştur |
+  | breviai.slack.list_channels | Slack kanalları listele |
+  | breviai.slack.send_message | Slack mesaj gönder |
+  | breviai.notion.search | Notion'da ara |
+  | breviai.notion.create_page | Notion sayfası oluştur |
+- NOT: Basit, tekrarlayan iş araçları için AGENT_AI yerine MCP_TOOL kullan (token tasarrufu + hız).
+
 # KISITLAMALAR & KURALLAR
 1.  **JSON Formatı:** Çıktı SADECE geçerli bir JSON olmalı. Başka metin ekleme.
 2.  **ID Yapısı:** Node ID'leri "1", "2", "3" şeklinde string ve ardışık olmalı.

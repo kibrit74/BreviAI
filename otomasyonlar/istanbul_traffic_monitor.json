@@ -1,0 +1,137 @@
+{
+    "id":  "istanbul-traffic-monitor",
+    "name":  "İstanbul Trafik Kontrolü",
+    "description":  "İBB trafik verisini ve web aramayı birlikte kullanır; agent ile özetleyip bildirim üretir.",
+    "icon":  "car",
+    "color":  "#0EA5E9",
+    "tags":  [
+                 "scheduled",
+                 "web-search",
+                 "agent",
+                 "mcp"
+             ],
+    "mcp":  {
+                "enabled":  true,
+                "mode":  "node-web-search",
+                "tools":  [
+                              "breviai.web_search"
+                          ]
+            },
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "TIME_TRIGGER",
+                      "label":  "Hafta İçi 07:30",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  100
+                                   },
+                      "config":  {
+                                     "cron":  "30 7 * * 1-5",
+                                     "hour":  7,
+                                     "minute":  30,
+                                     "repeat":  true,
+                                     "days":  [
+                                                  1,
+                                                  2,
+                                                  3,
+                                                  4,
+                                                  5
+                                              ]
+                                 }
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "HTTP_REQUEST",
+                      "label":  "İBB Trafik Verisi",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  250
+                                   },
+                      "config":  {
+                                     "url":  "https://tkmservices.ibb.gov.tr/web/api/TrafficData/v1/TrafficIndex_Sc1_Cont",
+                                     "method":  "GET",
+                                     "variableName":  "trafficData",
+                                     "headers":  {
+                                                     "User-Agent":  "Mozilla/5.0"
+                                                 }
+                                 }
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "WEB_SEARCH",
+                      "label":  "Web Arama (Trafik Haberleri)",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  400
+                                   },
+                      "config":  {
+                                     "query":  "İstanbul trafik durumu bugün İBB canlı trafik yoğunluğu kaza yol kapanması",
+                                     "variableName":  "trafficWebSearch"
+                                 }
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "AGENT_AI",
+                      "label":  "Trafik Analizi (AI Agent)",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  550
+                                   },
+                      "config":  {
+                                     "provider":  "gemini",
+                                     "model":  "gemini-2.5-flash",
+                                     "variableName":  "trafficReport",
+                                     "outputFormat":  "json",
+                                     "tools":  [
+                                                   "search_web"
+                                               ],
+                                     "prompt":  "Sen İstanbul trafik asistanısın.\n\n1) İBB Trafik API verisi (JSON): {{trafficData}}\n2) Web arama sonuçları (MCP-backed search node): {{trafficWebSearch}}\n\nAnahtar bilgiler (API tarafında):\n- TI: Genel trafik yoğunluğu\n- TI_An: Anadolu Yakası\n- TI_Av: Avrupa Yakası\n\nGörev:\n- API verisini öncelikli kullan.\n- Web arama sonuçlarını doğrulama / bağlam için kullan (kaza, yol kapanması gibi bilgiler varsa belirt).\n- Kısa, kullanışlı bir rapor hazırla.\n- Yoğunluk %50 üzerindeyse uyarı tonu kullan.\n- Sadece JSON döndür.\n\nJSON formatı:\n{\n  \"title\": \"Bildirim başlığı\",\n  \"message\": \"Kısa trafik özeti\",\n  \"severity\": \"low|medium|high\"\n}",
+                                     "mcp":  {
+                                                 "preferredTool":  "breviai.web_search",
+                                                 "enabled":  true
+                                             }
+                                 }
+                  },
+                  {
+                      "id":  "5",
+                      "type":  "NOTIFICATION",
+                      "label":  "Bildirim Gönder",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  700
+                                   },
+                      "config":  {
+                                     "title":  "{{trafficReport.title}}",
+                                     "message":  "{{trafficReport.message}}",
+                                     "type":  "push"
+                                 }
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e4",
+                      "sourceNodeId":  "4",
+                      "targetNodeId":  "5",
+                      "sourcePort":  "default"
+                  }
+              ]
+}

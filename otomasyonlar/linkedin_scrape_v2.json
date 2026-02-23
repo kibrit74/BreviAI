@@ -1,0 +1,170 @@
+﻿{
+    "name":  "LinkedIn Ä°ÅŸ Ä°lanÄ± Arama (GeliÅŸmiÅŸ)",
+    "description":  "KullanÄ±cÄ±dan arama kriteri ve API anahtarÄ± alarak LinkedIn ilanlarÄ±nÄ± Ã§eker.",
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "MANUAL_TRIGGER",
+                      "label":  "BaÅŸlat",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  50
+                                   },
+                      "config":  {
+
+                                 }
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "TEXT_INPUT",
+                      "label":  "Arama Kriteri Girin",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  200
+                                   },
+                      "config":  {
+                                     "title":  "Arama YapÄ±lacak Pozisyon/Kelime",
+                                     "placeholder":  "Ã–rn: YazÄ±lÄ±m MÃ¼hendisi",
+                                     "variableName":  "searchQuery",
+                                     "prompt":  "Arama YapÄ±lacak Pozisyon/Kelime"
+                                 }
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "TEXT_INPUT",
+                      "label":  "ScraperAPI Key (Opsiyonel)",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  350
+                                   },
+                      "config":  {
+                                     "title":  "ScraperAPI AnahtarÄ± (Varsa)",
+                                     "placeholder":  "API Key giriniz (BoÅŸ bÄ±rakÄ±labilir)",
+                                     "defaultValue":  "",
+                                     "variableName":  "apiKey",
+                                     "prompt":  "ScraperAPI AnahtarÄ± (Varsa)"
+                                 }
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "HTTP_REQUEST",
+                      "label":  "LinkedIn Ara",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  500
+                                   },
+                      "config":  {
+                                     "url":  "https://api.scraperapi.com",
+                                     "method":  "GET",
+                                     "queryParameters":  {
+                                                             "api_key":  "{{apiKey}}",
+                                                             "url":  "https://www.linkedin.com/jobs/search?keywords={{searchQuery}}\u0026location=TÃ¼rkiye"
+                                                         },
+                                     "headers":  {
+                                                     "User-Agent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                                                 },
+                                     "variableName":  "linkedinResponse"
+                                 }
+                  },
+                  {
+                      "id":  "5",
+                      "type":  "HTML_EXTRACT",
+                      "label":  "Ä°lanlarÄ± AyÄ±kla",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  650
+                                   },
+                      "config":  {
+                                     "htmlSource":  "{{linkedinResponse.data}}",
+                                     "variableName":  "extractedJobs",
+                                     "extracts":  [
+                                                      {
+                                                          "key":  "titles",
+                                                          "selector":  ".base-search-card__title",
+                                                          "valueType":  "text",
+                                                          "returnArray":  true
+                                                      },
+                                                      {
+                                                          "key":  "companies",
+                                                          "selector":  ".base-search-card__subtitle",
+                                                          "valueType":  "text",
+                                                          "returnArray":  true
+                                                      },
+                                                      {
+                                                          "key":  "links",
+                                                          "selector":  ".base-card__full-link",
+                                                          "valueType":  "attr",
+                                                          "attribute":  "href",
+                                                          "returnArray":  true
+                                                      }
+                                                  ]
+                                 }
+                  },
+                  {
+                      "id":  "6",
+                      "type":  "AGENT_AI",
+                      "label":  "SonuÃ§larÄ± Listele",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  800
+                                   },
+                      "config":  {
+                                     "prompt":  "Elimde ÅŸu JSON verisi var: {{extractedJobs}}\n\nBu verideki \u0027titles\u0027, \u0027companies\u0027 ve \u0027links\u0027 dizilerini kullanarak, her bir ilanÄ± alt alta, okunabilir bir liste formatÄ±nda yaz.\n\nÃ–rnek Format:\n1. **[Pozisyon AdÄ±]** - [Åirket]\n   [Link]\n\nEÄŸer veri yoksa \u0027Ä°lan bulunamadÄ±\u0027 de. Sadece listeyi ver, ekstra aÃ§Ä±klama yapma.",
+                                     "provider":  "gemini",
+                                     "model":  "gemini-2.5-flash",
+                                     "variableName":  "jobList"
+                                 }
+                  },
+                  {
+                      "id":  "7",
+                      "type":  "SHOW_TEXT",
+                      "label":  "Ä°lan SonuÃ§larÄ±",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  950
+                                   },
+                      "config":  {
+                                     "title":  "{{searchQuery}} Ä°lanlarÄ±",
+                                     "content":  "{{jobList}}"
+                                 }
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e4",
+                      "sourceNodeId":  "4",
+                      "targetNodeId":  "5",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e5",
+                      "sourceNodeId":  "5",
+                      "targetNodeId":  "6",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e6",
+                      "sourceNodeId":  "6",
+                      "targetNodeId":  "7",
+                      "sourcePort":  "default"
+                  }
+              ]
+}

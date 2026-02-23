@@ -376,10 +376,11 @@ export async function executeWebAutomation(
 }
 
 export async function executeWebSearch(
-    config: { query: string },
+    config: { query: string; variableName?: string },
     variableManager: VariableManager
 ): Promise<any> {
     const query = variableManager.resolveString(config.query);
+    const variableName = variableManager.resolveString(config.variableName || 'searchResults') || 'searchResults';
     if (!query) return { success: false, error: 'Arama sorgusu boş olamaz' };
 
     console.log('[WebSearch] Searching via MCP-backed API:', query);
@@ -392,7 +393,7 @@ export async function executeWebSearch(
 
         if (result.success && result.results) {
             // Store results in variable for AI to access
-            variableManager.set('searchResults', result.results);
+            variableManager.set(variableName, result.results);
 
             // Format results as readable text for AI
             const formattedResults = result.results
@@ -405,6 +406,7 @@ export async function executeWebSearch(
             return {
                 success: true,
                 query: query,
+                variableName,
                 resultCount: result.resultCount,
                 results: result.results,
                 formattedResults: formattedResults,

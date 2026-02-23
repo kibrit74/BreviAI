@@ -1,0 +1,292 @@
+{
+    "id":  "mcp-morning-brief",
+    "name":  "Akıllı Sabah Brifingi (MCP + Agent)",
+    "description":  "Hafta içi sabah 09:00\u0027da çalışır. Takvim, okunmamış mailler, MCP web arama (hava + USD/TRY) ve agent özeti ile WhatsApp/sesli brifing üretir.",
+    "icon":  "sunny",
+    "color":  "#F59E0B",
+    "tags":  [
+                 "scheduled",
+                 "web-search",
+                 "agent",
+                 "mcp",
+                 "morning-brief"
+             ],
+    "schedule":  "0 9 * * 1-5",
+    "enabled":  true,
+    "mcp":  {
+                "enabled":  true,
+                "mode":  "hybrid",
+                "tools":  [
+                              "breviai.google.calendar_list",
+                              "breviai.google.gmail_read",
+                              "breviai.web_search"
+                          ]
+            },
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "TIME_TRIGGER",
+                      "label":  "Hafta İçi 09:00",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  80
+                                   },
+                      "config":  {
+                                     "cron":  "0 9 * * 1-5",
+                                     "hour":  9,
+                                     "minute":  0,
+                                     "repeat":  true,
+                                     "days":  [
+                                                  1,
+                                                  2,
+                                                  3,
+                                                  4,
+                                                  5
+                                              ]
+                                 }
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "CALENDAR_READ",
+                      "label":  "Takvim (Bugün)",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  220
+                                   },
+                      "config":  {
+                                     "type":  "today",
+                                     "maxEvents":  10,
+                                     "variableName":  "events",
+                                     "calendarName":  "kibrit74@gmail.com",
+                                     "calendarSource":  "google"
+                                 }
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "GMAIL_READ",
+                      "label":  "Okunmamış Mailler",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  360
+                                   },
+                      "config":  {
+                                     "query":  "is:unread",
+                                     "maxResults":  8,
+                                     "variableName":  "emails"
+                                 }
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "WEB_SEARCH",
+                      "label":  "Hava Durumu Web Arama",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  500
+                                   },
+                      "config":  {
+                                     "query":  "İstanbul hava durumu bugün",
+                                     "variableName":  "weather_search"
+                                 }
+                  },
+                  {
+                      "id":  "5",
+                      "type":  "WEB_SEARCH",
+                      "label":  "USD/TRY Web Arama",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  640
+                                   },
+                      "config":  {
+                                     "query":  "USD TRY canlı kur bugün",
+                                     "variableName":  "usd_try_search"
+                                 }
+                  },
+                  {
+                      "id":  "6",
+                      "type":  "AGENT_AI",
+                      "label":  "Sabah Brifingi Özeti (Agent)",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  780
+                                   },
+                      "config":  {
+                                     "provider":  "gemini",
+                                     "model":  "gemini-2.5-flash",
+                                     "variableName":  "morning_brief",
+                                     "outputFormat":  "json",
+                                     "tools":  [
+                                                   "search_web"
+                                               ],
+                                     "prompt":  "Sen profesyonel bir kişisel asistansın. Aşağıdaki verilerle sabah brifingi hazırla.\n\nTarih: {{_date}}\nSaat: {{_time}}\nTakvim (bugün): {{events}}\nOkunmamış mailler: {{emails}}\nHava durumu web arama sonuçları: {{weather_search}}\nUSD/TRY web arama sonuçları: {{usd_try_search}}\n\nKurallar:\n1) Mailleri sadece listeleme; gönderen + konu + çok kısa özet yaz.\n2) Takvim etkinliklerini saatleriyle özetle.\n3) Hava ve USD/TRY verisini mutlaka kullan; yoksa \"mevcut değil\" yaz.\n4) Türkçe yaz.\n5) Sadece JSON döndür.\n\nJSON formatı:\n{\n  \"whatsapp\": \"WhatsApp için emojili ama kısa sabah brifingi\",\n  \"voice\": \"Sesli okuma için sade Türkçe brifing\"\n}",
+                                     "mcp":  {
+                                                 "enabled":  true,
+                                                 "preferredTool":  "breviai.web_search"
+                                             }
+                                 }
+                  },
+                  {
+                      "id":  "7",
+                      "type":  "WHATSAPP_SEND",
+                      "label":  "WhatsApp Brifing",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  920
+                                   },
+                      "config":  {
+                                     "phoneNumber":  "905337628160",
+                                     "message":  "{{morning_brief.whatsapp}}",
+                                     "mode":  "backend"
+                                 }
+                  },
+                  {
+                      "id":  "8",
+                      "type":  "SPEAK_TEXT",
+                      "label":  "Sesli Brifing",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  1060
+                                   },
+                      "config":  {
+                                     "text":  "{{morning_brief.voice}}",
+                                     "language":  "tr-TR"
+                                 }
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e4",
+                      "sourceNodeId":  "4",
+                      "targetNodeId":  "5",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e5",
+                      "sourceNodeId":  "5",
+                      "targetNodeId":  "6",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e6",
+                      "sourceNodeId":  "6",
+                      "targetNodeId":  "7",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e7",
+                      "sourceNodeId":  "7",
+                      "targetNodeId":  "8",
+                      "sourcePort":  "default"
+                  }
+              ],
+    "action":  {
+                   "type":  "multi_mcp",
+                   "executionMode":  "hybrid",
+                   "steps":  [
+                                 {
+                                     "id":  "step-1-calendar",
+                                     "name":  "Takvim (Bugün)",
+                                     "tool":  "breviai.google.calendar_list",
+                                     "nodeType":  "CALENDAR_READ",
+                                     "args":  {
+                                                  "accessToken":  "{{GOOGLE_ACCESS_TOKEN}}",
+                                                  "calendarId":  "kibrit74@gmail.com",
+                                                  "calendarName":  "kibrit74@gmail.com",
+                                                  "calendarSource":  "google",
+                                                  "maxResults":  10,
+                                                  "variableName":  "events",
+                                                  "type":  "today"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-2-mail",
+                                     "name":  "Okunmamış Mailler",
+                                     "tool":  "breviai.google.gmail_read",
+                                     "nodeType":  "GMAIL_READ",
+                                     "args":  {
+                                                  "accessToken":  "{{GOOGLE_ACCESS_TOKEN}}",
+                                                  "query":  "is:unread",
+                                                  "maxResults":  8,
+                                                  "variableName":  "emails"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-3-weather-search",
+                                     "name":  "İstanbul Hava (MCP Web Search)",
+                                     "tool":  "breviai.web_search",
+                                     "nodeType":  "WEB_SEARCH",
+                                     "args":  {
+                                                  "query":  "İstanbul hava durumu bugün",
+                                                  "limit":  5,
+                                                  "variableName":  "weather_search"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-4-currency-search",
+                                     "name":  "USD/TRY (MCP Web Search)",
+                                     "tool":  "breviai.web_search",
+                                     "nodeType":  "WEB_SEARCH",
+                                     "args":  {
+                                                  "query":  "USD TRY canlı kur bugün",
+                                                  "limit":  5,
+                                                  "variableName":  "usd_try_search"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-5-ai-summary",
+                                     "name":  "Sabah Brifingi Özeti (Agent)",
+                                     "tool":  "agent_ai",
+                                     "nodeType":  "AGENT_AI",
+                                     "args":  {
+                                                  "provider":  "gemini",
+                                                  "model":  "gemini-2.5-flash",
+                                                  "variableName":  "morning_brief",
+                                                  "outputFormat":  "json",
+                                                  "prompt":  "Sen profesyonel bir kişisel asistansın. Aşağıdaki verilerle sabah brifingi hazırla.\n\nTarih: {{_date}}\nSaat: {{_time}}\nTakvim (bugün): {{events}}\nOkunmamış mailler: {{emails}}\nHava durumu web arama sonuçları: {{weather_search}}\nUSD/TRY web arama sonuçları: {{usd_try_search}}\n\nKurallar:\n1) Mailleri sadece listeleme; gönderen + konu + çok kısa özet yaz.\n2) Takvim etkinliklerini saatleriyle özetle.\n3) Hava ve USD/TRY verisini mutlaka kullan; yoksa \"mevcut değil\" yaz.\n4) Türkçe yaz.\n5) Sadece JSON döndür.\n\nJSON formatı:\n{\n  \"whatsapp\": \"WhatsApp için emojili ama kısa sabah brifingi\",\n  \"voice\": \"Sesli okuma için sade Türkçe brifing\"\n}"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-6-whatsapp",
+                                     "name":  "WhatsApp Brifing",
+                                     "tool":  "whatsapp_send",
+                                     "nodeType":  "WHATSAPP_SEND",
+                                     "args":  {
+                                                  "phone":  "905337628160",
+                                                  "message":  "{{morning_brief.whatsapp}}",
+                                                  "mode":  "backend"
+                                              }
+                                 },
+                                 {
+                                     "id":  "step-7-voice",
+                                     "name":  "Sesli Brifing",
+                                     "tool":  "speak_text",
+                                     "nodeType":  "SPEAK_TEXT",
+                                     "args":  {
+                                                  "text":  "{{morning_brief.voice}}",
+                                                  "language":  "tr-TR"
+                                              }
+                                 }
+                             ]
+               },
+    "config_guide":  {
+                         "GOOGLE_ACCESS_TOKEN":  "Ayarlar \u003e Google ile Giriş Yap üzerinden alınan OAuth token (backend cron için gerekli)",
+                         "NOTE":  "speak_text adımı backend cron üzerinde simüle edilir; mobil cihaz workflow olarak çalıştırıldığında gerçek sesli okuma yapılır."
+                     }
+}

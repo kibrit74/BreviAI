@@ -1,0 +1,129 @@
+﻿{
+    "name":  "LinkedIn Ä°ÅŸ Ä°lanÄ± Arama",
+    "description":  "LinkedIn Ã¼zerinden iÅŸ ilanlarÄ±nÄ± Ã§eker ve html ayÄ±klayÄ±cÄ±sÄ± ile listeler.",
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "MANUAL_TRIGGER",
+                      "label":  "BaÅŸlat",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  100
+                                   },
+                      "config":  {
+
+                                 }
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "HTTP_REQUEST",
+                      "label":  "LinkedIn Ara",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  250
+                                   },
+                      "config":  {
+                                     "url":  "https://www.linkedin.com/jobs/search?keywords=YazÄ±lÄ±m\u0026location=TÃ¼rkiye",
+                                     "method":  "GET",
+                                     "headers":  {
+                                                     "User-Agent":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                                                 },
+                                     "variableName":  "linkedinResponse"
+                                 }
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "HTML_EXTRACT",
+                      "label":  "Ä°lanlarÄ± AyÄ±kla",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  400
+                                   },
+                      "config":  {
+                                     "htmlSource":  "{{linkedinResponse.data}}",
+                                     "variableName":  "jobs",
+                                     "extracts":  [
+                                                      {
+                                                          "key":  "titles",
+                                                          "selector":  ".base-search-card__title",
+                                                          "valueType":  "text",
+                                                          "returnArray":  true
+                                                      },
+                                                      {
+                                                          "key":  "companies",
+                                                          "selector":  ".base-search-card__subtitle",
+                                                          "valueType":  "text",
+                                                          "returnArray":  true
+                                                      },
+                                                      {
+                                                          "key":  "locations",
+                                                          "selector":  ".job-search-card__location",
+                                                          "valueType":  "text",
+                                                          "returnArray":  true
+                                                      },
+                                                      {
+                                                          "key":  "links",
+                                                          "selector":  ".base-card__full-link",
+                                                          "valueType":  "attr",
+                                                          "attribute":  "href",
+                                                          "returnArray":  true
+                                                      }
+                                                  ]
+                                 }
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "AGENT_AI",
+                      "label":  "SonuÃ§larÄ± DÃ¼zenle",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  550
+                                   },
+                      "config":  {
+                                     "prompt":  "AÅŸaÄŸÄ±daki iÅŸ ilanÄ± verilerini gÃ¼zel bir liste formatÄ±nda dÃ¼zenle:\n\nBaÅŸlÄ±klar: {{jobs.titles}}\nÅirketler: {{jobs.companies}}\nLokasyonlar: {{jobs.locations}}\nLinkler: {{jobs.links}}\n\nHer ilan iÃ§in BaÅŸlÄ±k, Åirket ve Link bilgilerini alt alta yaz.",
+                                     "provider":  "gemini",
+                                     "model":  "gemini-2.5-flash",
+                                     "variableName":  "formattedResult"
+                                 }
+                  },
+                  {
+                      "id":  "5",
+                      "type":  "SHOW_TEXT",
+                      "label":  "SonuÃ§ GÃ¶ster",
+                      "position":  {
+                                       "x":  100,
+                                       "y":  700
+                                   },
+                      "config":  {
+                                     "title":  "Ä°ÅŸ Ä°lanlarÄ±",
+                                     "content":  "{{formattedResult}}"
+                                 }
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e4",
+                      "sourceNodeId":  "4",
+                      "targetNodeId":  "5",
+                      "sourcePort":  "default"
+                  }
+              ]
+}

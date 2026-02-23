@@ -1,0 +1,169 @@
+﻿{
+    "id":  "backend-super-test",
+    "name":  "Backend SÃ¼per GÃ¼Ã§ Testi (MCP + Agent)",
+    "description":  "USD/TRY bilgisini webden alÄ±r, agent ile Ã¶zetler, WhatsApp gÃ¶nderir ve backend tarafÄ±nda MCP + agent hibrit zamanlanmÄ±ÅŸ gÃ¶rev oluÅŸturur.",
+    "icon":  "server",
+    "color":  "#6366F1",
+    "tags":  [
+                 "scheduled",
+                 "web-search",
+                 "agent",
+                 "mcp"
+             ],
+    "mcp":  {
+                "enabled":  true,
+                "mode":  "hybrid",
+                "tools":  [
+                              "breviai.web_search"
+                          ]
+            },
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "MANUAL_TRIGGER",
+                      "config":  {
+
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  100
+                                   },
+                      "label":  "Testi BaÅŸlat"
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "TEXT_INPUT",
+                      "config":  {
+                                     "prompt":  "WhatsApp mesajÄ± gÃ¶ndermek istediÄŸiniz telefon numarasÄ±nÄ± girin (Ã¼lke kodu ile, Ã¶rn: 905551234567)",
+                                     "placeholder":  "905551234567",
+                                     "defaultValue":  "",
+                                     "variableName":  "hedefNumara"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  250
+                                   },
+                      "label":  "Telefon NumarasÄ± Al"
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "BROWSER_SCRAPE",
+                      "config":  {
+                                     "url":  "https://www.google.com/finance/quote/USD-TRY",
+                                     "waitForSelector":  "",
+                                     "selector":  ".YMlKec.fxKbKc",
+                                     "variableName":  "dolarKuruRaw"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  400
+                                   },
+                      "label":  "Dolar Kurunu Ã‡ek (Test)"
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "AGENT_AI",
+                      "config":  {
+                                     "provider":  "gemini",
+                                     "model":  "gemini-2.5-flash",
+                                     "variableName":  "dolarAnaliz",
+                                     "outputFormat":  "json",
+                                     "tools":  [
+                                                   "search_web"
+                                               ],
+                                     "prompt":  "Sen finans verisi Ã¶zetleyen bir asistansÄ±n.\n\nElindeki veri (web scrape sonucu): {{dolarKuruRaw}}\nTarih: {{_date}}\nSaat: {{_time}}\n\nGÃ¶rev:\n- USD/TRY deÄŸerini kÄ±sa ve anlaÅŸÄ±lÄ±r ÅŸekilde Ã¶zetle.\n- EÄŸer scrape verisi boÅŸ, anlamsÄ±z veya Ã§ok kÄ±sa ise search_web aracÄ±nÄ± kullanarak gÃ¼ncel USD/TRY bilgisini doÄŸrula.\n- Uydurma bilgi verme.\n- TÃ¼rkÃ§e yaz.\n- Sadece JSON dÃ¶ndÃ¼r.\n\nJSON formatÄ±:\n{\n  \"whatsapp_message\": \"WhatsApp iÃ§in kÄ±sa mesaj\",\n  \"short_rate\": \"USD/TRY kÄ±sa deÄŸer Ã¶zeti\",\n  \"source_used\": \"scrape | search_web | mixed\"\n}",
+                                     "mcp":  {
+                                                 "preferredTool":  "breviai.web_search",
+                                                 "enabled":  true
+                                             }
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  550
+                                   },
+                      "label":  "Kur Ã–zeti (AI Agent)"
+                  },
+                  {
+                      "id":  "5",
+                      "type":  "WHATSAPP_SEND",
+                      "config":  {
+                                     "phoneNumber":  "{{hedefNumara}}",
+                                     "message":  "{{dolarAnaliz.whatsapp_message}}",
+                                     "mode":  "backend",
+                                     "backendUrl":  "http://136.109.124.154:3001/whatsapp",
+                                     "backendAuthKey":  "breviai-secret-password"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  700
+                                   },
+                      "label":  "WhatsApp\u0027tan GÃ¶nder (Test)"
+                  },
+                  {
+                      "id":  "6",
+                      "type":  "CRON_CREATE",
+                      "config":  {
+                                     "name":  "Dolar Kuru Takibi ({{hedefNumara}})",
+                                     "schedule":  "*/2 * * * *",
+                                     "actionType":  "multi_mcp",
+                                     "actionPayload":  "{\"steps\":[{\"id\":\"step-web-search\",\"name\":\"USD/TRY Web Search (MCP)\",\"tool\":\"breviai.web_search\",\"nodeType\":\"WEB_SEARCH\",\"args\":{\"query\":\"USD TRY canlÄ± kur Google Finance\",\"limit\":5,\"variableName\":\"usdtry_search\"}},{\"id\":\"step-agent-summary\",\"name\":\"Kur Ã–zeti (Agent)\",\"tool\":\"agent_ai\",\"nodeType\":\"AGENT_AI\",\"args\":{\"provider\":\"gemini\",\"model\":\"gemini-2.5-flash\",\"variableName\":\"cron_brief\",\"outputFormat\":\"json\",\"prompt\":\"Sen finans verisi Ã¶zetleyen bir asistansÄ±n.\\n\\nMCP web arama sonucu: {{usdtry_search}}\\nTarih: {{_date}}\\nSaat: {{_time}}\\n\\nGÃ¶rev:\\n- USD/TRY hakkÄ±nda kÄ±sa, net bir WhatsApp mesajÄ± hazÄ±rla.\\n- SonuÃ§larda net oran yoksa \\\"oran doÄŸrulanamadÄ±\\\" de; uydurma yapma.\\n- TÃ¼rkÃ§e yaz.\\n- Sadece JSON dÃ¶ndÃ¼r.\\n\\nJSON formatÄ±:\\n{\\n  \\\"whatsapp_message\\\": \\\"WhatsApp mesajÄ±\\\",\\n  \\\"summary\\\": \\\"KÄ±sa Ã¶zet\\\"\\n}\"}},{\"id\":\"step-whatsapp-send\",\"name\":\"WhatsApp GÃ¶nder\",\"tool\":\"whatsapp_send\",\"nodeType\":\"WHATSAPP_SEND\",\"args\":{\"phone\":\"{{hedefNumara}}\",\"message\":\"{{cron_brief.whatsapp_message}}\"}}],\"metadata\":{\"mode\":\"hybrid_mcp_agent\",\"features\":[\"scheduled\",\"web-search\",\"mcp\",\"agent\",\"whatsapp\"]}}"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  850
+                                   },
+                      "label":  "ZamanlanmÄ±ÅŸ GÃ¶rev OluÅŸtur (MCP+Agent)"
+                  },
+                  {
+                      "id":  "7",
+                      "type":  "SHOW_TEXT",
+                      "config":  {
+                                     "title":  "GÃ¶rev BaÅŸlatÄ±ldÄ±",
+                                     "content":  "Ä°lk test mesajÄ± gÃ¶nderildi. AyrÄ±ca backend Ã¼zerinde her 2 dakikada bir Ã§alÄ±ÅŸan MCP web arama + agent + WhatsApp hibrit gÃ¶revi oluÅŸturuldu.\n\nHedef: {{hedefNumara}}\nKaynak: MCP Web Search (USD/TRY)\nÃ–zet: Agent AI"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  1000
+                                   },
+                      "label":  "Bilgi Ver"
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e4",
+                      "sourceNodeId":  "4",
+                      "targetNodeId":  "5",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e5",
+                      "sourceNodeId":  "5",
+                      "targetNodeId":  "6",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e6",
+                      "sourceNodeId":  "6",
+                      "targetNodeId":  "7",
+                      "sourcePort":  "default"
+                  }
+              ]
+}

@@ -960,6 +960,44 @@ export class WorkflowEngine {
                     output = await executeCronList(node.config as any, this.variableManager);
                     break;
 
+                // MCP Tools (Backend Business Tools - standalone nodes)
+                case 'MCP_TOOL':
+                    const mcpConfig = node.config as any;
+                    const mcpTool = this.variableManager.resolveString(mcpConfig.toolName || '');
+                    if (!mcpTool) {
+                        output = { success: false, error: 'MCP tool name is required' };
+                        break;
+                    }
+                    // Resolve variables in params
+                    const resolvedParams: Record<string, any> = {};
+                    if (mcpConfig.params && typeof mcpConfig.params === 'object') {
+                        for (const [key, val] of Object.entries(mcpConfig.params)) {
+                            resolvedParams[key] = typeof val === 'string'
+                                ? this.variableManager.resolveString(val)
+                                : val;
+                        }
+                    }
+                    try {
+                        const { ApiService } = require('./ApiService');
+                        const mcpResp = await ApiService.getInstance().callMcpTool(mcpTool, resolvedParams);
+                        // Extract useful data from MCP response
+                        let mcpData: any = mcpResp;
+                        if (mcpResp?.content) {
+                            const jc = mcpResp.content.find((c: any) => c.type === 'json');
+                            const tc = mcpResp.content.find((c: any) => c.type === 'text');
+                            mcpData = jc?.json || tc?.text || mcpResp;
+                        }
+                        if (mcpConfig.variableName) {
+                            this.variableManager.set(mcpConfig.variableName, mcpData);
+                        }
+                        output = { success: true, data: mcpData };
+                        console.log(`[WorkflowEngine] MCP_TOOL '${mcpTool}' executed successfully`);
+                    } catch (mcpErr: any) {
+                        console.error(`[WorkflowEngine] MCP_TOOL '${mcpTool}' failed:`, mcpErr);
+                        output = { success: false, error: mcpErr.message };
+                    }
+                    break;
+
                 default:
                     console.warn(`Unknown node type: ${node.type}`);
             }
@@ -1499,6 +1537,31 @@ export class WorkflowEngine {
                     break;
                 case 'CLEAR_MEMORY':
                     result = await executeClearMemory(args, this.variableManager);
+                    break;
+
+                // --- MCP TOOLS (Backend) ---
+                case 'MCP_CALL':
+                    const mcpToolNameToCall = toolDef.mcpToolName;
+                    if (!mcpToolNameToCall) {
+                        throw new Error(`MCP tool name missing for '${toolName}'`);
+                    }
+                    try {
+                        const { ApiService } = require('./ApiService');
+                        const mcpResponse = await ApiService.getInstance().callMcpTool(mcpToolNameToCall, args);
+                        // MCP returns { content: [...], metadata: {...} }
+                        // Extract the useful data for the agent
+                        if (mcpResponse?.content) {
+                            const jsonContent = mcpResponse.content.find((c: any) => c.type === 'json');
+                            const textContent = mcpResponse.content.find((c: any) => c.type === 'text');
+                            result = jsonContent?.json || textContent?.text || mcpResponse;
+                        } else {
+                            result = mcpResponse;
+                        }
+                        console.log(`[WorkflowEngine] MCP tool '${mcpToolNameToCall}' executed successfully`);
+                    } catch (mcpErr: any) {
+                        console.error(`[WorkflowEngine] MCP tool '${mcpToolNameToCall}' failed:`, mcpErr);
+                        throw new Error(`MCP tool failed: ${mcpErr.message}`);
+                    }
                     break;
 
                 default:

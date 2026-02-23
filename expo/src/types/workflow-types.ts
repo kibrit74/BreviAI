@@ -179,7 +179,9 @@ export type NodeType =
     // Real-time AI
     | 'REALTIME_AI'
     // Execution
-    | 'EXECUTE_WORKFLOW';
+    | 'EXECUTE_WORKFLOW'
+    // MCP (Backend Business Tools)
+    | 'MCP_TOOL';
 
 // ═══════════════════════════════════════════════════════════════
 // NODE CONFIGURATIONS
@@ -190,6 +192,12 @@ export interface ExecuteWorkflowConfig {
     waitForCompletion?: boolean; // Wait for it to finish?
     passVariables?: boolean; // Pass current scope variables?
     variableName?: string; // Store result
+}
+
+export interface McpToolConfig {
+    toolName: string; // Backend MCP tool name, e.g. 'breviai.jira.create_issue'
+    params: Record<string, any>; // Parameters to pass to the tool (can contain {{variables}})
+    variableName?: string; // Variable name to store the result
 }
 
 export interface ManualTriggerConfig {

@@ -46,44 +46,56 @@ class CronManager {
     }
 
     loadAutomations() {
-        const AUTOMATIONS_DIR = path.join(__dirname, '../../automations');
-        if (!fs.existsSync(AUTOMATIONS_DIR)) {
-            console.log('[Cron] No automations/ folder found, skipping.');
-            return;
+        const automationDirs = [
+            path.join(__dirname, '../../automations'),
+            path.join(__dirname, '../../../otomasyonlar'),
+        ];
+
+        let foundAnyDir = false;
+
+        for (const automationDir of automationDirs) {
+            if (!fs.existsSync(automationDir)) {
+                continue;
+            }
+            foundAnyDir = true;
+
+            try {
+                const files = fs.readdirSync(automationDir).filter(f => f.endsWith('.json'));
+                console.log(`[Cron] Found ${files.length} automation files in ${automationDir}`);
+
+                for (const file of files) {
+                    try {
+                        const filePath = path.join(automationDir, file);
+                        const raw = fs.readFileSync(filePath, 'utf8');
+                        const config = JSON.parse(raw);
+
+                        // Skip if already loaded or disabled
+                        if (this.jobs.has(config.id)) {
+                            console.log(`[Cron] Automation '${config.id}' already loaded, skipping.`);
+                            continue;
+                        }
+                        if (config.enabled === false) {
+                            console.log(`[Cron] Automation '${config.id}' is disabled, skipping.`);
+                            continue;
+                        }
+                        if (!config.schedule || !config.action) {
+                            console.log(`[Cron] Automation '${config.id}' missing schedule/action, skipping.`);
+                            continue;
+                        }
+
+                        console.log(`[Cron] Loading automation: ${config.name || config.id} (${file})`);
+                        this.scheduleJob(config, false); // false = don't save to cron-jobs.json
+                    } catch (fileErr) {
+                        console.error(`[Cron] Failed to load automation ${file}:`, fileErr.message);
+                    }
+                }
+            } catch (err) {
+                console.error(`[Cron] Failed to read automations folder ${automationDir}:`, err);
+            }
         }
 
-        try {
-            const files = fs.readdirSync(AUTOMATIONS_DIR).filter(f => f.endsWith('.json'));
-            console.log(`[Cron] Found ${files.length} automation files in automations/`);
-
-            for (const file of files) {
-                try {
-                    const filePath = path.join(AUTOMATIONS_DIR, file);
-                    const raw = fs.readFileSync(filePath, 'utf8');
-                    const config = JSON.parse(raw);
-
-                    // Skip if already loaded or disabled
-                    if (this.jobs.has(config.id)) {
-                        console.log(`[Cron] Automation '${config.id}' already loaded, skipping.`);
-                        continue;
-                    }
-                    if (config.enabled === false) {
-                        console.log(`[Cron] Automation '${config.id}' is disabled, skipping.`);
-                        continue;
-                    }
-                    if (!config.schedule || !config.action) {
-                        console.log(`[Cron] Automation '${config.id}' missing schedule/action, skipping.`);
-                        continue;
-                    }
-
-                    console.log(`[Cron] Loading automation: ${config.name || config.id} (${file})`);
-                    this.scheduleJob(config, false); // false = don't save to cron-jobs.json
-                } catch (fileErr) {
-                    console.error(`[Cron] Failed to load automation ${file}:`, fileErr.message);
-                }
-            }
-        } catch (err) {
-            console.error('[Cron] Failed to read automations folder:', err);
+        if (!foundAnyDir) {
+            console.log('[Cron] No automation folders found, skipping.');
         }
     }
 
@@ -211,7 +223,7 @@ class CronManager {
                     body: JSON.stringify({
                         action: 'call_tool',
                         toolName: action.tool,
-                        args: action.args || {},
+                        arguments: action.args || {},
                     }),
                 });
                 const mcpData = await mcpResp.json();
@@ -225,6 +237,121 @@ class CronManager {
                 const SECRET = process.env.APP_SECRET || '';
                 const results = [];
                 const variables = {};
+
+                const localStepTools = new Set([
+                    'agent_ai',
+                    'browser_scrape',
+                    'whatsapp_send',
+                    'speak_text',
+                    'webhook_trigger',
+                ]);
+
+                function extractJsonFromText(text) {
+                    if (typeof text !== 'string') return null;
+                    const trimmed = text.trim();
+                    const start = trimmed.indexOf('{');
+                    const end = trimmed.lastIndexOf('}');
+                    if (start === -1 || end === -1 || end <= start) return null;
+                    try {
+                        return JSON.parse(trimmed.slice(start, end + 1));
+                    } catch {
+                        return null;
+                    }
+                }
+
+                async function executeLocalMultiStep(toolName, args) {
+                    switch (toolName) {
+                        case 'browser_scrape':
+                            return await browserService.scrape(args.url, args.selector);
+
+                        case 'whatsapp_send': {
+                            const phone = args.phone || args.phoneNumber;
+                            const message = args.message || '';
+                            const sessionId = args.sessionId || resolvedSessionId;
+                            if (!phone) throw new Error('whatsapp_send step requires phone/phoneNumber');
+                            if (!sessionId) throw new Error('sessionId required for whatsapp_send step');
+                            return await whatsappService.sendMessage(phone, message, sessionId);
+                        }
+
+                        case 'speak_text':
+                            // Server-side cron runner has no device speaker. Keep the step non-fatal and expose text.
+                            return {
+                                simulated: true,
+                                text: args.text || '',
+                                language: args.language || 'tr-TR',
+                                note: 'speak_text is not available on backend cron runner',
+                            };
+
+                        case 'webhook_trigger':
+                            return { triggered: true, payload: args || {} };
+
+                        case 'agent_ai': {
+                            const provider = String(args.provider || 'gemini').toLowerCase();
+                            if (provider !== 'gemini') {
+                                throw new Error(`agent_ai local step only supports provider=gemini (got: ${provider})`);
+                            }
+
+                            const prompt = String(args.prompt || '').trim();
+                            if (!prompt) {
+                                throw new Error('agent_ai step requires prompt');
+                            }
+
+                            const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+                            if (!apiKey) {
+                                throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) is required for agent_ai step');
+                            }
+
+                            const { GoogleGenerativeAI } = require('@google/generative-ai');
+                            const genAI = new GoogleGenerativeAI(apiKey);
+                            const preferredModel = String(args.model || 'gemini-2.5-flash');
+                            const fallbackModel = 'gemini-2.0-flash';
+                            const outputFormat = String(args.outputFormat || 'text').toLowerCase();
+                            const generationConfig = {
+                                temperature: Number.isFinite(Number(args.temperature))
+                                    ? Number(args.temperature)
+                                    : 0.3,
+                                maxOutputTokens: Number.isFinite(Number(args.maxTokens))
+                                    ? Number(args.maxTokens)
+                                    : 2048,
+                            };
+
+                            async function runModel(modelName) {
+                                const model = genAI.getGenerativeModel({
+                                    model: modelName,
+                                    generationConfig: outputFormat === 'json'
+                                        ? { ...generationConfig, responseMimeType: 'application/json' }
+                                        : generationConfig,
+                                });
+                                const response = await model.generateContent(prompt);
+                                return response.response.text();
+                            }
+
+                            let text;
+                            try {
+                                text = await runModel(preferredModel);
+                            } catch (primaryErr) {
+                                if (preferredModel !== fallbackModel) {
+                                    console.warn(`[Cron] agent_ai fallback to ${fallbackModel}:`, primaryErr.message);
+                                    text = await runModel(fallbackModel);
+                                } else {
+                                    throw primaryErr;
+                                }
+                            }
+
+                            if (outputFormat === 'json') {
+                                const parsed = extractJsonFromText(text);
+                                if (parsed !== null) {
+                                    return parsed;
+                                }
+                            }
+
+                            return text;
+                        }
+
+                        default:
+                            throw new Error(`Unsupported local multi_mcp step tool: ${toolName}`);
+                    }
+                }
 
                 function replaceVars(obj, vars) {
                     if (typeof obj === 'string') {
@@ -260,21 +387,27 @@ class CronManager {
                 for (const step of (action.steps || [])) {
                     console.log(`[Cron] Multi-MCP step: ${step.tool}`);
                     const resolvedArgs = replaceVars(step.args || {}, variables);
+                    let stepResult;
 
-                    const stepResp = await fetchMulti(`${BASE_URL}/api/mcp`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-app-secret': SECRET,
-                        },
-                        body: JSON.stringify({
-                            action: 'call_tool',
-                            toolName: step.tool,
-                            args: resolvedArgs,
-                        }),
-                    });
+                    if (localStepTools.has(step.tool)) {
+                        const localResult = await executeLocalMultiStep(step.tool, resolvedArgs);
+                        stepResult = { result: localResult };
+                    } else {
+                        const stepResp = await fetchMulti(`${BASE_URL}/api/mcp`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-app-secret': SECRET,
+                            },
+                            body: JSON.stringify({
+                                action: 'call_tool',
+                                toolName: step.tool,
+                                arguments: resolvedArgs,
+                            }),
+                        });
 
-                    const stepResult = await stepResp.json();
+                        stepResult = await stepResp.json();
+                    }
                     results.push({ tool: step.tool, result: stepResult });
 
                     let storedValue;
