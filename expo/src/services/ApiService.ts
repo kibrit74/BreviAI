@@ -365,7 +365,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/email/send`, {
+            const response = await fetch(`${API_BASE_URL}/api/email/send`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -390,7 +390,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${await this.getGoogleCloudUrl()}/api/google/sheets/read`;
+            const url = `${API_BASE_URL}/api/google/sheets/read`;
             console.log(`[ApiService] calling readSheet: ${url}`);
 
             const response = await fetch(url, {
@@ -429,10 +429,10 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-            const url = `${await this.getGoogleCloudUrl()}/api/email/read`;
+            const url = `${API_BASE_URL}/api/email/read`;
             console.log(`[ApiService] calling readEmails: ${url}`);
 
-            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/email/read`, {
+            const response = await fetch(`${API_BASE_URL}/api/email/read`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -516,7 +516,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${await this.getGoogleCloudUrl()}/api/search`;
+            const url = `${API_BASE_URL}/api/search`;
             console.log(`[ApiService] calling searchWeb: ${url}`);
 
             const response = await fetch(url, {
@@ -549,7 +549,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/mcp`, {
+            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
                 signal: controller.signal,
                 method: 'GET',
                 headers: this.headers,
@@ -573,7 +573,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/mcp`, {
+            const response = await fetch(`${API_BASE_URL}/api/mcp`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,

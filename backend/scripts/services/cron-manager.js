@@ -277,31 +277,66 @@ class CronManager {
                     const stepResult = await stepResp.json();
                     results.push({ tool: step.tool, result: stepResult });
 
+                    let storedValue;
                     let textValue = '';
+
                     if (stepResult.content && stepResult.content.length > 0) {
-                        const textContent = stepResult.content.find(c => c.type === 'text');
-                        if (textContent) textValue = textContent.text;
-                        else {
-                            const jsonContent = stepResult.content.find(c => c.type === 'json');
-                            if (jsonContent) textValue = JSON.stringify(jsonContent.json);
+                        const jsonContent = stepResult.content.find(c => c.type === 'json');
+                        if (jsonContent && jsonContent.json !== undefined) {
+                            storedValue = jsonContent.json;
+                            textValue = JSON.stringify(jsonContent.json);
+                        } else {
+                            const textContent = stepResult.content.find(c => c.type === 'text');
+                            if (textContent) {
+                                storedValue = textContent.text;
+                                textValue = textContent.text;
+                            }
                         }
                     } else if (stepResult.result && stepResult.result.content) {
                         const contentArr = stepResult.result.content;
-                        const textContent = contentArr.find(c => c.type === 'text');
-                        if (textContent) textValue = textContent.text;
+                        const jsonContent = contentArr.find(c => c.type === 'json');
+                        if (jsonContent && jsonContent.json !== undefined) {
+                            storedValue = jsonContent.json;
+                            textValue = JSON.stringify(jsonContent.json);
+                        } else {
+                            const textContent = contentArr.find(c => c.type === 'text');
+                            if (textContent) {
+                                storedValue = textContent.text;
+                                textValue = textContent.text;
+                            }
+                        }
                     } else if (typeof stepResult.result === 'string') {
+                        storedValue = stepResult.result;
                         textValue = stepResult.result;
+                    } else if (stepResult.result !== undefined) {
+                        storedValue = stepResult.result;
+                        textValue = typeof stepResult.result === 'object'
+                            ? JSON.stringify(stepResult.result)
+                            : String(stepResult.result);
                     }
 
+                    // If the step explicitly requested JSON but returned JSON text, parse it so dot-access works.
+                    if (resolvedArgs.outputFormat === 'json' && typeof storedValue === 'string') {
+                        const trimmed = storedValue.trim();
+                        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                            try {
+                                storedValue = JSON.parse(trimmed);
+                            } catch (e) {
+                                // Keep original string if parsing fails
+                            }
+                        }
+                    }
+
+                    const finalValue = storedValue !== undefined ? storedValue : textValue;
                     const varName = resolvedArgs.variableName || step.id;
                     if (varName) {
-                        variables[varName] = textValue;
+                        variables[varName] = finalValue;
                     }
                     if (step.tool === 'breviai.google.calendar_list') {
-                        variables['events'] = textValue || 'Etkinlik yok';
+                        variables['events'] = finalValue || 'Etkinlik yok';
                     }
                     if (step.tool === 'breviai.google.gmail_read') {
-                        variables['emails'] = textValue || 'Mail yok';
+                        variables['emails'] = finalValue || 'Mail yok';
                     }
                 }
                 return { steps: results, variables };

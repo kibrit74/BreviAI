@@ -279,6 +279,8 @@ export const WorkflowBuilderScreen: React.FC = () => {
                             'breviai.google.meet_create': 'CALENDAR_CREATE',
                             // Web & Search
                             'breviai.web_search': 'WEB_SEARCH',
+                            'http_request': 'HTTP_REQUEST',
+                            'agent_ai': 'AGENT_AI',
                             // Communication
                             'whatsapp_send': 'WHATSAPP_SEND',
                             'telegram_send': 'TELEGRAM_SEND',
@@ -295,17 +297,38 @@ export const WorkflowBuilderScreen: React.FC = () => {
                         // Build MCP step → node config mappers
                         const toolConfigMapper: Record<string, (args: any) => any> = {
                             'breviai.google.calendar_list': (args: any) => ({
-                                type: 'today', maxEvents: args.maxResults || 5, variableName: 'events',
-                                calendarName: '', calendarSource: '',
+                                type: args.type || 'today',
+                                maxEvents: args.maxResults || 5,
+                                variableName: args.variableName || 'events',
+                                // Mobile CALENDAR_READ node filters by calendarName/calendarSource (not calendarId).
+                                // If MCP automation uses an email as calendarId, map it to calendarName for import.
+                                calendarName: args.calendarName || args.calendarId || '',
+                                calendarSource: args.calendarSource || (args.calendarId ? 'google' : ''),
                             }),
                             'breviai.google.gmail_read': (args: any) => ({
-                                variableName: 'emails', maxResults: args.maxResults || 5,
+                                variableName: args.variableName || 'emails',
+                                maxResults: args.maxResults || 5,
+                                query: args.query || 'is:unread',
                             }),
                             'breviai.web_search': (args: any) => ({
-                                query: args.query || '', variableName: 'searchResults',
+                                query: args.query || '', variableName: args.variableName || 'searchResults',
+                            }),
+                            'http_request': (args: any) => ({
+                                url: args.url || '',
+                                method: args.method || 'GET',
+                                headers: args.headers,
+                                body: args.body,
+                                variableName: args.variableName || 'response',
+                            }),
+                            'agent_ai': (args: any) => ({
+                                prompt: args.prompt || '',
+                                provider: args.provider || 'gemini',
+                                model: args.model || 'gemini-2.0-flash-exp',
+                                outputFormat: args.outputFormat || 'text',
+                                variableName: args.variableName || 'aiResponse',
                             }),
                             'whatsapp_send': (args: any) => ({
-                                phoneNumber: args.phone || '', message: args.message || '',
+                                phoneNumber: args.phoneNumber || args.phone || '', message: args.message || '',
                                 mode: 'backend' as const,
                             }),
                             'speak_text': (args: any) => ({

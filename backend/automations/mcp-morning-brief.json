@@ -1,7 +1,7 @@
 {
     "id": "mcp-morning-brief",
     "name": "☀️ Akıllı Sabah Brifingi",
-    "description": "Her iş günü sabah 09:00'da çalışır. Takvim, mail, hava durumu, döviz kuru kontrol eder. WhatsApp özet + sesli bildirim.",
+    "description": "İş günlerinde sabah 09:00'da çalışır. kibrit74@gmail.com takvimini, okunmamış mailleri, web kazıma ile hava durumu ve USD/TRY kurunu alır; WhatsApp + sesli brifing üretir.",
     "schedule": "0 9 * * 1-5",
     "enabled": true,
     "action": {
@@ -9,13 +9,17 @@
         "steps": [
             {
                 "id": "step-1-calendar",
-                "name": "📅 Bugünkü Etkinlikler",
+                "name": "📅 kibrit74 Takvimi (Bugün)",
                 "tool": "breviai.google.calendar_list",
                 "nodeType": "CALENDAR_READ",
                 "args": {
                     "accessToken": "{{GOOGLE_ACCESS_TOKEN}}",
-                    "calendarId": "primary",
-                    "maxResults": 10
+                    "calendarId": "kibrit74@gmail.com",
+                    "calendarName": "kibrit74@gmail.com",
+                    "calendarSource": "google",
+                    "maxResults": 10,
+                    "variableName": "events",
+                    "type": "today"
                 }
             },
             {
@@ -26,54 +30,71 @@
                 "args": {
                     "accessToken": "{{GOOGLE_ACCESS_TOKEN}}",
                     "query": "is:unread",
-                    "maxResults": 5
+                    "maxResults": 8,
+                    "variableName": "emails"
                 }
             },
             {
                 "id": "step-3-weather",
-                "name": "☁️ Hava Durumu",
-                "tool": "breviai.web_search",
-                "nodeType": "WEB_SEARCH",
+                "name": "🌤️ İstanbul Hava (Web Kazıma)",
+                "tool": "browser_scrape",
+                "nodeType": "BROWSER_SCRAPE",
                 "args": {
-                    "query": "İstanbul hava durumu bugün",
-                    "variableName": "weather"
+                    "url": "https://wttr.in/Istanbul?format=4",
+                    "waitForSelector": "body",
+                    "selector": "body",
+                    "variableName": "weather_scraped"
                 }
             },
             {
                 "id": "step-4-currency",
-                "name": "💱 Döviz Kuru",
-                "tool": "breviai.web_search",
-                "nodeType": "WEB_SEARCH",
+                "name": "💱 USD/TRY (Web Kazıma)",
+                "tool": "browser_scrape",
+                "nodeType": "BROWSER_SCRAPE",
                 "args": {
-                    "query": "dolar euro TL kuru bugün",
-                    "variableName": "currency"
+                    "url": "https://www.google.com/finance/quote/USD-TRY",
+                    "waitForSelector": ".YMlKec.fxKbKc",
+                    "selector": ".YMlKec.fxKbKc",
+                    "variableName": "usd_try_scraped"
                 }
             },
             {
-                "id": "step-5-whatsapp",
-                "name": "📱 WhatsApp Özet",
+                "id": "step-5-ai-summary",
+                "name": "🤖 Sabah Brifingi Özeti",
+                "tool": "agent_ai",
+                "nodeType": "AGENT_AI",
+                "args": {
+                    "provider": "gemini",
+                    "model": "gemini-2.5-flash",
+                    "variableName": "morning_brief",
+                    "outputFormat": "json",
+                    "prompt": "Sen profesyonel bir kişisel asistansın. Aşağıdaki verilerle sabah brifingi hazırla.\n\nTarih: {{_date}}\nSaat: {{_time}}\nTakvim (özellikle kibrit74@gmail.com takviminden bugünkü etkinlikler): {{events}}\nOkunmamış Mailler: {{emails}}\nHava Durumu (web kazıma sonucu): {{weather_scraped}}\nUSD/TRY (web kazıma sonucu): {{usd_try_scraped}}\n\nKURALLAR:\n1) Mailleri SADECE listeleme; her mail için gönderen + konu + çok kısa özet (1 cümle) üret.\n2) Takvim etkinliklerini saatleriyle kısa ve net özetle.\n3) Hava durumu ve USD/TRY verisini mutlaka kullan. Veri yoksa 'mevcut değil' yaz, uydurma yapma.\n4) Türkçe yaz.\n5) Sadece JSON döndür, ekstra açıklama ekleme.\n\nJSON formatı:\n{\n  \"whatsapp\": \"WhatsApp için emojili, yıldızlı kalın vurgular (*) içeren detaylı ama kısa sabah brifingi. İçinde mail özetleri, etkinlikler, hava ve dolar bilgisi mutlaka olsun.\",\n  \"voice\": \"Sesli okuma için markdown içermeyen, doğal ve akıcı, kısa ama bilgi dolu Türkçe brifing. Mail özetlerini tek tek çok kısa cümlelerle belirt.\"\n}"
+                }
+            },
+            {
+                "id": "step-6-whatsapp",
+                "name": "📱 WhatsApp Brifing",
                 "tool": "whatsapp_send",
                 "nodeType": "WHATSAPP_SEND",
                 "args": {
-                    "phone": "{{WHATSAPP_PHONE}}",
-                    "message": "☀️ *Günaydın! Sabah Brifingin Hazır:*\n\n📅 *Bugünkü Etkinlikler:*\n{{events}}\n\n📧 *Okunmamış Mailler:*\n{{emails}}\n\n☁️ *Hava Durumu:*\n{{weather}}\n\n💱 *Döviz Kuru:*\n{{currency}}\n\n_BreviAI Sabah Brifingi • {{_date}} {{_time}}_",
+                    "phone": "905337628160",
+                    "message": "{{morning_brief.whatsapp}}",
                     "mode": "backend"
                 }
             },
             {
-                "id": "step-6-voice",
+                "id": "step-7-voice",
                 "name": "🔊 Sesli Brifing",
                 "tool": "speak_text",
                 "nodeType": "SPEAK_TEXT",
                 "args": {
-                    "text": "Günaydın! İşte sabah brifingin. Bugün {{events.count}} toplantın ve {{emails.count}} okunmamış mailin var. Hava durumu: {{weather}}. Döviz: {{currency}}. İyi günler!",
+                    "text": "{{morning_brief.voice}}",
                     "language": "tr-TR"
                 }
             }
         ]
     },
     "config_guide": {
-        "GOOGLE_ACCESS_TOKEN": "Ayarlar > Google ile Giriş Yap'tan alınan OAuth token",
-        "WHATSAPP_PHONE": "WhatsApp numarası (örn: 905551234567)"
+        "GOOGLE_ACCESS_TOKEN": "Ayarlar > Google ile Giriş Yap'tan alınan OAuth token (backend cron kullanımı için)"
     }
 }

@@ -78,12 +78,16 @@ export async function executeSpeakText(
     variableManager: VariableManager
 ): Promise<any> {
     try {
-        // DEBUG: Check if variable exists
-        const rawVarName = config.text ? config.text.replace(/\{\{|\}\}/g, '') : '';
-        if (rawVarName && variableManager.has(rawVarName)) {
-            console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' bulundu. Tipi:`, typeof variableManager.get(rawVarName));
-        } else {
-            console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' BULUNAMADI. Mevcut anahtarlar:`, Object.keys(variableManager.getAll()));
+        // DEBUG: Check placeholder resolution (supports nested paths like {{obj.prop}})
+        const exactPlaceholderMatch = (config.text || '').match(/^\s*\{\{([^}]+)\}\}\s*$/);
+        const rawVarName = exactPlaceholderMatch?.[1]?.trim() || '';
+        if (rawVarName) {
+            const resolvedPreview = variableManager.resolveValue(`{{${rawVarName}}}`);
+            if (resolvedPreview !== undefined) {
+                console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' bulundu. Tipi:`, typeof resolvedPreview);
+            } else {
+                console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' BULUNAMADI. Mevcut anahtarlar:`, Object.keys(variableManager.getAll()));
+            }
         }
 
         // AUTO-SPEAKERPHONE: If triggered by a call, enable speakerphone + max volume
