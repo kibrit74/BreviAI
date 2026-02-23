@@ -23,6 +23,33 @@ app.use(express.json());
 // Serve static files (public) - Allow access without auth
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
+// Proxy /api requests to Next.js on localhost:3000 (By-passing authMiddleware because Next.js has its own app-secret auth)
+app.use('/api', async (req, res) => {
+    try {
+        const url = `http://localhost:3000/api${req.url}`;
+        const options = {
+            method: req.method,
+            headers: { ...req.headers, host: 'localhost:3000' }
+        };
+        if (!['GET', 'HEAD'].includes(req.method) && req.body && Object.keys(req.body).length > 0) {
+            options.body = JSON.stringify(req.body);
+            options.headers['content-type'] = 'application/json';
+        }
+
+        const response = await fetch(url, options);
+        const data = await response.text();
+
+        response.headers.forEach((value, name) => {
+            res.setHeader(name, value);
+        });
+
+        res.status(response.status).send(data);
+    } catch (e) {
+        console.error('[Hub Proxy] Failed to proxy to Next.js API:', e.message);
+        res.status(502).json({ error: 'Bad Gateway - Is the Next.js server running on port 3000?' });
+    }
+});
+
 // Auth Middleware
 function authMiddleware(req, res, next) {
     const key = req.headers['x-auth-key'] || req.query.key;

@@ -72,13 +72,15 @@ export interface ShortcutStep {
 import { ShortcutTemplate } from '../types';
 
 class ApiService {
-    private async getGoogleCloudNextJsUrl(): Promise<string> {
+    private async getGoogleCloudUrl(): Promise<string> {
         try {
             const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
             const url = await AsyncStorage.getItem('whatsapp_backend_url');
-            if (url) return url.trim().replace(/\/$/, '').replace('3001', '3000');
-        } catch (e) { }
-        return 'http://136.109.124.154:3000';
+            if (url) return url.trim().replace(/\/$/, '');
+        } catch (e) {
+            console.warn('[ApiService] Failed to get url:', e);
+        }
+        return 'http://136.109.124.154:3001';
     }
 
     private headers = {
@@ -363,7 +365,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const response = await fetch(`${await this.getGoogleCloudNextJsUrl()}/api/email/send`, {
+            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/email/send`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -388,7 +390,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${await this.getGoogleCloudNextJsUrl()}/api/google/sheets/read`;
+            const url = `${await this.getGoogleCloudUrl()}/api/google/sheets/read`;
             console.log(`[ApiService] calling readSheet: ${url}`);
 
             const response = await fetch(url, {
@@ -427,10 +429,10 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout
 
-            const url = `${await this.getGoogleCloudNextJsUrl()}/api/email/read`;
+            const url = `${await this.getGoogleCloudUrl()}/api/email/read`;
             console.log(`[ApiService] calling readEmails: ${url}`);
 
-            const response = await fetch(`${await this.getGoogleCloudNextJsUrl()}/api/email/read`, {
+            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/email/read`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
@@ -514,7 +516,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-            const url = `${await this.getGoogleCloudNextJsUrl()}/api/search`;
+            const url = `${await this.getGoogleCloudUrl()}/api/search`;
             console.log(`[ApiService] calling searchWeb: ${url}`);
 
             const response = await fetch(url, {
@@ -547,7 +549,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-            const response = await fetch(`${await this.getGoogleCloudNextJsUrl()}/api/mcp`, {
+            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/mcp`, {
                 signal: controller.signal,
                 method: 'GET',
                 headers: this.headers,
@@ -571,7 +573,7 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            const response = await fetch(`${await this.getGoogleCloudNextJsUrl()}/api/mcp`, {
+            const response = await fetch(`${await this.getGoogleCloudUrl()}/api/mcp`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
