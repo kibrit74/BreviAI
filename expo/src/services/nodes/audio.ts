@@ -236,10 +236,160 @@ export async function executeSpeakText(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Metin okunamadı',
+
+            // AUTO-SPEAKERPHONE: If triggered by a call, enable speakerphone + max volume
+            const triggerType = variableManager.get('_triggerType');
+            if(triggerType === 'call' && BreviSettings) {
+            try {
+                if (BreviSettings.maximizeCallVolume) {
+                    await BreviSettings.maximizeCallVolume();
+                    console.log('[SPEAK_TEXT] Arama modu: Hoparlör açıldı + ses maximize edildi');
+                } else if (BreviSettings.setSpeakerphone) {
+                    await BreviSettings.setSpeakerphone(true);
+                    await BreviSettings.setVolume(100, 'media');
+                    await BreviSettings.setVolume(100, 'call');
+                    console.log('[SPEAK_TEXT] Arama modu: Hoparlör açıldı');
+                }
+            } catch (spkErr) {
+                console.warn('[SPEAK_TEXT] Hoparlör açılamadı:', spkErr);
+            }
+        }
+
+        let text = variableManager.resolveString(config.text);
+
+        // DEBUG: JSON Handling
+        if (text && (text.trim().startsWith('{') || text.trim().startsWith('['))) {
+            try {
+                const parsed = JSON.parse(text);
+                console.log('[SPEAK_TEXT] JSON içeriği algılandı. Okunabilir metne dönüştürülüyor.');
+
+                if (Array.isArray(parsed)) {
+                    text = `Liste şunları içeriyor: ${parsed.map(item => typeof item === 'object' ? Object.values(item).join(' ') : item).join(', ')}`;
+                } else if (typeof parsed === 'object') {
+                    // Smart conversion: Only read meaningful keys (skip huge raw data)
+                    const keys = Object.keys(parsed);
+
+                    // Specific handling for Court Info (common use case)
+                    if (keys.includes('mahkemeAdi') || keys.includes('mahkeme_adi')) {
+                        const mahkeme = parsed.mahkemeAdi || parsed.mahkeme_adi;
+                        const dosya = parsed.dosyaNo || parsed.dosya_no;
+                        const tarih = parsed.durusmaTarihi || parsed.durusma_tarihi;
+                        const saat = parsed.durusmaSaati || parsed.durusma_saati;
+                        text = `Mahkeme Bilgileri Şöyle: ${mahkeme}, Dosya Numarası: ${dosya}. Duruşma Tarihi: ${tarih}, Saat: ${saat}`;
+                    } else {
+                        // Generic Fallback: Read up to 5 keys
+                        text = keys.slice(0, 5).map(k => `${k}: ${parsed[k]}`).join('. ');
+                    }
+                }
+            } catch (e) {
+                // Not valid JSON, ignore
+                console.log('[SPEAK_TEXT] JSON ayrıştırma başarısız, ham metin olarak okunuyor.');
+            }
+        }
+
+        if (!text || text.includes('{{')) {
+            console.warn('[SPEAK_TEXT] Uyarı: Değişken çözümü başarısız olmuş olabilir. Sonuç:', text);
+        }
+
+        if (!text) {
+            return { success: false, error: 'Okunacak metin boş' };
+        }
+
+        // Get saved TTS settings as defaults
+        const { userSettingsService } = await import('../UserSettingsService');
+        const savedTTS = userSettingsService.getTTSSettings();
+
+        // Node config overrides saved settings if provided
+        const requestedLang = config.language || savedTTS.language || 'tr-TR';
+
+        let voiceId: string | undefined;
+        let finalLang = requestedLang;
+
+        try {
+            const voices = await Speech.getAvailableVoicesAsync();
+
+            // Log available voices for debugging (Samsung specific debugging)
+            if (voices.length > 0) {
+                const voiceList = voices.map(v => `${v.name} (${v.language})`).join(', ');
+                console.log('[SPEAK_TEXT] Cihazdaki Mevcut Sesler:', voiceList.substring(0, 200) + '...');
+            } else {
+                console.warn('[SPEAK_TEXT] Cihazda hiç ses paketi bulunamadı!');
+            }
+
+            // ROBUST VOICE SELECTION STRATEGY
+            // 1. Exact Match (e.g. 'tr-TR')
+            let targetVoice = voices.find(v => v.language === requestedLang);
+
+            // 2. Loose Match (e.g. 'tr_TR' vs 'tr-TR')
+            if (!targetVoice) {
+                targetVoice = voices.find(v => v.language.replace('_', '-') === requestedLang.replace('_', '-'));
+            }
+
+            // 3. Short Code Match (e.g. 'tr' match for 'tr-TR')
+            if (!targetVoice) {
+                const shortLang = requestedLang.split('-')[0];
+                targetVoice = voices.find(v => v.language.startsWith(shortLang));
+            }
+
+            // 4. Name/Identifier Match (Samsung devices sometimes use names like "Turkish Female")
+            if (!targetVoice && requestedLang.startsWith('tr')) {
+                console.log('[SPEAK_TEXT] Dil kodu ile bulunamadı, isimlerde "Turkish/Turk" aranıyor...');
+                targetVoice = voices.find(v =>
+                    v.name.toLowerCase().includes('turkish') ||
+                    v.name.toLowerCase().includes('türk') ||
+                    v.identifier.toLowerCase().includes('tr_') ||
+                    v.identifier.toLowerCase().includes('tur')
+                );
+            }
+
+            if (targetVoice) {
+                voiceId = targetVoice.identifier;
+                finalLang = targetVoice.language; // Update lang to match the actual voice
+                console.log(`[SPEAK_TEXT] Ses Bulundu: ${targetVoice.name} (${targetVoice.language}) - ID: ${voiceId}`);
+            } else {
+                console.warn(`[SPEAK_TEXT] DIKKAT: '${requestedLang}' için uygun ses bulunamadı.`);
+
+                // Critical Error for Turkish users instead of silent fail
+                if (requestedLang.startsWith('tr')) {
+                    return {
+                        success: false,
+                        error: 'Cihazda Türkçe Ses Paketi (TTS) bulunamadı. Lütfen "Ayarlar > Erişilebilirlik > Metin Okuma (TTS)" menüsünden Türkçe dilini indirin/seçin.'
+                    };
+                }
+            }
+
+        } catch (e) {
+            console.warn('[SPEAK_TEXT] Ses listesi alınamadı:', e);
+        }
+
+        const options: Speech.SpeechOptions = {
+            language: finalLang,
+            voice: voiceId, // Explicitly set voice ID
+            pitch: config.pitch || savedTTS.pitch || 1.0,
+            rate: config.rate || savedTTS.rate || 1.0,
+        };
+
+        console.log('[SPEAK_TEXT] Okunuyor:', text.substring(0, 50) + '...', 'Dil (Lang):', options.language, 'Ses (Voice):', options.voice);
+        await Speech.speak(text, options);
+
+        return {
+            success: true,
+            text,
+            language: options.language,
+            rate: options.rate,
+            pitch: options.pitch,
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Metin okunamadı',
         };
     }
 }
 
+
+// Global variable to keep track of the active recording
+let activeRecording: Audio.Recording | null = null;
 
 export async function executeAudioRecord(
     config: AudioRecordConfig,
@@ -262,12 +412,29 @@ export async function executeAudioRecord(
             };
         }
 
+        // Clean up any existing active recording to prevent the
+        // "Only one Recording object can be prepared at a given time" error
+        if (activeRecording) {
+            try {
+                const status = await activeRecording.getStatusAsync();
+                if (status.isRecording || status.isPrepared) {
+                    await activeRecording.stopAndUnloadAsync();
+                }
+            } catch (cleanupError) {
+                console.warn('[AUDIO_RECORD] Mevcut kayıt temizlenirken hata oluştu:', cleanupError);
+            } finally {
+                activeRecording = null;
+            }
+        }
+
         await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
             playsInSilentModeIOS: true,
         });
 
         const recording = new Audio.Recording();
+        activeRecording = recording;
+
         await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
         await recording.startAsync();
 
@@ -275,8 +442,14 @@ export async function executeAudioRecord(
         const duration = (config.duration || 5) * 1000;
         await new Promise(resolve => setTimeout(resolve, duration));
 
+        // Wait is over, stop recording
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
+
+        // Clean global ref if it's still this one
+        if (activeRecording === recording) {
+            activeRecording = null;
+        }
 
         if (!uri) {
             return { success: false, error: 'Ses kaydedilemedi (URI yok)' };
@@ -290,6 +463,13 @@ export async function executeAudioRecord(
             duration: config.duration,
         };
     } catch (error) {
+        if (activeRecording) {
+            try {
+                await activeRecording.stopAndUnloadAsync();
+            } catch (e) { }
+            activeRecording = null;
+        }
+
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Ses kaydı başlatılamadı',
