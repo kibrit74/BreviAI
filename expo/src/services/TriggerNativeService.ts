@@ -122,10 +122,27 @@ class TriggerNativeService {
     }
 
     private registerCall(workflowId: string, config: any) {
+        // Map new array-based config (CallTriggerConfig) to Android legacy string format
+        let mappedState = 'incoming';
+
+        if (config.states && Array.isArray(config.states) && config.states.length > 0) {
+            if (config.states.length > 1) {
+                mappedState = 'any'; // If multiple selected, tell Android receiver to trigger on any state
+            } else {
+                mappedState = config.states[0].toLowerCase();
+            }
+        } else if (config.callState) {
+            // Fallback for older workflow JSONs
+            mappedState = config.callState.toLowerCase();
+        }
+
+        // Map new phoneNumber property, fallback to legacy phoneFilter
+        const mappedPhone = config.phoneNumber || config.phoneFilter || null;
+
         BreviHelperModule.registerCallTrigger(
             workflowId,
-            config.callState || 'incoming',
-            config.phoneFilter || null
+            mappedState,
+            mappedPhone
         );
     }
 

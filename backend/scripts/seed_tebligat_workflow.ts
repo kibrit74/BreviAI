@@ -44,7 +44,7 @@ const tebligatWorkflow: ShortcutTemplate = {
                 "type": "AGENT_AI",
                 "label": "Evrak Kontrol & Analiz",
                 "config": {
-                    "model": "gemini-2.0-flash-exp",
+                    "model": "gemini-2.5-flash",
                     "prompt": "Bu görsel bir resmi evrak/tebligat mı? Eğer evetse, OCR yaparak metni oku ve şu bilgileri çıkar:\n\n{\n  \"is_document\": true/false,\n  \"mahkeme\": \"mahkeme adı\",\n  \"esas_no\": \"dosya numarası\",\n  \"durusma_tarihi\": \"YYYY-MM-DD (eğer varsa, yoksa null)\",\n  \"durusma_saati\": \"HH:MM (eğer varsa, yoksa null)\",\n  \"teblig_tarihi\": \"YYYY-MM-DD\",\n  \"cevap_suresi_gun\": sayı,\n  \"dava_turu\": \"kısa açıklama\",\n  \"taraflar\": \"davacı ve davalı isimleri\",\n  \"son_gun\": \"YYYY-MM-DD (tebliğ tarihi + cevap süresi, hafta sonu ve resmi tatiller hariç)\"\n}\n\nSadece JSON döndür.",
                     "provider": "gemini",
                     "attachments": "evrak_foto",

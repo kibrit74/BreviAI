@@ -171,7 +171,7 @@ ${API_DOCS}
     - "Notion'a toplantı notlarını kaydet" (AGENT MCP üzerinden yapar)
     - "Slack'e bildirim gönder" (AGENT MCP üzerinden yapar)
   * **DİKKAT:** Agent'tan sonra genelde sadece SHOW_TEXT eklenir. Agent 'send_whatsapp' gibi araçları ve MCP araçlarını kendisi çağırır, ayrıca node eklemeye gerek yoktur (ama görsel netlik için eklenebilir).
-  * **Config:** { prompt: "İstek... (Dosya varsa: 'Ekteki dosyayı analiz et')", provider: "gemini", model: "gemini-2.0-flash-exp", variableName: "agentResponse" }
+  * **Config:** { prompt: "İstek... (Dosya varsa: 'Ekteki dosyayı analiz et')", provider: "gemini", model: "gemini-2.5-flash", variableName: "agentResponse" }
   
 - IMAGE_GENERATOR: Resim Üret (config: { prompt: "A cat", provider: "nanobana", variableName: "generatedImage" })
 - SPEECH_TO_TEXT: Sesi Yazıya Çevir (config: { language: "tr-TR", variableName: "speechText" })
@@ -243,7 +243,7 @@ Bu senaryo için JSON Yapısı:
   "nodes": [
     { "id": "1", "type": "MANUAL_TRIGGER", "label": "Başlat", "position": { "x": 100, "y": 50 } },
     { "id": "2", "type": "TEXT_INPUT", "label": "Mesaj Al", "config": { "prompt": "Mesajınızı yazın", "variableName": "userInput" }, "position": { "x": 100, "y": 150 } },
-    { "id": "3", "type": "AGENT_AI", "label": "AI Yanıt", "config": { "prompt": "Sen yardımcı bir asistansın. Kullanıcı: {{userInput}}", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "aiResponse" }, "position": { "x": 100, "y": 250 } },
+    { "id": "3", "type": "AGENT_AI", "label": "AI Yanıt", "config": { "prompt": "Sen yardımcı bir asistansın. Kullanıcı: {{userInput}}", "provider": "gemini", "model": "gemini-2.5-flash", "variableName": "aiResponse" }, "position": { "x": 100, "y": 250 } },
     { "id": "4", "type": "SHOW_TEXT", "label": "Yanıt Göster", "config": { "title": "AI Yanıtı", "content": "{{aiResponse}}" }, "position": { "x": 100, "y": 350 } }
   ],
   "edges": [
@@ -301,7 +301,7 @@ Kullanıcı MCP servislerinden (Notion, Slack, Jira, Trello, Asana, Airtable, Za
   "name": "MCP Sesli Asistan",
   "nodes": [
     { "id": "1", "type": "CHAT_INPUT_TRIGGER", "label": "Ne yapayım?", "config": { "prompt": "Ne yapmamı istersin?", "variableName": "userCommand" }, "position": { "x": 100, "y": 50 } },
-    { "id": "2", "type": "AGENT_AI", "label": "MCP Asistan", "config": { "prompt": "Sen MCP araçlarına erişimi olan kişisel asistansın. Notion, Slack, Jira, Trello, Asana, Airtable, Zapier, Google (Gmail, Calendar, Sheets, Drive, Meet), Microsoft (Outlook, Calendar, Excel, OneDrive, Teams) araçlarını kullanabilirsin.\\n\\nKullanıcı isteği: {{userCommand}}\\n\\nUygun MCP aracını çağır ve sonucu KISA özetle (sesli okunacak).", "provider": "gemini", "model": "gemini-2.0-flash-exp", "variableName": "result" }, "position": { "x": 100, "y": 200 } },
+    { "id": "2", "type": "AGENT_AI", "label": "MCP Asistan", "config": { "prompt": "Sen MCP araçlarına erişimi olan kişisel asistansın. Notion, Slack, Jira, Trello, Asana, Airtable, Zapier, Google (Gmail, Calendar, Sheets, Drive, Meet), Microsoft (Outlook, Calendar, Excel, OneDrive, Teams) araçlarını kullanabilirsin.\\n\\nKullanıcı isteği: {{userCommand}}\\n\\nUygun MCP aracını çağır ve sonucu KISA özetle (sesli okunacak).", "provider": "gemini", "model": "gemini-2.5-flash", "variableName": "result" }, "position": { "x": 100, "y": 200 } },
     { "id": "3", "type": "SPEAK_TEXT", "label": "Sesli Yanıt", "config": { "text": "{{result}}", "language": "tr-TR" }, "position": { "x": 100, "y": 400 } },
     { "id": "4", "type": "SHOW_TEXT", "label": "Yazılı Sonuç", "config": { "content": "{{result}}" }, "position": { "x": 100, "y": 550 } }
   ],

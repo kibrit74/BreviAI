@@ -10,7 +10,7 @@
             "type": "CALL_TRIGGER",
             "label": "Arama Geldi",
             "config": {
-                "callState": "Incoming",
+                "states": ["Incoming"],
                 "variableName": "callerInfo"
             },
             "position": {
@@ -25,7 +25,6 @@
             "config": {
                 "systemPrompt": "Sen bir AI telefon sekretersin. Arayan kişiyle Türkçe konuşuyorsun.\n\nKurallar:\n- Kısa ve profesyonel cevaplar ver (1-2 cümle)\n- Aramayı karşıla: 'Merhaba, BreviAI asistanı, size nasıl yardımcı olabilirim?'\n- Arayan kişinin ismini ve mesajını not al\n- Gerektiğinde bilgi sor\n- Arayan: {{_callerNumber}}",
                 "voice": "Kore",
-                "model": "gemini-2.5-flash-live-001",
                 "tools": true,
                 "speakerMode": true,
                 "maxDuration": 120,
@@ -41,7 +40,7 @@
             "type": "NOTIFICATION",
             "label": "Görüşme Bitti",
             "config": {
-                "type": "notification",
+                "type": "push",
                 "title": "📞 Arama Tamamlandı",
                 "message": "Arayan: {{_callerNumber}}\n{{konusmaMetni}}"
             },

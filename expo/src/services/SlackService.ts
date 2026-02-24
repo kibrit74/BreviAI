@@ -1,11 +1,24 @@
 /**
- * Slack Service - OAuth & Token Integration
- * Specifically designed to store Bot token for MCP tools 
+ * Slack Service - OAuth & API Integration
+ * Backend-based OAuth flow for Slack integration
  */
 
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Complete auth session for web browser
+WebBrowser.maybeCompleteAuthSession();
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════════════
+
+const STORAGE_KEYS = {
+    accessToken: '@slack_access_token',
+    workspaceName: '@slack_workspace_name', // To display which workspace is connected
+    botUserId: '@slack_bot_user_id',
+};
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -14,76 +27,100 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface SlackAuthState {
     isSignedIn: boolean;
     workspaceName: string | null;
-    workspaceId: string | null;
-    botToken: string | null;
+    accessToken: string | null;
 }
-
-const STORAGE_KEYS = {
-    botToken: '@slack_bot_token',
-    workspaceName: '@slack_workspace_name',
-    workspaceId: '@slack_workspace_id',
-};
 
 // ═══════════════════════════════════════════════════════════════
 // SLACK SERVICE CLASS
 // ═══════════════════════════════════════════════════════════════
 
 class SlackService {
-    private botToken: string | null = null;
+    private accessToken: string | null = null;
     private workspaceName: string | null = null;
-    private workspaceId: string | null = null;
+    private botUserId: string | null = null;
 
     constructor() {
         this.loadStoredAuth();
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // AUTH METHODS
+    // ─────────────────────────────────────────────────────────────
+
     private async loadStoredAuth(): Promise<void> {
         try {
-            const [token, wsName, wsId] = await Promise.all([
-                AsyncStorage.getItem(STORAGE_KEYS.botToken),
+            const [accessToken, workspaceName, botUserId] = await Promise.all([
+                AsyncStorage.getItem(STORAGE_KEYS.accessToken),
                 AsyncStorage.getItem(STORAGE_KEYS.workspaceName),
-                AsyncStorage.getItem(STORAGE_KEYS.workspaceId),
+                AsyncStorage.getItem(STORAGE_KEYS.botUserId),
             ]);
 
-            this.botToken = token;
-            this.workspaceName = wsName;
-            this.workspaceId = wsId;
+            this.accessToken = accessToken;
+            this.workspaceName = workspaceName;
+            this.botUserId = botUserId;
 
-            console.log('[SlackService] Loaded auth:', { hasToken: !!token, workspace: wsName });
+            console.log('[SlackService] Loaded auth:', {
+                hasToken: !!accessToken,
+                workspaceName: this.workspaceName
+            });
         } catch (error) {
-            console.error('[SlackService] Error loading auth:', error);
+            console.error('[SlackService] Error loading stored auth:', error);
         }
     }
 
     private async saveAuth(): Promise<void> {
         try {
             await Promise.all([
-                AsyncStorage.setItem(STORAGE_KEYS.botToken, this.botToken || ''),
+                AsyncStorage.setItem(STORAGE_KEYS.accessToken, this.accessToken || ''),
                 AsyncStorage.setItem(STORAGE_KEYS.workspaceName, this.workspaceName || ''),
-                AsyncStorage.setItem(STORAGE_KEYS.workspaceId, this.workspaceId || ''),
+                AsyncStorage.setItem(STORAGE_KEYS.botUserId, this.botUserId || ''),
             ]);
         } catch (error) {
             console.error('[SlackService] Error saving auth:', error);
         }
     }
 
-    public getAuthState(): SlackAuthState {
-        return {
-            isSignedIn: !!this.botToken,
-            botToken: this.botToken,
-            workspaceName: this.workspaceName,
-            workspaceId: this.workspaceId,
-        };
-    }
+    private async clearAuth(): Promise<void> {
+        this.accessToken = null;
+        this.workspaceName = null;
+        this.botUserId = null;
 
-    public async getAccessToken(): Promise<string | null> {
-        return this.botToken;
+        try {
+            await Promise.all([
+                AsyncStorage.removeItem(STORAGE_KEYS.accessToken),
+                AsyncStorage.removeItem(STORAGE_KEYS.workspaceName),
+                AsyncStorage.removeItem(STORAGE_KEYS.botUserId),
+            ]);
+        } catch (error) {
+            console.error('[SlackService] Error clearing auth:', error);
+        }
     }
 
     /**
-     * Sign in via Backend OAuth Flow
+     * Get current auth state
      */
-    public async signIn(): Promise<SlackAuthState> {
+    getAuthState(): SlackAuthState {
+        return {
+            isSignedIn: !!this.accessToken,
+            workspaceName: this.workspaceName,
+            accessToken: this.accessToken,
+        };
+    }
+
+    /**
+     * Get the stored access token for MCP tools
+     */
+    async getAccessToken(): Promise<string | null> {
+        if (!this.accessToken) {
+            await this.loadStoredAuth();
+        }
+        return this.accessToken;
+    }
+
+    /**
+     * Sign in with Slack OAuth via Backend
+     */
+    async signIn(): Promise<SlackAuthState> {
         try {
             // Mobile redirect URI (deep link)
             const redirectUri = AuthSession.makeRedirectUri({
@@ -94,13 +131,19 @@ class SlackService {
             // Determine Backend URL based on environment
             let backendBaseUrl = 'https://breviai.vercel.app';
 
-            // IMPORTANT: If you test locally with a real device, you can set your IP:
-            // if (__DEV__) { backendBaseUrl = 'http://192.168.1.x:3000'; }
+            if (__DEV__) {
+                // Determine if running on web, emulator or physical device.
+                // In a real expo environment you'd use manifest values, but we'll try a common approach.
+                // You may need to uncomment and set your LAN IP manually if using a physical device during dev.
+                // backendBaseUrl = 'http://192.168.1.x:3000';
+                backendBaseUrl = 'http://10.0.2.2:3000'; // Default Android emulator localhost
+            }
 
             // Backend Auth Start URL
             const authUrl = `${backendBaseUrl}/api/auth/slack/start?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
-            console.log('[SlackService] ===== OAUTH START =====');
+            console.log('[SlackService] ===== BACKEND OAUTH START =====');
+            console.log('[SlackService] Backend URL:', backendBaseUrl);
             console.log('[SlackService] Full Auth URL:', authUrl);
             console.log('[SlackService] Callback URI:', redirectUri);
 
@@ -112,12 +155,14 @@ class SlackService {
             if (result.type === 'success' && result.url) {
                 console.log('[SlackService] Success URL:', result.url);
 
+                // Parse tokens from deep link query params
+                // Format: brevi-ai://oauth?slack_token=...&team_name=...
                 const urlObj = new URL(result.url);
                 const queryParams = new URLSearchParams(urlObj.search);
 
-                const token = queryParams.get('slack_token');
-                const workspaceId = queryParams.get('workspace_id');
-                const workspaceName = queryParams.get('workspace_name');
+                const slackToken = queryParams.get('slack_token');
+                const workspaceName = queryParams.get('team_name');
+                const botUserId = queryParams.get('bot_user_id');
                 const error = queryParams.get('error');
 
                 if (error) {
@@ -125,14 +170,14 @@ class SlackService {
                     throw new Error(`OAuth hatası: ${error}`);
                 }
 
-                if (token) {
-                    this.botToken = token;
-                    this.workspaceId = workspaceId || null;
-                    this.workspaceName = workspaceName || null;
+                if (slackToken) {
+                    this.accessToken = slackToken;
+                    this.workspaceName = workspaceName || 'Workspace';
+                    this.botUserId = botUserId || null;
 
                     await this.saveAuth();
 
-                    console.log('[SlackService] Sign in successful!');
+                    console.log('[SlackService] Sign in successful. Connected to:', this.workspaceName);
                     return this.getAuthState();
                 }
 
@@ -148,16 +193,11 @@ class SlackService {
         }
     }
 
-    public async signOut(): Promise<void> {
-        this.botToken = null;
-        this.workspaceName = null;
-        this.workspaceId = null;
-
-        await Promise.all([
-            AsyncStorage.removeItem(STORAGE_KEYS.botToken),
-            AsyncStorage.removeItem(STORAGE_KEYS.workspaceName),
-            AsyncStorage.removeItem(STORAGE_KEYS.workspaceId),
-        ]);
+    /**
+     * Sign out
+     */
+    async signOut(): Promise<void> {
+        await this.clearAuth();
         console.log('[SlackService] Signed out');
     }
 }

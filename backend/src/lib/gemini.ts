@@ -77,7 +77,7 @@ let searchModel: GenerativeModel | null = null;
 export function getSearchModel(): GenerativeModel {
     if (!searchModel) {
         searchModel = genAI.getGenerativeModel({
-            model: 'gemini-2.0-flash',
+            model: 'gemini-2.5-flash',
             tools: [
                 {
                     googleSearch: {}

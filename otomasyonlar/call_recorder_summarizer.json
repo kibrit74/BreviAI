@@ -1,0 +1,126 @@
+{
+    "id": "template_call_recorder_summarizer",
+    "name": "Sihirli Sekreter (Telefon Kaydı & Özet)",
+    "description": "Gelen veya yapılan telefon görüşmelerini kaydeder, metne döker, AI ile özetleyip önemli detayları cihaz hafızasına kaydeder.",
+    "nodes": [
+        {
+            "id": "trigger_call",
+            "type": "CALL_TRIGGER",
+            "label": "Görüşme Başladığında",
+            "config": {
+                "states": [
+                    "Connected"
+                ],
+                "variableName": "callerInfo"
+            },
+            "position": {
+                "x": 250,
+                "y": 100
+            }
+        },
+        {
+            "id": "action_record",
+            "type": "AUDIO_RECORD",
+            "label": "Konuşmayı Kaydet",
+            "config": {
+                "duration": 300,
+                "variableName": "callAudio"
+            },
+            "position": {
+                "x": 250,
+                "y": 250
+            }
+        },
+        {
+            "id": "action_stt",
+            "type": "SPEECH_TO_TEXT",
+            "label": "Yazıya Dök",
+            "config": {
+                "language": "tr",
+                "variableName": "transcription",
+                "silenceTimeout": 3000
+            },
+            "position": {
+                "x": 250,
+                "y": 400
+            }
+        },
+        {
+            "id": "action_ai_summarize",
+            "type": "AGENT_AI",
+            "label": "Özetle ve Ayıkla",
+            "config": {
+                "provider": "gemini",
+                "model": "gemini-2.5-flash",
+                "prompt": "Şu telefon görüşmesi dökümünü analiz et. Görüşmenin ana konusunu, zikredilen herhangi bir tarihi/saati veya önemli detayları çok kısa maddeler halinde Türkce özetle. Döküm: {{transcription}}",
+                "variableName": "callSummary",
+                "temperature": 0.3
+            },
+            "position": {
+                "x": 250,
+                "y": 550
+            }
+        },
+        {
+            "id": "action_memory",
+            "type": "ADD_TO_MEMORY",
+            "label": "Hafızaya Kaydet",
+            "config": {
+                "text": "{{callerInfo.phoneNumber}} ile yapılan görüşme özeti: {{callSummary}}",
+                "variableName": "memoryResult",
+                "storageType": "auto",
+                "metadata": "{\"date\": \"{{_date}}\", \"time\": \"{{_time}}\", \"type\": \"phone_call\"}"
+            },
+            "position": {
+                "x": 250,
+                "y": 700
+            }
+        },
+        {
+            "id": "action_notify",
+            "type": "NOTIFICATION",
+            "label": "Bildirim Gönder",
+            "config": {
+                "type": "push",
+                "title": "Görüşme Kaydedildi",
+                "message": "Telefon görüşmesi özetlendi ve hafızaya başarıyla eklendi."
+            },
+            "position": {
+                "x": 250,
+                "y": 850
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e_trigger_record",
+            "source": "trigger_call",
+            "target": "action_record"
+        },
+        {
+            "id": "e_record_stt",
+            "source": "action_record",
+            "target": "action_stt"
+        },
+        {
+            "id": "e_stt_ai",
+            "source": "action_stt",
+            "target": "action_ai_summarize"
+        },
+        {
+            "id": "e_ai_memory",
+            "source": "action_ai_summarize",
+            "target": "action_memory"
+        },
+        {
+            "id": "e_memory_notify",
+            "source": "action_memory",
+            "target": "action_notify"
+        }
+    ],
+    "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 1
+    }
+}
