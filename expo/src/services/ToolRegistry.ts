@@ -1106,7 +1106,8 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         parameters: {
             type: 'OBJECT',
             properties: {
-                gesture: { type: 'STRING', description: 'Gesture type: "shake", "face_down", "face_up", "quadruple_tap"' },
+                gesture: { type: 'STRING', description: 'Gesture type: "shake", "face_down", "face_up", "flip", "tap", "double_tap", "triple_tap", "quadruple_tap"' },
+                tapCount: { type: 'INTEGER', description: 'Tap count if gesture="tap" (2-6, default 4)' },
                 sensitivity: { type: 'STRING', description: 'Sensitivity: "low", "medium", "high"' }
             },
             required: ['gesture']

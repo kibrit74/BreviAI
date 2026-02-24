@@ -4613,19 +4613,41 @@ const GestureTriggerFields: React.FC<ConfigFieldsProps> = ({ config, updateConfi
         <View style={styles.field}>
             <Text style={styles.fieldLabel}>Hareket Tipi</Text>
             <View style={styles.buttonRow}>
-                {['shake', 'face_down', 'face_up', 'quadruple_tap'].map(g => (
+                {['shake', 'face_down', 'face_up', 'flip', 'tap', 'double_tap', 'triple_tap', 'quadruple_tap'].map(g => (
                     <TouchableOpacity
                         key={g}
                         style={[styles.unitButton, config.gesture === g && styles.unitButtonSelected]}
-                        onPress={() => updateConfig('gesture', g)}
+                        onPress={() => {
+                            updateConfig('gesture', g);
+                            if (g === 'tap' && !config.tapCount) updateConfig('tapCount', 4);
+                        }}
                     >
                         <Text style={[styles.unitButtonText, config.gesture === g && styles.unitButtonTextSelected]}>
-                            {g === 'shake' ? 'Salla' : g === 'face_down' ? 'Ters Çevir' : g === 'face_up' ? 'Düz Çevir' : '4 Kez Vur'}
+                            {g === 'shake' ? 'Salla' : g === 'face_down' ? 'Ters Cevir' : g === 'face_up' ? 'Duz Cevir' : g === 'flip' ? 'Cevir (Ters->Duz)' : g === 'tap' ? 'Vur (2-6)' : g === 'double_tap' ? '2 Kez Vur' : g === 'triple_tap' ? '3 Kez Vur' : '4 Kez Vur'}
                         </Text>
                     </TouchableOpacity>
                 ))}
             </View>
         </View>
+        {config.gesture === 'tap' && (
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Tiklama Sayisi</Text>
+                <View style={styles.buttonRow}>
+                    {[2, 3, 4, 5, 6].map(count => (
+                        <TouchableOpacity
+                            key={String(count)}
+                            style={[styles.unitButton, (config.tapCount || 4) === count && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('tapCount', count)}
+                        >
+                            <Text style={[styles.unitButtonText, (config.tapCount || 4) === count && styles.unitButtonTextSelected]}>
+                                {count} Kez
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <Text style={styles.fieldHint}>Dinamik vurma sayisi (2-6). Eski 2/3/4 kisayollari da calisir.</Text>
+            </View>
+        )}
         <View style={styles.field}>
             <Text style={styles.fieldLabel}>Hassasiyet</Text>
             <View style={styles.buttonRow}>

@@ -1260,5 +1260,27 @@ export const SEED_TEMPLATES: BaseTemplate[] = [
                 { "id": "e3-4", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" }
             ]
         }
+    },
+    {
+        id: 'test-slack-oauth',
+        title: 'Slack Bağlantı Testi (OAuth)',
+        title_en: 'Slack Connection Test (OAuth)',
+        description: 'Yeni eklenen Slack "Bağlan" özelliği üzerinden kanalınıza test mesajı gönderir.',
+        description_en: 'Sends a test message to your channel via the new Slack OAuth integration.',
+        category: 'Business',
+        author: 'BreviAI',
+        downloads: '1k+',
+        tags: ['slack', 'test', 'oauth', 'mcp'],
+        template_json: {
+            "name": "Slack Test (OAuth)",
+            "description": "Slack OAuth üzerinden token kullanarak mesaj gönderir.",
+            "nodes": [
+                { "id": "1", "type": "MANUAL_TRIGGER", "label": "Testi Başlat", "data": {}, "position": { "x": 100, "y": 100 } },
+                { "id": "2", "type": "MCP_TOOL", "label": "Slack ile Test", "data": { "toolName": "breviai.slack.send_message", "params": { "channel": "#general", "text": "Merhabalar! BreviAI Slack OAuth bağlantısı başarıyla çalışıyor! 🎉" } }, "position": { "x": 100, "y": 200 } }
+            ],
+            "edges": [
+                { "id": "e1", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" }
+            ]
+        }
     }
 ];

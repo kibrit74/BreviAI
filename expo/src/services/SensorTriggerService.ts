@@ -72,16 +72,49 @@ class SensorTriggerService {
             const triggerNode = workflow.nodes.find(n => n.type === 'GESTURE_TRIGGER');
             if (triggerNode) {
                 const config = triggerNode.config as GestureTriggerConfig;
+                const rawGesture = (config as any)?.gesture || (config as any)?.gestureType || 'shake';
+                const gesture = this.normalizeGestureForNative(rawGesture, (config as any)?.tapCount);
                 // Native registerTrigger(workflowId, gesture, sensitivity)
-                // Note: Native supports 'shake', 'flip', 'double_tap', 'triple_tap'
-                if (['shake', 'flip', 'double_tap', 'triple_tap'].includes(config.gesture)) {
-                    await MotionTrigger.registerTrigger(workflow.id, config.gesture, config.sensitivity || 'medium');
+                if (gesture) {
+                    await MotionTrigger.registerTrigger(workflow.id, gesture, config.sensitivity || 'medium');
                 } else {
-                    console.warn(`[SensorTriggerService] Unsupported native gesture: ${config.gesture}`);
+                    console.warn(`[SensorTriggerService] Unsupported native gesture: ${rawGesture}`);
                 }
             }
         }
         console.log(`[SensorTriggerService] Registered ${this.activeGestureWorkflows.length} workflows with Native Motion Service`);
+    }
+
+    private normalizeGestureForNative(gesture?: string, tapCount?: number): string | null {
+        if (!gesture) return 'shake';
+        if (gesture === 'chop') return 'shake'; // legacy alias fallback
+        if (gesture === 'tap') return this.tapCountToNativeGesture(tapCount);
+
+        const supported = new Set([
+            'shake',
+            'flip',
+            'face_down',
+            'face_up',
+            'double_tap',
+            'triple_tap',
+            'quadruple_tap',
+            'quintuple_tap',
+            'sextuple_tap',
+        ]);
+
+        return supported.has(gesture) ? gesture : null;
+    }
+
+    private tapCountToNativeGesture(tapCount?: number): string {
+        const count = Math.max(2, Math.min(6, Number(tapCount) || 4));
+        switch (count) {
+            case 2: return 'double_tap';
+            case 3: return 'triple_tap';
+            case 4: return 'quadruple_tap';
+            case 5: return 'quintuple_tap';
+            case 6: return 'sextuple_tap';
+            default: return 'quadruple_tap';
+        }
     }
 
     // JS-side gesture monitoring REMOVED to prevent conflict and spam

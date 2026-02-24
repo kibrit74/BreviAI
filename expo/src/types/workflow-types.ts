@@ -941,7 +941,8 @@ export interface BarometerConfig {
 
 // Gesture Config
 export interface GestureTriggerConfig {
-    gesture: 'shake' | 'flip' | 'chop' | 'double_tap';
+    gesture: 'shake' | 'flip' | 'face_down' | 'face_up' | 'tap' | 'double_tap' | 'triple_tap' | 'quadruple_tap' | 'quintuple_tap' | 'sextuple_tap' | 'chop';
+    tapCount?: number; // Used when gesture = 'tap' (2-6)
     sensitivity: 'low' | 'medium' | 'high';
 }
 

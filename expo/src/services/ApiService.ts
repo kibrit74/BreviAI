@@ -570,6 +570,17 @@ INSTRUCTIONS:
         args: Record<string, unknown> = {}
     ): Promise<{ success: boolean; result?: McpToolResult; error?: string }> {
         try {
+            // Auto-inject Slack token for Slack MCP tools
+            if (toolName.startsWith('breviai.slack.') && !args.token) {
+                const { slackService } = require('./SlackService');
+                const token = await slackService.getAccessToken();
+                if (token) {
+                    args = { ...args, token };
+                } else {
+                    return { success: false, error: 'Slack bağlı değil. Lütfen Ayarlar sayfasından Slack hesabınızı bağlayın.' };
+                }
+            }
+
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 

@@ -162,11 +162,30 @@ class TriggerNativeService {
         const { MotionTrigger } = NativeModules;
         if (!MotionTrigger) return;
 
+        // Backward/forward compatible: some configs use `gesture`, older code used `gestureType`.
+        const rawGesture = config.gesture || config.gestureType || 'shake';
+        const gesture = this.mapGestureForNative(rawGesture, config.tapCount);
         MotionTrigger.registerTrigger(
             workflowId,
-            config.gestureType || 'shake',
+            gesture,
             config.sensitivity || 'medium'
         );
+    }
+
+    private mapGestureForNative(gesture: string, tapCount?: number): string {
+        if (gesture === 'tap') {
+            const count = Math.max(2, Math.min(6, Number(tapCount) || 4));
+            switch (count) {
+                case 2: return 'double_tap';
+                case 3: return 'triple_tap';
+                case 4: return 'quadruple_tap';
+                case 5: return 'quintuple_tap';
+                case 6: return 'sextuple_tap';
+                default: return 'quadruple_tap';
+            }
+        }
+        if (gesture === 'chop') return 'shake';
+        return gesture;
     }
 }
 

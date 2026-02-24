@@ -8,6 +8,7 @@ import { userSettingsService, AIProvider } from '../services/UserSettingsService
 import { googleService, GoogleAuthState } from '../services/GoogleService';
 
 import { microsoftService, MicrosoftAuthState } from '../services/MicrosoftService';
+import { slackService, SlackAuthState } from '../services/SlackService';
 import { backgroundService } from '../services/BackgroundService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -128,6 +129,10 @@ export default function SettingsScreen({ navigation }: any) {
 
     // Microsoft account state
     const [microsoftAuth, setMicrosoftAuth] = React.useState<MicrosoftAuthState>(microsoftService.getAuthState());
+
+    // Slack account state
+    const [slackAuth, setSlackAuth] = React.useState<SlackAuthState>(slackService.getAuthState());
+    const [isSlackLoading, setIsSlackLoading] = React.useState(false);
 
 
     // WhatsApp State
@@ -597,6 +602,39 @@ export default function SettingsScreen({ navigation }: any) {
                     onPress: async () => {
                         await microsoftService.signOut();
                         setMicrosoftAuth(microsoftService.getAuthState());
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleSlackSignIn = async () => {
+        setIsSlackLoading(true);
+        try {
+            const authState = await slackService.signIn();
+            setSlackAuth(authState);
+            if (authState.isSignedIn) {
+                Alert.alert('✅ Başarılı', `${authState.workspaceName || 'Slack'} ile bağlandı`);
+            }
+        } catch (error: any) {
+            Alert.alert('Hata', error.message || 'Slack girişi başarısız');
+        } finally {
+            setIsSlackLoading(false);
+        }
+    };
+
+    const handleSlackSignOut = async () => {
+        Alert.alert(
+            'Slack Hesabı',
+            'Hesap bağlantısını kaldırmak istiyor musunuz?',
+            [
+                { text: 'İptal', style: 'cancel' },
+                {
+                    text: 'Kaldır',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await slackService.signOut();
+                        setSlackAuth(slackService.getAuthState());
                     }
                 }
             ]
@@ -1300,6 +1338,24 @@ export default function SettingsScreen({ navigation }: any) {
                                 <TouchableOpacity style={[styles.googleButton, { backgroundColor: '#2F2F2F' }]} onPress={() => navigation.navigate('OutlookSetup')}>
                                     <Ionicons name="logo-microsoft" size={18} color="#fff" />
                                     <Text style={styles.googleButtonText}>Bağlan</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Slack */}
+                        <View style={{ marginBottom: 12 }}>
+                            <Text style={[styles.sectionHeader, { marginBottom: 8, fontSize: 14 }]}>Slack Hesabı</Text>
+                            {slackAuth.isSignedIn ? (
+                                <TouchableOpacity style={[styles.googleConnected, { backgroundColor: '#F4EDE4', borderColor: '#E0D4C8' }]} onPress={handleSlackSignOut}>
+                                    <View style={styles.googleInfo}>
+                                        <Text style={[styles.googleEmail, { color: '#4A154B' }]}>{slackAuth.workspaceName || 'Slack Workspace'}</Text>
+                                        <Text style={[styles.googleSubtext, { color: '#611f69' }]}>Kanallar ve Mesajlar</Text>
+                                    </View>
+                                    <Ionicons name="checkmark-circle" size={24} color="#4A154B" />
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity style={[styles.googleButton, { backgroundColor: '#4A154B' }]} onPress={handleSlackSignIn} disabled={isSlackLoading}>
+                                    {isSlackLoading ? <ActivityIndicator color="#fff" size="small" /> : <><Ionicons name="logo-slack" size={18} color="#fff" /><Text style={styles.googleButtonText}>Bağlan</Text></>}
                                 </TouchableOpacity>
                             )}
                         </View>
