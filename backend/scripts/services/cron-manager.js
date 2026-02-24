@@ -243,6 +243,7 @@ class CronManager {
                     'browser_scrape',
                     'whatsapp_send',
                     'speak_text',
+                    'file_write',
                     'webhook_trigger',
                 ]);
 
@@ -281,6 +282,38 @@ class CronManager {
                                 language: args.language || 'tr-TR',
                                 note: 'speak_text is not available on backend cron runner',
                             };
+
+                        case 'file_write': {
+                            const EXPORT_DIR = path.join(DATA_DIR, 'cron-exports');
+                            fs.mkdirSync(EXPORT_DIR, { recursive: true });
+
+                            const requestedFileName = String(args.filename || 'cron-output.log').trim() || 'cron-output.log';
+                            // Prevent path traversal and keep writes inside .data/cron-exports
+                            const safeFileName = path.basename(requestedFileName).replace(/[<>:\"/\\\\|?*]+/g, '_');
+                            const targetPath = path.join(EXPORT_DIR, safeFileName);
+                            const append = !!args.append;
+
+                            let content = args.content;
+                            if (content === undefined || content === null) {
+                                content = '';
+                            } else if (typeof content !== 'string') {
+                                content = JSON.stringify(content, null, 2);
+                            }
+
+                            if (append) {
+                                fs.appendFileSync(targetPath, content, 'utf8');
+                            } else {
+                                fs.writeFileSync(targetPath, content, 'utf8');
+                            }
+
+                            return {
+                                success: true,
+                                filePath: targetPath,
+                                fileName: safeFileName,
+                                append,
+                                bytes: Buffer.byteLength(content, 'utf8'),
+                            };
+                        }
 
                         case 'webhook_trigger':
                             return { triggered: true, payload: args || {} };
@@ -370,6 +403,11 @@ class CronManager {
                             if (val !== undefined) {
                                 return typeof val === 'object' ? JSON.stringify(val) : String(val);
                             }
+                            // Fallback: allow backend automations to reference environment variables
+                            // e.g. {{GOOGLE_ACCESS_TOKEN}}, {{MICROSOFT_ACCESS_TOKEN}}
+                            if (!varName.includes('.') && process.env[varName] !== undefined) {
+                                return String(process.env[varName]);
+                            }
                             return match;
                         });
                     } else if (Array.isArray(obj)) {
@@ -393,6 +431,10 @@ class CronManager {
                         const localResult = await executeLocalMultiStep(step.tool, resolvedArgs);
                         stepResult = { result: localResult };
                     } else {
+                        const mcpArguments = { ...(resolvedArgs || {}) };
+                        // Local orchestration-only metadata should not be forwarded to MCP tools
+                        delete mcpArguments.variableName;
+
                         const stepResp = await fetchMulti(`${BASE_URL}/api/mcp`, {
                             method: 'POST',
                             headers: {
@@ -402,7 +444,7 @@ class CronManager {
                             body: JSON.stringify({
                                 action: 'call_tool',
                                 toolName: step.tool,
-                                arguments: resolvedArgs,
+                                arguments: mcpArguments,
                             }),
                         });
 

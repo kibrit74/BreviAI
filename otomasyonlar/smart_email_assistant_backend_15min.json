@@ -1,0 +1,110 @@
+﻿{
+    "id":  "smart-email-assistant-backend-15min",
+    "name":  "AkÄ±llÄ± E-posta AsistanÄ± (Backend 15dk, MCP + Agent)",
+    "description":  "Bir kez Ã§alÄ±ÅŸtÄ±rÄ±ldÄ±ÄŸÄ±nda backend Ã¼zerinde her 15 dakikada bir Ã§alÄ±ÅŸan gÃ¶rev oluÅŸturur. MCP ile Gmail/Outlook okunmamÄ±ÅŸ mailleri okur, agent ile Ã¶zetler ve WhatsApp bildirimi gÃ¶nderir.",
+    "icon":  "server",
+    "color":  "#0284C7",
+    "tags":  [
+                 "scheduled",
+                 "backend",
+                 "mcp",
+                 "agent",
+                 "gmail",
+                 "outlook",
+                 "email"
+             ],
+    "mcp":  {
+                "enabled":  true,
+                "mode":  "hybrid",
+                "tools":  [
+                              "breviai.google.gmail_read",
+                              "breviai.microsoft.outlook_read"
+                          ]
+            },
+    "nodes":  [
+                  {
+                      "id":  "1",
+                      "type":  "MANUAL_TRIGGER",
+                      "label":  "Kurulumu BaÅŸlat",
+                      "config":  {
+
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  100
+                                   }
+                  },
+                  {
+                      "id":  "2",
+                      "type":  "TEXT_INPUT",
+                      "label":  "WhatsApp Numara",
+                      "config":  {
+                                     "prompt":  "Ã–zetlerin gÃ¶nderileceÄŸi WhatsApp numarasÄ±nÄ± girin (Ã¶rn: 905551234567)",
+                                     "placeholder":  "905551234567",
+                                     "defaultValue":  "",
+                                     "variableName":  "hedefNumara"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  250
+                                   }
+                  },
+                  {
+                      "id":  "3",
+                      "type":  "CRON_CREATE",
+                      "label":  "Backend 15dk GÃ¶revi OluÅŸtur",
+                      "config":  {
+                                     "name":  "Smart Email Assistant 15dk ({{hedefNumara}})",
+                                     "schedule":  "*/15 * * * *",
+                                     "actionType":  "multi_mcp",
+                                     "actionPayload":  "{\"steps\":[{\"id\":\"step-gmail-unread\",\"name\":\"Gmail OkunmamÄ±ÅŸlarÄ± Oku (MCP)\",\"tool\":\"breviai.google.gmail_read\",\"nodeType\":\"GMAIL_READ\",\"args\":{\"accessToken\":\"{{GOOGLE_ACCESS_TOKEN}}\",\"searchQuery\":\"is:unread\",\"maxResults\":10,\"variableName\":\"gmail_unread\"}},{\"id\":\"step-outlook-unread\",\"name\":\"Outlook OkunmamÄ±ÅŸlarÄ± Oku (MCP)\",\"tool\":\"breviai.microsoft.outlook_read\",\"nodeType\":\"OUTLOOK_READ\",\"args\":{\"accessToken\":\"{{MICROSOFT_ACCESS_TOKEN}}\",\"filter\":\"isRead eq false\",\"maxResults\":10,\"variableName\":\"outlook_unread\"}},{\"id\":\"step-agent-digest\",\"name\":\"E-posta Ã–zeti ve Cevap Ã–nerileri (Agent)\",\"tool\":\"agent_ai\",\"nodeType\":\"AGENT_AI\",\"args\":{\"provider\":\"gemini\",\"model\":\"gemini-2.5-flash\",\"temperature\":0.2,\"maxTokens\":3500,\"variableName\":\"email_digest\",\"outputFormat\":\"json\",\"prompt\":\"Sen profesyonel bir e-posta asistanÄ±sÄ±n.\\n\\nAÅŸaÄŸÄ±daki iki kaynaktan gelen okunmamÄ±ÅŸ e-postalarÄ± analiz et:\\n- Gmail (MCP): {{gmail_unread}}\\n- Outlook (MCP): {{outlook_unread}}\\n\\nGÃ¶revler:\\n1) Gmail + Outlook verisini birleÅŸtir.\\n2) VIP/Ã¶nemli mailleri tespit et.\\n   VIP ipuÃ§larÄ±: yavuz.obuz, patron, muhasebe, ceo, cfo, cto (gÃ¶nderen adÄ±nda veya e-postasÄ±nda geÃ§ebilir)\\n3) Acil mailleri tespit et (ACÄ°L, URGENT, Ã–NEMLÄ°, deadline, toplantÄ±, Ã¶deme vb.)\\n4) En fazla 3 Ã¶nemli mail iÃ§in kÄ±sa cevap Ã¶nerisi Ã¼ret (hÄ±zlÄ± + detaylÄ±)\\n5) WhatsApp iÃ§in kÄ±sa ve okunabilir bir Ã¶zet hazÄ±rla.\\n\\nKurallar:\\n- Uydurma yapma, sadece verilen e-posta verisini kullan.\\n- TÃ¼rkÃ§e yaz.\\n- Ã‡ok uzun yazma.\\n- Sadece JSON dÃ¶ndÃ¼r.\\n\\nJSON formatÄ±:\\n{\\n  \\\"summary\\\": \\\"Toplam X mail: Y VIP, Z acil\\\",\\n  \\\"gmailCount\\\": 0,\\n  \\\"outlookCount\\\": 0,\\n  \\\"vipCount\\\": 0,\\n  \\\"urgentCount\\\": 0,\\n  \\\"topEmails\\\": [\\n    {\\n      \\\"source\\\": \\\"gmail|outlook\\\",\\n      \\\"from\\\": \\\"...\\\",\\n      \\\"subject\\\": \\\"...\\\",\\n      \\\"reason\\\": \\\"vip|urgent|finance|meeting\\\"\\n    }\\n  ],\\n  \\\"replyDrafts\\\": [\\n    {\\n      \\\"from\\\": \\\"...\\\",\\n      \\\"subject\\\": \\\"...\\\",\\n      \\\"quickReply\\\": \\\"...\\\",\\n      \\\"detailedReply\\\": \\\"...\\\"\\n    }\\n  ],\\n  \\\"whatsapp_message\\\": \\\"ğŸ“§ KÄ±sa Ã¶zet + Ã¶nemli mailler + kÄ±sa aksiyon Ã¶nerisi\\\"\\n}\"}},{\"id\":\"step-save-reply-drafts\",\"name\":\"Cevap Taslaklarını Dosyaya Kaydet\",\"tool\":\"file_write\",\"nodeType\":\"FILE_WRITE\",\"args\":{\"filename\":\"smart_email_reply_drafts.log\",\"append\":true,\"variableName\":\"reply_drafts_file\",\"content\":\"=== {{_date}} {{_time}} ===\\nÖZET: {{email_digest.summary}}\\nVIP: {{email_digest.vipCount}} | ACİL: {{email_digest.urgentCount}}\\n\\nREPLY_DRAFTS:\\n{{email_digest.replyDrafts}}\\n\\nHAM_JSON:\\n{{email_digest}}\\n\\n\"}},{\"id\":\"step-whatsapp-notify\",\"name\":\"WhatsApp Ã–zet GÃ¶nder\",\"tool\":\"whatsapp_send\",\"nodeType\":\"WHATSAPP_SEND\",\"args\":{\"phone\":\"{{hedefNumara}}\",\"message\":\"{{email_digest.whatsapp_message}}\"}}],\"metadata\":{\"mode\":\"hybrid_mcp_agent\",\"features\":[\"scheduled\",\"email\",\"gmail\",\"outlook\",\"mcp\",\"agent\",\"whatsapp\",\"file-save\"],\"schedule\":\"*/15 * * * *\"}}"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  400
+                                   }
+                  },
+                  {
+                      "id":  "4",
+                      "type":  "SHOW_TEXT",
+                      "label":  "Kurulum Ã–zeti",
+                      "config":  {
+                                     "title":  "Backend E-posta AsistanÄ± Kuruldu",
+                                     "content":  "Her 15 dakikada bir Ã§alÄ±ÅŸan backend gÃ¶revi oluÅŸturuldu.\n\nHedef WhatsApp: {{hedefNumara}}\nKaynaklar: Gmail (MCP) + Outlook (MCP)\nÄ°ÅŸleme: Agent AI (Gemini)\nBildirim: WhatsApp\nTaslak kayıt dosyası: .data/cron-exports/smart_email_reply_drafts.log"
+                                 },
+                      "position":  {
+                                       "x":  100,
+                                       "y":  550
+                                   }
+                  }
+              ],
+    "edges":  [
+                  {
+                      "id":  "e1",
+                      "sourceNodeId":  "1",
+                      "targetNodeId":  "2",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e2",
+                      "sourceNodeId":  "2",
+                      "targetNodeId":  "3",
+                      "sourcePort":  "default"
+                  },
+                  {
+                      "id":  "e3",
+                      "sourceNodeId":  "3",
+                      "targetNodeId":  "4",
+                      "sourcePort":  "default"
+                  }
+              ],
+    "config_guide":  {
+                         "GOOGLE_ACCESS_TOKEN":  "Backend environment variable. Google OAuth token (Gmail read iÃ§in gerekli). Placeholder {{GOOGLE_ACCESS_TOKEN}} backend envden Ã§Ã¶zÃ¼lÃ¼r.",
+                         "MICROSOFT_ACCESS_TOKEN":  "Backend environment variable. Microsoft Graph OAuth token (Outlook read iÃ§in gerekli). Placeholder {{MICROSOFT_ACCESS_TOKEN}} backend envden Ã§Ã¶zÃ¼lÃ¼r.",
+                         "APP_SECRET":  "Backend /api/mcp Ã§aÄŸrÄ±larÄ± iÃ§in APP_SECRET env gerekli.",
+                         "GEMINI_API_KEY":  "Backend local agent_ai adÄ±mÄ± iÃ§in gerekli.",
+                         "WA_DEFAULT_SESSION_ID":  "Backend WhatsApp servisi iÃ§in session ID (veya step args iÃ§ine sessionId eklenebilir).",
+                         "NOTE":  "Bu workflow mobilde sadece kurulumu yapar; asÄ±l Ã§alÄ±ÅŸma backend cron Ã¼zerinde her 15 dakikada bir gerÃ§ekleÅŸir.",
+                         "FILE_OUTPUT":  "Cevap taslakları backend tarafında .data/cron-exports/smart_email_reply_drafts.log dosyasına append edilir."
+                     }
+}

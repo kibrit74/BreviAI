@@ -16,12 +16,17 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
 app.use(cors());
 app.use(express.json());
 
 // Serve static files (public) - Allow access without auth
 app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// 🔌 Slack Agent (must be BEFORE /api proxy — Slack events need direct handling)
+const slackAgent = require('./services/slack-agent');
+app.use('/slack', slackAgent.router);
 
 // Proxy /api requests to Next.js on localhost:3000 (By-passing authMiddleware because Next.js has its own app-secret auth)
 app.use('/api', async (req, res) => {
@@ -57,6 +62,7 @@ function authMiddleware(req, res, next) {
     if (req.path === '/') return next();
     if (req.path === '/whatsapp/qr') return next();
     if (req.path === '/whatsapp/connect/status') return next();
+    if (req.path.startsWith('/slack/')) return next(); // Slack handles its own auth
 
     if (key !== AUTH_KEY) {
         return res.status(401).json({ error: 'Unauthorized access' });
@@ -96,7 +102,8 @@ app.get('/', (req, res) => {
         services: {
             whatsapp: 'active',
             cron: 'pending',
-            browser: 'pending'
+            browser: 'pending',
+            slack: SLACK_BOT_TOKEN ? 'active' : 'no_token'
         }
     });
 });

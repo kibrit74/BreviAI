@@ -2505,6 +2505,16 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         color: '#6366F1',
         hasInputPort: true,
         outputPorts: ['default'],
+    },
+    MCP_TOOL: {
+        type: 'MCP_TOOL',
+        category: 'web',
+        name: 'MCP Araç',
+        description: 'Backend MCP servisini çağırır (Jira, Trello, Asana, vb.)',
+        icon: 'extension',
+        color: '#8B5CF6',
+        hasInputPort: true,
+        outputPorts: ['default'],
     }
 };
 
