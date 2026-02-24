@@ -95,6 +95,7 @@ export type NodeType =
     | 'VOLUME_CONTROL'
     | 'SPEAK_TEXT'
     | 'AUDIO_RECORD'
+    | 'FIND_CALL_RECORDING'
     | 'SPEECH_TO_TEXT'
     // Communication (7)
     | 'SMS_SEND'
@@ -1825,6 +1826,16 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         hasInputPort: true,
         outputPorts: ['default'],
     },
+    FIND_CALL_RECORDING: {
+        type: 'FIND_CALL_RECORDING',
+        category: 'audio',
+        name: 'Arama Kaydi Bul',
+        description: 'Telefondaki arama kaydi dosyasini otomatik bulur',
+        icon: 'call',
+        color: '#10B981',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
     SPEECH_TO_TEXT: {
         type: 'SPEECH_TO_TEXT',
         category: 'audio',
@@ -2565,6 +2576,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'VOLUME_CONTROL': return { level: 50, type: 'media' };
         case 'SPEAK_TEXT': return { text: '' };
         case 'AUDIO_RECORD': return { duration: 10, variableName: 'audioFile' };
+        case 'FIND_CALL_RECORDING': return { variableName: 'callRecording', maxAgeSeconds: 120 };
         case 'SPEECH_TO_TEXT': return { language: 'tr-TR', variableName: 'transcription', continuous: false };
         case 'SMS_SEND': return { phoneNumber: '', message: '' };
         case 'EMAIL_SEND': return { to: '', subject: '', body: '', isAuto: false };

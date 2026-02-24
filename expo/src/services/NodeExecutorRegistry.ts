@@ -183,6 +183,7 @@ import {
 } from './nodes/sensors';
 
 import { executeCameraCapture } from './nodes/camera';
+import { executeFindCallRecording } from './nodes/find_call_recording';
 import { VariableManager as VMClass } from './VariableManager';
 
 // ═══════════════════════════════════════════════════════════════
@@ -236,6 +237,7 @@ const executorRegistry: Partial<Record<NodeType, ExecutorEntry>> = {
     'VOLUME_CONTROL': { executor: executeVolumeControl },
     'SPEAK_TEXT': { executor: executeSpeakText },
     'AUDIO_RECORD': { executor: executeAudioRecord },
+    'FIND_CALL_RECORDING': { executor: executeFindCallRecording },
     'SPEECH_TO_TEXT': { executor: executeSpeechToText },
 
     // Communication

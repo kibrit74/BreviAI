@@ -1,126 +1,155 @@
 {
-    "id": "template_call_recorder_summarizer",
-    "name": "Sihirli Sekreter (Telefon Kaydı & Özet)",
-    "description": "Gelen veya yapılan telefon görüşmelerini kaydeder, metne döker, AI ile özetleyip önemli detayları cihaz hafızasına kaydeder.",
+    "id": "template_smart_call_recorder",
+    "name": "Akıllı Arama Kaydedici",
+    "description": "Arama bittiğinde otomatik olarak kayıt dosyasını bulur, metne çevirir, özetler ve hafızaya kaydeder. Cube ACR veya benzeri bir uygulama ile hoparlörsüz çalışır.",
+    "isActive": true,
     "nodes": [
         {
-            "id": "trigger_call",
+            "id": "trigger_call_end",
             "type": "CALL_TRIGGER",
-            "label": "Görüşme Başladığında",
+            "label": "Arama Bitti",
             "config": {
                 "states": [
-                    "Connected"
+                    "Disconnected"
                 ],
                 "variableName": "callerInfo"
             },
             "position": {
-                "x": 250,
-                "y": 100
+                "x": 100,
+                "y": 50
             }
         },
         {
-            "id": "action_record",
-            "type": "AUDIO_RECORD",
-            "label": "Konuşmayı Kaydet",
+            "id": "delay_wait",
+            "type": "DELAY",
+            "label": "Dosya Yazılmasını Bekle",
             "config": {
-                "duration": 300,
-                "variableName": "callAudio"
+                "duration": 5,
+                "unit": "seconds"
             },
             "position": {
-                "x": 250,
-                "y": 250
+                "x": 100,
+                "y": 180
             }
         },
         {
-            "id": "action_stt",
+            "id": "find_recording",
+            "type": "FIND_CALL_RECORDING",
+            "label": "Kayıt Dosyasını Bul",
+            "config": {
+                "variableName": "callRecording",
+                "maxAgeSeconds": 120
+            },
+            "position": {
+                "x": 100,
+                "y": 310
+            }
+        },
+        {
+            "id": "transcribe",
             "type": "SPEECH_TO_TEXT",
             "label": "Yazıya Dök",
             "config": {
                 "language": "tr",
                 "variableName": "transcription",
-                "silenceTimeout": 3000
+                "continuous": true
             },
             "position": {
-                "x": 250,
-                "y": 400
+                "x": 100,
+                "y": 440
             }
         },
         {
-            "id": "action_ai_summarize",
+            "id": "summarize",
             "type": "AGENT_AI",
-            "label": "Özetle ve Ayıkla",
+            "label": "Özet Çıkar",
             "config": {
-                "provider": "gemini",
                 "model": "gemini-2.5-flash",
-                "prompt": "Şu telefon görüşmesi dökümünü analiz et. Görüşmenin ana konusunu, zikredilen herhangi bir tarihi/saati veya önemli detayları çok kısa maddeler halinde Türkce özetle. Döküm: {{transcription}}",
-                "variableName": "callSummary",
-                "temperature": 0.3
+                "systemPrompt": "Sen bir telefon görüşmesi analiz uzmanısın. Sana bir telefon görüşmesinin dökümü verilecek. Lütfen şunları çıkar:\n\n1. Görüşmenin kısa özeti (2-3 cümle)\n2. Konuşulan önemli konular (madde madde)\n3. Varsa belirtilen tarihler, saatler veya randevular\n4. Varsa karar alınan veya söz verilen işler\n\nÖzeti Türkçe ve profesyonel bir dilde yaz.",
+                "prompt": "Arayan: {{callerInfo}}\nTarih: {{_date}}, Saat: {{_time}}\n\nGörüşme Dökümü:\n{{transcription}}",
+                "variableName": "summary",
+                "maxTokens": 1024
             },
             "position": {
-                "x": 250,
-                "y": 550
+                "x": 100,
+                "y": 570
             }
         },
         {
-            "id": "action_memory",
+            "id": "save_memory",
             "type": "ADD_TO_MEMORY",
             "label": "Hafızaya Kaydet",
             "config": {
-                "text": "{{callerInfo.phoneNumber}} ile yapılan görüşme özeti: {{callSummary}}",
-                "variableName": "memoryResult",
-                "storageType": "auto",
-                "metadata": "{\"date\": \"{{_date}}\", \"time\": \"{{_time}}\", \"type\": \"phone_call\"}"
+                "content": "📞 ARAMA KAYDI - {{_date}} {{_time}}\nArayan: {{callerInfo}}\n\n{{summary}}",
+                "metadata": {
+                    "type": "call_recording",
+                    "caller": "{{callerInfo}}",
+                    "date": "{{_date}}",
+                    "time": "{{_time}}"
+                }
             },
             "position": {
-                "x": 250,
+                "x": 100,
                 "y": 700
             }
         },
         {
-            "id": "action_notify",
+            "id": "notify_user",
             "type": "NOTIFICATION",
-            "label": "Bildirim Gönder",
+            "label": "Bildir",
             "config": {
                 "type": "push",
-                "title": "Görüşme Kaydedildi",
-                "message": "Telefon görüşmesi özetlendi ve hafızaya başarıyla eklendi."
+                "title": "📞 Görüşme Kaydedildi",
+                "message": "{{callerInfo}} ile yapılan görüşme özetlendi ve hafızaya kaydedildi."
             },
             "position": {
-                "x": 250,
-                "y": 850
+                "x": 100,
+                "y": 830
             }
         }
     ],
     "edges": [
         {
-            "id": "e_trigger_record",
-            "source": "trigger_call",
-            "target": "action_record"
+            "id": "e1",
+            "source": "trigger_call_end",
+            "target": "delay_wait",
+            "sourcePort": "default",
+            "targetPort": "input"
         },
         {
-            "id": "e_record_stt",
-            "source": "action_record",
-            "target": "action_stt"
+            "id": "e2",
+            "source": "delay_wait",
+            "target": "find_recording",
+            "sourcePort": "default",
+            "targetPort": "input"
         },
         {
-            "id": "e_stt_ai",
-            "source": "action_stt",
-            "target": "action_ai_summarize"
+            "id": "e3",
+            "source": "find_recording",
+            "target": "transcribe",
+            "sourcePort": "default",
+            "targetPort": "input"
         },
         {
-            "id": "e_ai_memory",
-            "source": "action_ai_summarize",
-            "target": "action_memory"
+            "id": "e4",
+            "source": "transcribe",
+            "target": "summarize",
+            "sourcePort": "default",
+            "targetPort": "input"
         },
         {
-            "id": "e_memory_notify",
-            "source": "action_memory",
-            "target": "action_notify"
+            "id": "e5",
+            "source": "summarize",
+            "target": "save_memory",
+            "sourcePort": "default",
+            "targetPort": "input"
+        },
+        {
+            "id": "e6",
+            "source": "save_memory",
+            "target": "notify_user",
+            "sourcePort": "default",
+            "targetPort": "input"
         }
-    ],
-    "viewport": {
-        "x": 0,
-        "y": 0,
-        "zoom": 1
-    }
+    ]
 }
