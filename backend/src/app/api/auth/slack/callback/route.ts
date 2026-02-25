@@ -1,5 +1,51 @@
 import { NextResponse } from 'next/server';
 
+function normalizeBaseUrl(value?: string | null): string | null {
+    const v = value?.trim();
+    if (!v) return null;
+    return v.replace(/\/+$/, '');
+}
+
+function resolveRequestOrigin(request: Request): string {
+    const url = new URL(request.url);
+    const xfHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    const xfProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    if (xfHost) {
+        return `${xfProto || url.protocol.replace(':', '')}://${xfHost}`;
+    }
+    return url.origin;
+}
+
+function parseMobileRedirectUri(state: string | null): string {
+    const fallback = 'brevi-ai://oauth';
+    if (!state) return fallback;
+
+    try {
+        const decodedState = Buffer.from(state, 'base64url').toString('utf8');
+        const parsed = JSON.parse(decodedState) as { redirectUri?: unknown };
+        if (typeof parsed.redirectUri === 'string' && parsed.redirectUri) {
+            return parsed.redirectUri;
+        }
+    } catch {
+        // Legacy state format fallback below.
+    }
+
+    try {
+        const decoded = decodeURIComponent(state);
+        if (/^[a-z][a-z0-9+.-]*:\/\//i.test(decoded)) {
+            return decoded;
+        }
+    } catch {
+        // ignore
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(state)) {
+        return state;
+    }
+
+    return fallback;
+}
+
 function escapeHtml(value: string): string {
     return value
         .replace(/&/g, '&amp;')
@@ -63,7 +109,7 @@ export async function GET(request: Request) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
-    const mobileRedirectUri = state ? decodeURIComponent(state) : 'brevi-ai://oauth';
+    const mobileRedirectUri = parseMobileRedirectUri(state);
 
     console.log('[Slack Auth Callback] Code received:', !!code);
     console.log('[Slack Auth Callback] Mobile Redirect:', mobileRedirectUri);
@@ -75,12 +121,20 @@ export async function GET(request: Request) {
 
     const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
     const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
-    const BACKEND_URL = process.env.BACKEND_URL || 'https://breviai.vercel.app';
-    const CALLBACK_URL = `${BACKEND_URL}/api/auth/slack/callback`;
+    const requestOrigin = resolveRequestOrigin(request);
+    const configuredBackendUrl = normalizeBaseUrl(process.env.BACKEND_URL);
+    const CALLBACK_URL = `${requestOrigin}/api/auth/slack/callback`;
 
     if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
         console.error('[Slack Auth Callback] Missing SLACK_CLIENT_ID or SLACK_CLIENT_SECRET');
         return redirectToClient(`${mobileRedirectUri}?error=server_configuration_error`);
+    }
+
+    if (configuredBackendUrl && configuredBackendUrl !== requestOrigin) {
+        console.warn('[Slack Auth Callback] BACKEND_URL mismatch. Using request origin for callback.', {
+            configuredBackendUrl,
+            requestOrigin,
+        });
     }
 
     try {
