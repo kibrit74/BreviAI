@@ -26,6 +26,7 @@ const WIDGET_STORAGE_KEY = '@breviai_widget_preferences';
 
 type NativeWidgetManager = {
   updateWidget?: (widgetId: string, configJson?: string) => Promise<void> | void;
+  deleteWidgetConfig?: (widgetId: string) => Promise<void> | void;
   openBreviAI?: (payload: any) => Promise<void> | void;
   executeWidgetWorkflow?: (shortcutId: string) => Promise<boolean> | boolean;
   executeSystemAction?: (action: any) => Promise<void> | void;
@@ -150,10 +151,6 @@ export class WidgetService {
       }
 
       await this.saveWidgetConfig(configToSave);
-
-      if (request.forceUpdate && this.nativeWidgetManager?.updateWidget) {
-        await this.updateNativeWidget(request.widgetId);
-      }
     } catch (error) {
       if (error instanceof WidgetError) throw error;
 
@@ -253,19 +250,49 @@ export class WidgetService {
   async deleteWidgetConfig(widgetId: string): Promise<void> {
     try {
       const preferences = await this.getWidgetPreferences();
+      const hadConfig = !!preferences.widgets[widgetId];
       const { [widgetId]: removed, ...remainingWidgets } = preferences.widgets;
+      if (!hadConfig) {
+        return;
+      }
+
+      const remainingIds = Object.keys(remainingWidgets);
+      const wasDefault = preferences.defaultWidgetId === widgetId;
 
       const updatedPreferences: WidgetPreferences = {
         ...preferences,
         widgets: remainingWidgets
       };
 
-      if (preferences.defaultWidgetId === widgetId) {
+      if (wasDefault) {
+        const nextDefaultId = remainingIds[0];
+        if (nextDefaultId) {
+          updatedPreferences.defaultWidgetId = nextDefaultId;
+        } else {
+          delete updatedPreferences.defaultWidgetId;
+        }
+      } else if (!updatedPreferences.defaultWidgetId || !remainingWidgets[updatedPreferences.defaultWidgetId]) {
         delete updatedPreferences.defaultWidgetId;
       }
 
       await AsyncStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(updatedPreferences));
+
+      await this.clearNativeWidgetConfig(widgetId);
+
+      if (!wasDefault && !updatedPreferences.defaultWidgetId && preferences.defaultWidgetId) {
+        await this.clearNativeWidgetConfig('default_widget');
+      }
+
+      if (wasDefault) {
+        if (updatedPreferences.defaultWidgetId) {
+          await this.syncDefaultWidgetAlias(updatedPreferences);
+        } else {
+          await this.clearNativeWidgetConfig('default_widget');
+        }
+      }
     } catch (error) {
+      if (error instanceof WidgetError) throw error;
+
       throw new WidgetError(
         `Failed to delete widget ${widgetId}`,
         WIDGET_ERROR_CODES.STORAGE_ERROR,
@@ -277,9 +304,18 @@ export class WidgetService {
   async setDefaultWidget(widgetId: string): Promise<void> {
     try {
       const preferences = await this.getWidgetPreferences();
+      if (!preferences.widgets[widgetId]) {
+        throw new WidgetError(
+          `Widget ${widgetId} not found`,
+          WIDGET_ERROR_CODES.CONFIG_NOT_FOUND
+        );
+      }
       preferences.defaultWidgetId = widgetId;
       await AsyncStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(preferences));
+      await this.syncDefaultWidgetAlias(preferences);
     } catch (error) {
+      if (error instanceof WidgetError) throw error;
+
       throw new WidgetError(
         'Failed to set default widget',
         WIDGET_ERROR_CODES.STORAGE_ERROR,
@@ -308,8 +344,16 @@ export class WidgetService {
       }
 
       await AsyncStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(preferences));
-      await this.syncToNativeWidget(normalizedConfig, preferences.defaultWidgetId);
+      await this.syncToNativeWidget(normalizedConfig);
+      if (
+        preferences.defaultWidgetId === normalizedConfig.id &&
+        normalizedConfig.id !== 'default_widget'
+      ) {
+        await this.syncDefaultWidgetAlias(preferences, normalizedConfig);
+      }
     } catch (error) {
+      if (error instanceof WidgetError) throw error;
+
       throw new WidgetError(
         'Failed to save widget configuration',
         WIDGET_ERROR_CODES.STORAGE_ERROR,
@@ -318,20 +362,67 @@ export class WidgetService {
     }
   }
 
-  private async syncToNativeWidget(config: WidgetConfig, defaultWidgetId?: string): Promise<void> {
-    try {
-      if (this.nativeWidgetManager?.updateWidget) {
-        await this.nativeWidgetManager.updateWidget(config.id, JSON.stringify(config));
-      }
+  private async syncToNativeWidget(config: WidgetConfig): Promise<void> {
+    if (!this.nativeWidgetManager?.updateWidget) {
+      return;
+    }
 
-      if (
-        this.nativeWidgetManager?.updateWidget &&
-        (config.id === 'default_widget' || defaultWidgetId === config.id)
-      ) {
-        await this.nativeWidgetManager.updateWidget('default_widget', JSON.stringify(config));
-      }
+    try {
+      await this.nativeWidgetManager.updateWidget(config.id, JSON.stringify(config));
     } catch (error) {
-      console.warn('[WidgetService] Native sync failed:', error);
+      throw new WidgetError(
+        `Failed to sync widget ${config.id} to native storage`,
+        WIDGET_ERROR_CODES.NATIVE_BRIDGE_ERROR,
+        error
+      );
+    }
+  }
+
+  private async syncDefaultWidgetAlias(
+    preferences: WidgetPreferences,
+    knownDefaultConfig?: WidgetConfig
+  ): Promise<void> {
+    const defaultWidgetId = preferences.defaultWidgetId;
+    if (!defaultWidgetId || !this.nativeWidgetManager?.updateWidget) {
+      return;
+    }
+
+    const defaultConfig =
+      knownDefaultConfig?.id === defaultWidgetId
+        ? knownDefaultConfig
+        : preferences.widgets[defaultWidgetId];
+
+    if (!defaultConfig) {
+      throw new WidgetError(
+        `Default widget ${defaultWidgetId} not found`,
+        WIDGET_ERROR_CODES.CONFIG_NOT_FOUND
+      );
+    }
+
+    try {
+      await this.nativeWidgetManager.updateWidget('default_widget', JSON.stringify(defaultConfig));
+    } catch (error) {
+      throw new WidgetError(
+        'Failed to sync default widget alias to native storage',
+        WIDGET_ERROR_CODES.NATIVE_BRIDGE_ERROR,
+        error
+      );
+    }
+  }
+
+  private async clearNativeWidgetConfig(widgetId: string): Promise<void> {
+    if (!this.nativeWidgetManager?.deleteWidgetConfig) {
+      return;
+    }
+
+    try {
+      await this.nativeWidgetManager.deleteWidgetConfig(widgetId);
+    } catch (error) {
+      throw new WidgetError(
+        `Failed to delete native widget config ${widgetId}`,
+        WIDGET_ERROR_CODES.NATIVE_BRIDGE_ERROR,
+        error
+      );
     }
   }
 
@@ -402,18 +493,6 @@ export class WidgetService {
         success: false,
         error: `Failed to execute custom action: ${error?.message || String(error)}`
       };
-    }
-  }
-
-  private async updateNativeWidget(widgetId: string): Promise<void> {
-    if (!this.nativeWidgetManager?.updateWidget) {
-      console.warn('Native widget update not available');
-      return;
-    }
-
-    const config = await this.getWidgetConfig(widgetId);
-    if (config) {
-      await this.nativeWidgetManager.updateWidget(widgetId, JSON.stringify(config));
     }
   }
 

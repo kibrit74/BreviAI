@@ -586,7 +586,15 @@ class BreviSettingsModule : Module() {
         val context = appContext.reactContext
             ?: throw Exception("React context is not available")
         val prefs = context.getSharedPreferences("WidgetConfigs", Context.MODE_PRIVATE)
-        return@AsyncFunction prefs.getString(widgetId, null)
+        val rawValue = prefs.getString(widgetId, null) ?: return@AsyncFunction null
+
+        val decodedValue = try {
+            String(android.util.Base64.decode(rawValue, android.util.Base64.DEFAULT))
+        } catch (_: IllegalArgumentException) {
+            rawValue
+        }
+
+        return@AsyncFunction decodedValue
     }
 
     AsyncFunction("saveWidgetConfig") { widgetId: String, config: Map<String, Any?> ->
@@ -598,6 +606,26 @@ class BreviSettingsModule : Module() {
             android.util.Base64.DEFAULT
         )
         prefs.edit().putString(widgetId, configJson).apply()
+        return@AsyncFunction true
+    }
+
+    AsyncFunction("deleteWidgetConfig") { widgetId: String ->
+        val context = appContext.reactContext
+            ?: throw Exception("React context is not available")
+
+        val prefs = context.getSharedPreferences("WidgetConfigs", Context.MODE_PRIVATE)
+        prefs.edit().remove(widgetId).apply()
+
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val componentName = android.content.ComponentName(context, "com.breviai.app.ShortcutWidgetProvider")
+        val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+
+        val intent = Intent().setClassName(context, "com.breviai.app.ShortcutWidgetProvider").apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+        }
+        context.sendBroadcast(intent)
+
         return@AsyncFunction true
     }
 

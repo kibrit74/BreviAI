@@ -65,6 +65,7 @@ export default function WidgetConfigScreen({ navigation }: any) {
     const [buttons, setButtons] = useState<WidgetButtonConfig[]>([]);
     const [widgetSize, setWidgetSize] = useState<WidgetSize>('2x3');
     const [widgetName, setWidgetName] = useState('BreviAI Widget');
+    const [widgetAppearance, setWidgetAppearance] = useState({ ...DEFAULT_WIDGET_CONFIG.appearance });
     const [currentWidgetId, setCurrentWidgetId] = useState(requestedWidgetId || 'default_widget');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -107,12 +108,17 @@ export default function WidgetConfigScreen({ navigation }: any) {
             setCurrentWidgetId(resolvedWidgetId);
             setWidgetName(config?.name || 'BreviAI Widget');
             setWidgetSize(size);
+            setWidgetAppearance({
+                ...DEFAULT_WIDGET_CONFIG.appearance,
+                ...(config?.appearance || {}),
+            });
             setButtons(hydratedButtons);
             setHasChanges(false);
         } catch (error) {
             console.error('Error loading widget config:', error);
             const fallbackSize: WidgetSize = '2x3';
             setWidgetSize(fallbackSize);
+            setWidgetAppearance({ ...DEFAULT_WIDGET_CONFIG.appearance });
             setButtons(createDefaultButtonsForSize(fallbackSize).map((btn) => ({ ...btn, assignedShortcut: null })));
         } finally {
             setLoading(false);
@@ -206,7 +212,7 @@ export default function WidgetConfigScreen({ navigation }: any) {
                 name: widgetName,
                 size: widgetSize,
                 buttons: normalizedButtons,
-                appearance: DEFAULT_WIDGET_CONFIG.appearance,
+                appearance: widgetAppearance,
             };
 
             await widgetService.updateWidgetConfig({

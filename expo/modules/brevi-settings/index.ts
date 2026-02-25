@@ -43,6 +43,7 @@ try {
         executeSystemAction: (action: any) => { console.log('Mock: executeSystemAction', action); return Promise.resolve(); },
         getWidgetConfig: (widgetId: string) => { console.log('Mock: getWidgetConfig', widgetId); return Promise.resolve(null); },
         saveWidgetConfig: (widgetId: string, config: any) => { console.log('Mock: saveWidgetConfig', widgetId, config); return Promise.resolve(); },
+        deleteWidgetConfig: (widgetId: string) => { console.log('Mock: deleteWidgetConfig', widgetId); return Promise.resolve(); },
         fetchEmails: (host: string, port: number, user: string, pass: string, max: number) => {
             console.log('Mock: fetchEmails', user);
             return [{
@@ -226,7 +227,15 @@ export function executeSystemAction(action: any): Promise<void> {
  * @param widgetId Widget ID to retrieve config for
  */
 export function getWidgetConfig(widgetId: string): Promise<any> {
-    return BreviSettings.getWidgetConfig?.(widgetId) ?? Promise.resolve(null);
+    return (async () => {
+        const raw = await (BreviSettings.getWidgetConfig?.(widgetId) ?? Promise.resolve(null));
+        if (typeof raw !== 'string') return raw;
+        try {
+            return JSON.parse(raw);
+        } catch {
+            return raw;
+        }
+    })();
 }
 
 /**
@@ -236,6 +245,14 @@ export function getWidgetConfig(widgetId: string): Promise<any> {
  */
 export function saveWidgetConfig(widgetId: string, config: any): Promise<void> {
     return BreviSettings.saveWidgetConfig?.(widgetId, config) ?? Promise.resolve();
+}
+
+/**
+ * Delete widget configuration from native storage
+ * @param widgetId Widget ID
+ */
+export function deleteWidgetConfig(widgetId: string): Promise<void> {
+    return BreviSettings.deleteWidgetConfig?.(widgetId) ?? Promise.resolve();
 }
 
 
