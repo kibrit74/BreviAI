@@ -1,5 +1,62 @@
 import { NextResponse } from 'next/server';
 
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function redirectToClient(targetUrl: string): NextResponse {
+    if (/^https?:\/\//i.test(targetUrl)) {
+        return NextResponse.redirect(targetUrl);
+    }
+
+    const safeHref = escapeHtml(targetUrl);
+    const jsTarget = JSON.stringify(targetUrl);
+    const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="0;url=${safeHref}" />
+  <title>Returning to BreviAI</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; background:#0b1220; color:#e5eefc; display:flex; min-height:100vh; align-items:center; justify-content:center; margin:0; padding:16px; }
+    .card { width:100%; max-width:420px; background:#101a2c; border:1px solid #24344d; border-radius:16px; padding:20px; }
+    a { display:inline-block; margin-top:12px; background:#2563eb; color:white; text-decoration:none; padding:10px 14px; border-radius:10px; font-weight:600; }
+    p { margin:8px 0; color:#b7c8e6; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="margin:0 0 8px 0;">BreviAI'ye donuluyor...</h2>
+    <p>Eger uygulama otomatik acilmazsa asagidaki butona dokunun.</p>
+    <a href="${safeHref}">Uygulamaya Don</a>
+  </div>
+  <script>
+    (function () {
+      var url = ${jsTarget};
+      try { window.location.replace(url); } catch (_) {}
+      setTimeout(function () {
+        try { window.location.href = url; } catch (_) {}
+      }, 250);
+    })();
+  </script>
+</body>
+</html>`;
+
+    return new NextResponse(html, {
+        status: 200,
+        headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'cache-control': 'no-store, no-cache, must-revalidate',
+        },
+    });
+}
+
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const code = searchParams.get('code');
@@ -13,7 +70,7 @@ export async function GET(request: Request) {
 
     if (error || !code) {
         console.error('[Slack Auth Callback] Error:', error);
-        return NextResponse.redirect(`${mobileRedirectUri}?error=${error || 'no_code'}`);
+        return redirectToClient(`${mobileRedirectUri}?error=${error || 'no_code'}`);
     }
 
     const SLACK_CLIENT_ID = process.env.SLACK_CLIENT_ID;
@@ -23,7 +80,7 @@ export async function GET(request: Request) {
 
     if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
         console.error('[Slack Auth Callback] Missing SLACK_CLIENT_ID or SLACK_CLIENT_SECRET');
-        return NextResponse.redirect(`${mobileRedirectUri}?error=server_configuration_error`);
+        return redirectToClient(`${mobileRedirectUri}?error=server_configuration_error`);
     }
 
     try {
@@ -43,7 +100,7 @@ export async function GET(request: Request) {
 
         if (!data.ok) {
             console.error('[Slack Auth Callback] Token exchange failed:', data);
-            return NextResponse.redirect(`${mobileRedirectUri}?error=${encodeURIComponent(data.error || 'token_failed')}`);
+            return redirectToClient(`${mobileRedirectUri}?error=${encodeURIComponent(data.error || 'token_failed')}`);
         }
 
         console.log('[Slack Auth Callback] Tokens received successfully');
@@ -61,9 +118,9 @@ export async function GET(request: Request) {
             `&workspace_id=${encodeURIComponent(workspaceId)}` +
             `&workspace_name=${encodeURIComponent(workspaceName)}`;
 
-        return NextResponse.redirect(deepLink);
+        return redirectToClient(deepLink);
     } catch (err) {
         console.error('[Slack Auth Callback] Exception:', err);
-        return NextResponse.redirect(`${mobileRedirectUri}?error=server_error`);
+        return redirectToClient(`${mobileRedirectUri}?error=server_error`);
     }
 }

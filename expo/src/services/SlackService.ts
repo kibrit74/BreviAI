@@ -4,6 +4,7 @@
  */
 
 import * as AuthSession from 'expo-auth-session';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -127,6 +128,7 @@ class SlackService {
                 scheme: 'brevi-ai',
                 path: 'oauth',
             });
+            const redirectUriPrefix = redirectUri.split('?')[0];
 
             // Determine Backend URL (default to production; allow explicit override)
             const configuredBackendUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -151,17 +153,46 @@ class SlackService {
             console.log('[SlackService] Full Auth URL:', authUrl);
             console.log('[SlackService] Callback URI:', redirectUri);
 
+            let capturedRedirectUrl: string | null = null;
+            const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
+                if (typeof url === 'string' && url.startsWith(redirectUriPrefix)) {
+                    capturedRedirectUrl = url;
+                    console.log('[SlackService] Captured OAuth deep link:', url);
+                }
+            });
+
             // Open browser to backend auth start
-            const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+            let result: WebBrowser.WebBrowserAuthSessionResult;
+            try {
+                result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+            } finally {
+                linkingSubscription.remove();
+            }
 
             console.log('[SlackService] Auth result type:', result.type);
 
+            let callbackUrl: string | null = null;
             if (result.type === 'success' && result.url) {
-                console.log('[SlackService] Success URL:', result.url);
+                callbackUrl = result.url;
+            } else if (result.type === 'dismiss') {
+                await new Promise(resolve => setTimeout(resolve, 600));
+                if (capturedRedirectUrl) {
+                    callbackUrl = capturedRedirectUrl;
+                } else {
+                    const initialUrl = await Linking.getInitialURL();
+                    if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
+                        callbackUrl = initialUrl;
+                        console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
+                    }
+                }
+            }
+
+            if (callbackUrl) {
+                console.log('[SlackService] Success URL:', callbackUrl);
 
                 // Parse tokens from deep link query params
                 // Format: brevi-ai://oauth?slack_token=...&workspace_name=...
-                const urlObj = new URL(result.url);
+                const urlObj = new URL(callbackUrl);
                 const queryParams = new URLSearchParams(urlObj.search);
 
                 const slackToken = queryParams.get('slack_token');
@@ -171,7 +202,7 @@ class SlackService {
 
                 if (error) {
                     console.error('[SlackService] OAuth error from backend:', error);
-                    throw new Error(`OAuth hatası: ${error}`);
+                    throw new Error(`OAuth hatasi: ${error}`);
                 }
 
                 if (slackToken) {
@@ -185,11 +216,13 @@ class SlackService {
                     return this.getAuthState();
                 }
 
-                throw new Error('Token alınamadı');
+                throw new Error('Token alinamadi');
             } else if (result.type === 'cancel') {
-                throw new Error('Giriş iptal edildi');
+                throw new Error('Giris iptal edildi');
+            } else if (result.type === 'dismiss') {
+                throw new Error('OAuth ekrani kapandi (callback alinamadi)');
             } else {
-                throw new Error('OAuth başarısız oldu');
+                throw new Error('OAuth basarisiz oldu');
             }
         } catch (error) {
             console.error('[SlackService] Sign in error:', error);
