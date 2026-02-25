@@ -506,6 +506,12 @@ export interface AudioRecordConfig {
     variableName: string;
 }
 
+export interface FindCallRecordingConfig {
+    variableName: string;
+    customPath?: string;
+    maxAgeSeconds?: number;
+}
+
 export interface SpeechToTextConfig {
     language?: string;
     variableName: string;
@@ -1043,6 +1049,7 @@ export type NodeConfig =
     | VolumeControlConfig
     | SpeakTextConfig
     | AudioRecordConfig
+    | FindCallRecordingConfig
     | SpeechToTextConfig
     | SmsSendConfig
     | EmailSendConfig

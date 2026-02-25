@@ -12,6 +12,7 @@ export { executeCalendarRead, executeCalendarCreate, executeCalendarUpdate, exec
 export { executeContactsRead, executeContactsWrite } from './contacts';
 export { executeLocationGet, executeBatteryCheck, executeNetworkCheck, executeGeofenceCreate, executeWeatherGet } from './state';
 export { executeVolumeControl, executeSpeakText, executeAudioRecord } from './audio';
+export { executeFindCallRecording } from './find_call_recording';
 export { executeSmsSend, executeEmailSend, executeWhatsAppSend } from './communication';
 export { executeHttpRequest, executeOpenUrl, executeRssRead, executeWebAutomation, executeWebSearch } from './web';
 export { executeFileWrite, executeFileRead, executeFilePick, executeViewUdf, executeViewDocument } from './files';

@@ -11,6 +11,7 @@ import { microsoftService, MicrosoftAuthState } from '../services/MicrosoftServi
 import { slackService, SlackAuthState } from '../services/SlackService';
 import { backgroundService } from '../services/BackgroundService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const WHATSAPP_SESSION_STORAGE_KEY = 'whatsapp_session_id';
 const WHATSAPP_CONNECT_USER_STORAGE_KEY = 'whatsapp_connect_user_id';
@@ -133,6 +134,29 @@ export default function SettingsScreen({ navigation }: any) {
     // Slack account state
     const [slackAuth, setSlackAuth] = React.useState<SlackAuthState>(slackService.getAuthState());
     const [isSlackLoading, setIsSlackLoading] = React.useState(false);
+
+    // Call Recording State
+    const [cubeAcrSafUri, setCubeAcrSafUri] = React.useState('');
+    React.useEffect(() => {
+        AsyncStorage.getItem('cube_acr_saf_uri').then(v => {
+            if (v) setCubeAcrSafUri(v);
+        });
+    }, []);
+
+    const handlePickCubeAcrFolder = async () => {
+        try {
+            const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+            if (permissions.granted) {
+                await AsyncStorage.setItem('cube_acr_saf_uri', permissions.directoryUri);
+                setCubeAcrSafUri(permissions.directoryUri);
+                Alert.alert('Başarılı', 'Cube ACR klasörü başarıyla seçildi.');
+            } else {
+                Alert.alert('İzin Reddedildi', 'Klasör seçimi iptal edildi.');
+            }
+        } catch (e: any) {
+            Alert.alert('Hata', 'Klasör seçilirken bir hata oluştu: ' + e.message);
+        }
+    };
 
 
     // WhatsApp State
@@ -925,6 +949,21 @@ export default function SettingsScreen({ navigation }: any) {
                                 thumbColor={'#ffffff'}
                             />
                         </View>
+                        <TouchableOpacity
+                            style={styles.item}
+                            onPress={handlePickCubeAcrFolder}
+                        >
+                            <View style={styles.itemLeft}>
+                                <Ionicons name="folder-open-outline" size={22} color="#6366F1" style={styles.itemIcon} />
+                                <View>
+                                    <Text style={styles.itemLabel}>Cube ACR Klasörünü Seç</Text>
+                                    <Text style={{ fontSize: 11, color: activeColors.textSecondary, marginTop: 2 }} numberOfLines={2}>
+                                        {cubeAcrSafUri ? 'Seçildi: ' + decodeURIComponent(cubeAcrSafUri.split('%3A').pop() || '') : 'Android 11+ arama kaydı erişimi için zorunludur'}
+                                    </Text>
+                                </View>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color={activeColors.textSecondary} />
+                        </TouchableOpacity>
                     </>
                 ))}
 

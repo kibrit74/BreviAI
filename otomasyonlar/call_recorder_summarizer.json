@@ -24,7 +24,7 @@
             "type": "DELAY",
             "label": "Dosya Yazılmasını Bekle",
             "config": {
-                "duration": 5,
+                "duration": 10,
                 "unit": "seconds"
             },
             "position": {
@@ -38,7 +38,7 @@
             "label": "Kayıt Dosyasını Bul",
             "config": {
                 "variableName": "callRecording",
-                "maxAgeSeconds": 120
+                "maxAgeSeconds": 3600
             },
             "position": {
                 "x": 100,
@@ -52,7 +52,7 @@
             "config": {
                 "language": "tr",
                 "variableName": "transcription",
-                "continuous": true
+                "audioUri": "{{callRecording}}"
             },
             "position": {
                 "x": 100,
@@ -65,7 +65,7 @@
             "label": "Özet Çıkar",
             "config": {
                 "model": "gemini-2.5-flash",
-                "systemPrompt": "Sen bir telefon görüşmesi analiz uzmanısın. Sana bir telefon görüşmesinin dökümü verilecek. Lütfen şunları çıkar:\n\n1. Görüşmenin kısa özeti (2-3 cümle)\n2. Konuşulan önemli konular (madde madde)\n3. Varsa belirtilen tarihler, saatler veya randevular\n4. Varsa karar alınan veya söz verilen işler\n\nÖzeti Türkçe ve profesyonel bir dilde yaz.",
+                "systemPrompt": "Sen bir telefon görüşmesi analiz uzmanısın. Görevin verilen dökümü analiz edip özet çıkarmaktır. ASLA kullanıcıya soru sorma, ASLA JSON formatı kullanma. Sadece düz metin olarak şunları yaz:\n\n1. Görüşmenin kısa özeti (2-3 cümle)\n2. Konuşulan önemli konular (madde madde)\n3. Varsa belirtilen tarihler, saatler veya randevular\n4. Varsa karar alınan veya söz verilen işler\n\nEğer döküm çok kısa veya anlaşılmaz ise, bunu belirt ve eldeki bilgiyle özet çıkar.",
                 "prompt": "Arayan: {{callerInfo}}\nTarih: {{_date}}, Saat: {{_time}}\n\nGörüşme Dökümü:\n{{transcription}}",
                 "variableName": "summary",
                 "maxTokens": 1024
@@ -80,13 +80,8 @@
             "type": "ADD_TO_MEMORY",
             "label": "Hafızaya Kaydet",
             "config": {
-                "content": "📞 ARAMA KAYDI - {{_date}} {{_time}}\nArayan: {{callerInfo}}\n\n{{summary}}",
-                "metadata": {
-                    "type": "call_recording",
-                    "caller": "{{callerInfo}}",
-                    "date": "{{_date}}",
-                    "time": "{{_time}}"
-                }
+                "text": "📞 ARAMA KAYDI - {{_date}} {{_time}}\nArayan: {{callerInfo}}\n\n{{summary}}",
+                "metadata": "{\"type\":\"call_recording\",\"caller\":\"{{callerInfo}}\",\"date\":\"{{_date}}\",\"time\":\"{{_time}}\"}"
             },
             "position": {
                 "x": 100,

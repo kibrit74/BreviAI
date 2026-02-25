@@ -45,7 +45,8 @@
         "android.permission.WAKE_LOCK",
         "android.permission.WRITE_CONTACTS",
         "android.permission.WRITE_SETTINGS",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_EXTERNAL_STORAGE"
       ]
     },
     "plugins": [

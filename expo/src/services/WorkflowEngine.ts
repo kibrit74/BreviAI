@@ -61,6 +61,7 @@ import {
     executeVolumeControl,
     executeSpeakText,
     executeAudioRecord,
+    executeFindCallRecording,
     executeSmsSend,
     executeEmailSend,
     executeWhatsAppSend,
@@ -714,6 +715,9 @@ export class WorkflowEngine {
                     break;
                 case 'AUDIO_RECORD':
                     output = await executeAudioRecord(node.config as any, this.variableManager);
+                    break;
+                case 'FIND_CALL_RECORDING':
+                    output = await executeFindCallRecording(node.config as any, this.variableManager);
                     break;
                 case 'SPEECH_TO_TEXT':
                     output = await executeSpeechToText(node.config as any, this.variableManager);

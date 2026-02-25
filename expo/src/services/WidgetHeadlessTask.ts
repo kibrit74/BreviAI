@@ -19,6 +19,27 @@ interface HeadlessTaskData {
     [key: string]: any; // Allow additional native extras
 }
 
+async function loadWorkflowsForHeadless(): Promise<Workflow[] | null> {
+    const candidateKeys = ['brevi_workflows', 'workflows'];
+
+    for (const key of candidateKeys) {
+        try {
+            const raw = await AsyncStorage.getItem(key);
+            if (!raw) continue;
+
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                console.log(`[WidgetHeadlessTask] Loaded workflows from key: ${key} (count=${parsed.length})`);
+                return parsed as Workflow[];
+            }
+        } catch (e) {
+            console.warn(`[WidgetHeadlessTask] Failed to parse workflows from key ${key}:`, e);
+        }
+    }
+
+    return null;
+}
+
 const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
     console.log('[WidgetHeadlessTask] Starting headless task with data:', data);
 
@@ -30,20 +51,13 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
 
     try {
         // 1. Load workflow from storage (since we don't have hydrated store)
-        // correct key is 'brevi_workflows', NOT 'workflows'
-
-        // Diag: List all keys
-        const allKeys = await AsyncStorage.getAllKeys();
-        console.log('[WidgetHeadlessTask] Available keys in storage:', allKeys);
-
-        const savedWorkflows = await AsyncStorage.getItem('brevi_workflows');
-        if (!savedWorkflows) {
+        const workflows = await loadWorkflowsForHeadless();
+        if (!workflows) {
             console.error('[WidgetHeadlessTask] No workflows found in storage');
             await showNotification('Hata', 'Kaydedilmiş otomasyon bulunamadı');
             return;
         }
 
-        const workflows: Workflow[] = JSON.parse(savedWorkflows);
         const workflow = workflows.find(w => w.id === workflowId);
 
         if (!workflow) {
@@ -64,6 +78,12 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
         if (data._triggerType) {
             initialVariables._triggerType = data._triggerType;
             console.log(`[WidgetHeadlessTask] Using native _triggerType from data: ${data._triggerType}`);
+        }
+        if (data.widgetId) {
+            initialVariables._widgetId = data.widgetId;
+        }
+        if (data.widgetSource) {
+            initialVariables._widgetSource = data.widgetSource;
         }
         if (data._gestureType) {
             initialVariables._gestureType = data._gestureType;

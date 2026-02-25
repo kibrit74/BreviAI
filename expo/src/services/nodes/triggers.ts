@@ -204,6 +204,7 @@ export async function executeCallTrigger(
         variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
         variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
         variableManager.set('triggerMessage', injectedNumber);
+        variableManager.set('callerInfo', injectedNumber); // Added for compatibility with workflow templates
 
         console.log('[CALL_TRIGGER] Triggered by call from:', injectedNumber);
         return {
