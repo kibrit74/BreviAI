@@ -128,15 +128,19 @@ class SlackService {
                 path: 'oauth',
             });
 
-            // Determine Backend URL based on environment
-            let backendBaseUrl = 'https://breviai.vercel.app';
+            // Determine Backend URL (default to production; allow explicit override)
+            const configuredBackendUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+            let backendBaseUrl = configuredBackendUrl
+                ? configuredBackendUrl.replace(/\/$/, '')
+                : 'https://breviai.vercel.app';
 
             if (__DEV__) {
                 // Determine if running on web, emulator or physical device.
                 // In a real expo environment you'd use manifest values, but we'll try a common approach.
                 // You may need to uncomment and set your LAN IP manually if using a physical device during dev.
+                // Do not force 10.0.2.2 here; it breaks OAuth on physical devices / Expo Go.
+                // If you need local backend for testing, set EXPO_PUBLIC_API_BASE_URL or uncomment and set your LAN IP:
                 // backendBaseUrl = 'http://192.168.1.x:3000';
-                backendBaseUrl = 'http://10.0.2.2:3000'; // Default Android emulator localhost
             }
 
             // Backend Auth Start URL
@@ -156,12 +160,12 @@ class SlackService {
                 console.log('[SlackService] Success URL:', result.url);
 
                 // Parse tokens from deep link query params
-                // Format: brevi-ai://oauth?slack_token=...&team_name=...
+                // Format: brevi-ai://oauth?slack_token=...&workspace_name=...
                 const urlObj = new URL(result.url);
                 const queryParams = new URLSearchParams(urlObj.search);
 
                 const slackToken = queryParams.get('slack_token');
-                const workspaceName = queryParams.get('team_name');
+                const workspaceName = queryParams.get('workspace_name') || queryParams.get('team_name');
                 const botUserId = queryParams.get('bot_user_id');
                 const error = queryParams.get('error');
 
