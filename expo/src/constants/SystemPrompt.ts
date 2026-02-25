@@ -175,15 +175,26 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
 **SHEETS_READ** / **SHEETS_WRITE** (Google Sheets)
 - config: {"spreadsheetId": "...", "range": "A1:B10", "variableName": "tablo"}
 
+**SHEETS_CREATE** (Yeni Google E-Tablo Oluştur)
+- config: {"title": "Satış Raporu", "variableName": "yeniTablo"}
+- Dönen değer: {spreadsheetId, spreadsheetUrl, title}
+
+**EXCEL_READ** / **EXCEL_WRITE** (OneDrive Excel)
+- config: {"fileId": "...", "range": "Sheet1!A1:B10", "variableName": "excelVeri"}
+
+**EXCEL_CREATE** (Yeni Excel Dosyası Oluştur - OneDrive)
+- config: {"fileName": "Finans Tablosu", "variableName": "yeniExcel"}
+- Dönen değer: {fileId, webUrl, name}
+
 **NOTION_READ** / **NOTION_CREATE** (Notion)
 **DRIVE_UPLOAD** / **ONEDRIVE_UPLOAD** (Bulut Depolama)
-180: 
-181: **FACEBOOK_LOGIN** (Facebook Giriş)
-182: - config: {"variableName": "fb_token"}
-183: 
-184: **INSTAGRAM_POST** (Instagram Paylaş)
-185: - config: {"imageUrl": "{{resim}}", "caption": "...", "accessTokenVariable": "fb_token"}
-186: - NOT: Yerel dosya (generated image, file pick) veya URL destekler.
+
+**FACEBOOK_LOGIN** (Facebook Giriş)
+- config: {"variableName": "fb_token"}
+
+**INSTAGRAM_POST** (Instagram Paylaş)
+- config: {"imageUrl": "{{resim}}", "caption": "...", "accessTokenVariable": "fb_token"}
+- NOT: Yerel dosya (generated image, file pick) veya URL destekler.
 
 ## 7. AKIŞ KONTROLÜ (MANTIK)
 **IF_ELSE** (Koşul)

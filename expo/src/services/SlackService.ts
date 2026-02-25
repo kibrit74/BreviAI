@@ -7,6 +7,7 @@ import * as AuthSession from 'expo-auth-session';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 // Complete auth session for web browser
 WebBrowser.maybeCompleteAuthSession();
@@ -20,6 +21,9 @@ const STORAGE_KEYS = {
     workspaceName: '@slack_workspace_name', // To display which workspace is connected
     botUserId: '@slack_bot_user_id',
 };
+
+const SLACK_OAUTH_INITIAL_WAIT_MS = 15 * 60 * 1000; // first-time install/onboarding can take a while
+const SLACK_OAUTH_DISMISS_WAIT_MS = 10 * 60 * 1000;
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -129,6 +133,25 @@ class SlackService {
                 path: 'oauth',
             });
             const redirectUriPrefix = redirectUri.split('?')[0];
+            const fallbackRedirectPrefixes = [
+                redirectUriPrefix,
+                redirectUriPrefix.replace('://', ':///'),
+                'brevi-ai:///oauth',
+                'com.breviai.app://oauth',
+                'com.breviai.app:///oauth',
+            ];
+            const isSlackOAuthCallbackUrl = (url: string | null | undefined): url is string => {
+                if (!url || typeof url !== 'string') return false;
+                if (fallbackRedirectPrefixes.some((prefix) => url.startsWith(prefix))) return true;
+                try {
+                    const parsed = Linking.parse(url);
+                    const scheme = (parsed.scheme || '').toLowerCase();
+                    const path = (parsed.path || '').replace(/^\/+/, '');
+                    return (scheme === 'brevi-ai' || scheme === 'com.breviai.app') && path.startsWith('oauth');
+                } catch {
+                    return false;
+                }
+            };
 
             // Determine Backend URL (default to production; allow explicit override)
             const configuredBackendUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
@@ -146,7 +169,7 @@ class SlackService {
             }
 
             // Backend Auth Start URL
-            const authUrl = `${backendBaseUrl}/api/auth/slack/start?redirect_uri=${encodeURIComponent(redirectUri)}`;
+            const authUrl = `${backendBaseUrl}/api/auth/slack/start/?redirect_uri=${encodeURIComponent(redirectUri)}`;
 
             console.log('[SlackService] ===== BACKEND OAUTH START =====');
             console.log('[SlackService] Backend URL:', backendBaseUrl);
@@ -166,7 +189,7 @@ class SlackService {
                 callbackPromiseResolve?.(url);
             };
             const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
-                if (typeof url === 'string' && url.startsWith(redirectUriPrefix)) {
+                if (isSlackOAuthCallbackUrl(url)) {
                     resolveCallbackUrl(url);
                     console.log('[SlackService] Captured OAuth deep link:', url);
                 }
@@ -179,7 +202,7 @@ class SlackService {
 
                 try {
                     const initialUrl = await Linking.getInitialURL();
-                    if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
+                    if (isSlackOAuthCallbackUrl(initialUrl)) {
                         console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
                         resolveCallbackUrl(initialUrl);
                         return initialUrl;
@@ -194,16 +217,24 @@ class SlackService {
                 ]);
             };
 
-            // Open browser to backend auth start (wrapped to avoid unhandled promise if deep link wins first)
-            const authOutcomePromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri)
-                .then((authResult) => ({ kind: 'auth' as const, authResult }))
-                .catch((authError) => ({ kind: 'auth_error' as const, authError }));
+            // Slack mobile often switches to the Slack app (or install flow), which causes
+            // openAuthSessionAsync to dismiss early. Prefer a browser-first flow and rely on
+            // deep-link callback capture via Linking.
+            const browserOutcomePromise = (Platform.OS === 'android'
+                ? Linking.openURL(authUrl)
+                    .then(() => ({ kind: 'external_opened' as const }))
+                    .catch((browserError) => ({ kind: 'browser_error' as const, browserError }))
+                : WebBrowser.openBrowserAsync(authUrl)
+                    .then((browserResult) => ({ kind: 'browser' as const, browserResult }))
+                    .catch((browserError) => ({ kind: 'browser_error' as const, browserError })));
 
-            let result: WebBrowser.WebBrowserAuthSessionResult | null = null;
+            let browserResult: WebBrowser.WebBrowserResult | null = null;
+            let browserResultType: string | null = null;
+            let externalBrowserOpened = false;
             try {
                 const firstOutcome = await Promise.race([
-                    authOutcomePromise,
-                    waitForSlackCallback(120000).then((url) => ({ kind: 'callback' as const, url })),
+                    browserOutcomePromise,
+                    waitForSlackCallback(SLACK_OAUTH_INITIAL_WAIT_MS).then((url) => ({ kind: 'callback' as const, url })),
                 ]);
 
                 let callbackUrl: string | null = null;
@@ -211,34 +242,46 @@ class SlackService {
                 if (firstOutcome.kind === 'callback') {
                     if (firstOutcome.url) {
                         callbackUrl = firstOutcome.url;
-                        console.log('[SlackService] OAuth callback arrived before auth session resolved');
+                        console.log('[SlackService] OAuth callback arrived before browser flow resolved');
                         try {
                             await WebBrowser.dismissBrowser();
                         } catch {
                             // no-op
                         }
                     } else {
-                        const authOutcome = await authOutcomePromise;
-                        if (authOutcome.kind === 'auth_error') {
-                            throw authOutcome.authError;
+                        const browserOutcome = await browserOutcomePromise;
+                        if (browserOutcome.kind === 'browser_error') {
+                            throw browserOutcome.browserError;
                         }
-                        result = authOutcome.authResult;
+                        if (browserOutcome.kind === 'browser') {
+                            browserResult = browserOutcome.browserResult;
+                            browserResultType = browserOutcome.browserResult.type;
+                        } else {
+                            externalBrowserOpened = true;
+                            browserResultType = 'external_opened';
+                        }
                     }
-                } else if (firstOutcome.kind === 'auth_error') {
-                    throw firstOutcome.authError;
+                } else if (firstOutcome.kind === 'browser_error') {
+                    throw firstOutcome.browserError;
+                } else if (firstOutcome.kind === 'browser') {
+                    browserResult = firstOutcome.browserResult;
+                    browserResultType = firstOutcome.browserResult.type;
                 } else {
-                    result = firstOutcome.authResult;
+                    externalBrowserOpened = true;
+                    browserResultType = 'external_opened';
                 }
 
-                if (result) {
-                    console.log('[SlackService] Auth result type:', result.type);
+                if (!callbackUrl && browserResult) {
+                    console.log('[SlackService] Browser result type:', browserResult.type);
 
-                    if (result.type === 'success' && result.url) {
-                        callbackUrl = result.url;
-                    } else if (result.type === 'dismiss') {
-                        console.log('[SlackService] Auth session dismissed; waiting for Slack app callback...');
-                        callbackUrl = await waitForSlackCallback(90000);
-                    }
+                    // `openBrowserAsync` may return before the deep-link callback arrives
+                    // (especially when Slack switches apps or after first-time install/login).
+                    console.log('[SlackService] Waiting for Slack app/browser callback after browser result...');
+                    callbackUrl = await waitForSlackCallback(SLACK_OAUTH_DISMISS_WAIT_MS);
+                }
+                if (!callbackUrl && externalBrowserOpened) {
+                    console.log('[SlackService] Waiting for Slack callback after external browser launch...');
+                    callbackUrl = await waitForSlackCallback(SLACK_OAUTH_DISMISS_WAIT_MS);
                 }
 
                 if (callbackUrl) {
@@ -271,14 +314,14 @@ class SlackService {
                     }
 
                     throw new Error('Token alinamadi');
-                } else if (result?.type === 'cancel') {
+                } else if (browserResultType === 'cancel') {
                     throw new Error('Giris iptal edildi');
-                } else if (result?.type === 'dismiss') {
-                    throw new Error('OAuth ekrani kapandi (callback alinamadi)');
-                } else if (!result) {
+                } else if (externalBrowserOpened) {
+                    throw new Error('OAuth callback alinamadi (Slack uygulama acilisi takilmis olabilir)');
+                } else if (!browserResult) {
                     throw new Error('OAuth callback zaman asimina ugradi');
                 } else {
-                    throw new Error('OAuth basarisiz oldu');
+                    throw new Error('OAuth ekrani kapandi (callback alinamadi)');
                 }
             } finally {
                 linkingSubscription.remove();

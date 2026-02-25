@@ -1,0 +1,17 @@
+# Large local artifacts not needed for Vercel build/deploy
+backend.rar
+*.rar
+
+# Local build/output caches
+backend/.next
+backend/node_modules
+backend/.wwebjs_auth
+backend/logs
+backend/tmp
+backend/temp
+
+# Mobile app workspace is not needed by the backend Vercel project (rootDirectory=backend)
+expo
+
+# Local screenshots / misc assets
+screnresim

@@ -907,6 +907,19 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         permissions: { requiresConfirmation: true, isSensitive: true }
     },
     {
+        name: 'create_sheet',
+        description: 'Creates a new Google Spreadsheet.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                title: { type: 'STRING', description: 'Name/title of the new spreadsheet' }
+            },
+            required: ['title']
+        },
+        nodeType: 'SHEETS_CREATE',
+        permissions: { requiresConfirmation: true, isSensitive: false }
+    },
+    {
         name: 'upload_drive',
         description: 'Uploads a file to Google Drive.',
         parameters: {
@@ -947,6 +960,19 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
             required: ['filePath', 'data']
         },
         nodeType: 'EXCEL_WRITE'
+    },
+    {
+        name: 'create_excel',
+        description: 'Creates a new empty Excel file (.xlsx) in OneDrive root directory.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                fileName: { type: 'STRING', description: 'Name of the new Excel file' }
+            },
+            required: ['fileName']
+        },
+        nodeType: 'EXCEL_CREATE',
+        permissions: { requiresConfirmation: true, isSensitive: false }
     },
     {
         name: 'send_outlook',

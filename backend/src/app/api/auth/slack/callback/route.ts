@@ -104,7 +104,8 @@ function redirectToClient(targetUrl: string): NextResponse {
 }
 
 export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
+    const requestUrl = new URL(request.url);
+    const { searchParams } = requestUrl;
     const code = searchParams.get('code');
     const state = searchParams.get('state');
     const error = searchParams.get('error');
@@ -123,7 +124,10 @@ export async function GET(request: Request) {
     const SLACK_CLIENT_SECRET = process.env.SLACK_CLIENT_SECRET;
     const requestOrigin = resolveRequestOrigin(request);
     const configuredBackendUrl = normalizeBaseUrl(process.env.BACKEND_URL);
-    const CALLBACK_URL = `${requestOrigin}/api/auth/slack/callback`;
+    // Use the exact callback path that Slack hit (including trailing slash if present)
+    // so token exchange redirect_uri matches the authorize redirect_uri precisely.
+    const callbackPath = requestUrl.pathname || '/api/auth/slack/callback/';
+    const CALLBACK_URL = `${requestOrigin}${callbackPath}`;
 
     if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
         console.error('[Slack Auth Callback] Missing SLACK_CLIENT_ID or SLACK_CLIENT_SECRET');

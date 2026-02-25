@@ -360,6 +360,51 @@ class GoogleService {
     // ─────────────────────────────────────────────────────────────
 
     /**
+     * Create a new Google Spreadsheet
+     */
+    async createSheet(
+        title: string
+    ): Promise<{ success: boolean; spreadsheetId?: string; spreadsheetUrl?: string; error?: string }> {
+        try {
+            const token = await this.ensureValidToken();
+
+            const url = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    properties: {
+                        title: title
+                    }
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('[GoogleService] Sheet created successfully:', data.spreadsheetId);
+                return {
+                    success: true,
+                    spreadsheetId: data.spreadsheetId,
+                    spreadsheetUrl: data.spreadsheetUrl
+                };
+            } else {
+                const error = await response.text();
+                return { success: false, error };
+            }
+        } catch (error) {
+            console.error('[GoogleService] Create sheet error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error'
+            };
+        }
+    }
+
+    /**
      * Read data from Google Sheets
      */
     async readSheet(

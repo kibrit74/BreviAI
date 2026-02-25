@@ -24,7 +24,9 @@ export async function GET(request: Request) {
     const requestOrigin = resolveRequestOrigin(request);
     const configuredBackendUrl = normalizeBaseUrl(process.env.BACKEND_URL);
     const callbackBaseUrl = requestOrigin;
-    const CALLBACK_URL = `${callbackBaseUrl}/api/auth/slack/callback`;
+    // backend/next.config.js has `trailingSlash: true`; use the canonical slash path
+    // to avoid an extra 308 that can drop query params in some embedded browsers.
+    const CALLBACK_URL = `${callbackBaseUrl}/api/auth/slack/callback/`;
 
     if (!SLACK_CLIENT_ID) {
         console.error('[Slack Auth] Missing SLACK_CLIENT_ID in env');

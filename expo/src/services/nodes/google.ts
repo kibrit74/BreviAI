@@ -5,6 +5,7 @@ import {
     GmailReadConfig,
     GoogleSheetsReadConfig,
     GoogleSheetsWriteConfig,
+    GoogleSheetsCreateConfig,
     GoogleDriveUploadConfig
 } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
@@ -451,7 +452,164 @@ export async function executeGoogleSheetsRead(
         return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
-export async function executeGoogleSheetsWrite(config: GoogleSheetsWriteConfig, vm: VariableManager) { return { success: true }; }
+
+export async function executeGoogleSheetsWrite(
+    config: GoogleSheetsWriteConfig,
+    vm: VariableManager
+): Promise<any> {
+    const spreadsheetId = vm.resolveString(config.spreadsheetId);
+    const range = vm.resolveString(config.range);
+    const rawValues = vm.resolveString(config.values);
+    const operation = config.operation || 'append';
+
+    if (!spreadsheetId || !range || !rawValues) {
+        return { success: false, error: 'Eksik parametre: spreadsheetId, range veya values yok' };
+    }
+
+    let values: any[][] = [];
+    try {
+        const parsed = JSON.parse(rawValues);
+        // Ensure values is an array of arrays
+        if (Array.isArray(parsed)) {
+            if (parsed.length > 0 && Array.isArray(parsed[0])) {
+                values = parsed;
+            } else {
+                values = [parsed]; // wrap in array
+            }
+        } else {
+            values = [[parsed]];
+        }
+    } catch (e) {
+        // If not JSON, treat as single cell
+        values = [[rawValues]];
+    }
+
+    try {
+        console.log(`[GoogleSheets] Writing to ${spreadsheetId} range ${range} (op: ${operation})`);
+
+        // 1. Get token directly from AuthState to bypass broken ensureValidToken
+        const authState = googleService.getAuthState();
+        let token = authState.accessToken;
+
+        if (!token) {
+            token = vm.get('GOOGLE_ACCESS_TOKEN') as string || null;
+        }
+
+        if (!token) {
+            return {
+                success: false,
+                error: 'Google hesabına giriş yapılmamış. Lütfen Ayarlar > Google ile giriş yapın.'
+            };
+        }
+
+        let url = '';
+        let method = '';
+        if (operation === 'append') {
+            url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+            method = 'POST';
+        } else {
+            url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ values }),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[GoogleSheets] Write API error:', errorText);
+            throw new Error(`Google Sheets yazma hatası: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('[GoogleSheets] Sheet write/append successful');
+        return { success: true, updatedCells: data.updates?.updatedCells || data.updatedCells };
+
+    } catch (error) {
+        console.error('[GoogleSheets] Write error:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function executeGoogleSheetsCreate(
+    config: GoogleSheetsCreateConfig,
+    vm: VariableManager
+): Promise<any> {
+    const title = vm.resolveString(config.title || 'Yeni E-Tablo');
+
+    try {
+        console.log(`[GoogleSheets] Creating new spreadsheet via Drive API: ${title}`);
+
+        // 1. Get token from OAuth state
+        const authState = googleService.getAuthState();
+        let token = authState.accessToken;
+
+        // 2. Fallback: check VariableManager for manually set token
+        if (!token) {
+            token = vm.get('GOOGLE_ACCESS_TOKEN') as string || null;
+        }
+
+        if (!token) {
+            return {
+                success: false,
+                error: 'Google hesabına giriş yapılmamış. Lütfen Ayarlar > Google ile giriş yapın.'
+            };
+        }
+
+        // 3. BYPASS METHOD: Use Drive API directly instead of Sheets API
+        // This solves the 403 PERMISSION_DENIED error that occurs when Sheets API refuses file creation
+        const url = 'https://www.googleapis.com/drive/v3/files';
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: title,
+                mimeType: 'application/vnd.google-apps.spreadsheet'
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[GoogleSheets] Drive API Create error:', errorText);
+
+            // Helpful user message for this specific 403
+            if (response.status === 403) {
+                throw new Error(`Google Drive API yetkisi yetersiz veya etkin değil: ${errorText}\n\nGCP (Google Cloud Console) üzerinden "Google Drive API"nin etkinleştirildiğinden emin olun.`);
+            }
+
+            throw new Error(`Google Sheets oluşturulamadı: ${errorText}`);
+        }
+
+        const data = await response.json();
+        console.log('[GoogleSheets] Sheet created successfully via Drive API:', data.id);
+
+        const outputData = {
+            success: true,
+            spreadsheetId: data.id,
+            spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${data.id}`,
+            title
+        };
+
+        if (config.variableName) {
+            vm.set(config.variableName, outputData);
+        }
+
+        return outputData;
+    } catch (error) {
+        console.error('[GoogleSheets] Create error:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
 export async function executeGoogleDriveUpload(
     config: GoogleDriveUploadConfig,
     variableManager: VariableManager

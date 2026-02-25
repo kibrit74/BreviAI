@@ -83,6 +83,7 @@ import {
     executeRssRead,
     executeGoogleSheetsRead,
     executeGoogleSheetsWrite,
+    executeGoogleSheetsCreate,
     executeGoogleDriveUpload,
     executeGmailSend,
     executeGmailRead,
@@ -104,6 +105,7 @@ import {
     executeOutlookRead,
     executeExcelRead,
     executeExcelWrite,
+    executeExcelCreate,
     executeOneDriveUpload,
     executeOneDriveDownload,
     executeOneDriveList,
@@ -1447,6 +1449,9 @@ export class WorkflowEngine {
                 case 'SHEETS_WRITE':
                     result = await executeGoogleSheetsWrite(args as any, this.variableManager);
                     break;
+                case 'SHEETS_CREATE':
+                    result = await executeGoogleSheetsCreate(args as any, this.variableManager);
+                    break;
                 case 'DRIVE_UPLOAD':
                     result = await executeGoogleDriveUpload(args as any, this.variableManager);
                     break;
@@ -1463,6 +1468,9 @@ export class WorkflowEngine {
                     break;
                 case 'EXCEL_WRITE':
                     result = await executeExcelWrite(args as any, this.variableManager);
+                    break;
+                case 'EXCEL_CREATE':
+                    result = await executeExcelCreate(args as any, this.variableManager);
                     break;
 
                 // --- ONEDRIVE ---

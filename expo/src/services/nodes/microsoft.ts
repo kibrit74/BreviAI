@@ -3,7 +3,8 @@ import {
     OutlookSendConfig,
     OutlookReadConfig,
     ExcelReadConfig,
-    ExcelWriteConfig
+    ExcelWriteConfig,
+    ExcelCreateConfig
 } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 import { Platform } from 'react-native';
@@ -391,6 +392,50 @@ export async function executeExcelWrite(
         }
 
         return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function executeExcelCreate(
+    config: ExcelCreateConfig,
+    variableManager: VariableManager
+): Promise<any> {
+    const token = await getAccessToken(variableManager);
+    if (!token) return { success: false, error: 'Microsoft account not connected' };
+
+    const fileNameRaw = variableManager.resolveString(config.fileName || 'Yeni Excel Tablosu');
+    const fileName = fileNameRaw.endsWith('.xlsx') ? fileNameRaw : `${fileNameRaw}.xlsx`;
+
+    try {
+        const uploadUrl = `${GRAPH_API_URL}/me/drive/root:/${fileName}:/content`;
+
+        // Minimal empty .xlsx file structure in base64
+        const emptyXlsxBase64 = "UEsDBBQAAAAIAAAAAAAAAAAAAAAAAAAAAAAIAAAAZG9jUHJvcHMvUEsDBBQAAAAIAAAAAAAAAAAAAAAAAAAAAAAQAAAAdHh0RGlyZWN0b3J5L3R4dFBLAwQUAAAACAAAAAAAAAAAAAAAAAAAAAAABAAAALnhtbFBLAwQUAAAACAAAAAAAAAAAAAAAABIAAAB4bWwvcmVscy9fcmVscy54bWxQSwMEFAAAAAgAAAAAAAAAAAAAAAAAAAAAAAwAAABkb2NQcm9wcy9hcHAueG1sUEsDBBQAAAAIAAAAAAAAAAAAAAAAAAAAAAARAAAAZG9jUHJvcHwvY29yZS54bWxQSwMEFAAAAAgAAAAAAAAAAAAAAAAAAAAAAA0AAAB4bWwvd29ya2Jvb2sueG1sUEsDBBQAAAAIAAAAAAAAAAAAAAAAAAAAAAANAAAAeG1sL3N0eWxlcy54bWxQSwMEFAAAAAgAAAAAAAAAAAAAAAAAAAAAAA8AAAB4bWwvdGhlbWUvdGhlbWUxLnhtbFBLAwQUAAAACAAAAAAAAAAAAAAAAAAAAAAAGQAAAHhtbC93b3Jrc2hlZXRzL3NoZWV0MS54bWxQSwUGAAAAAAoACgA0AgAA4AAAAAAA";
+
+        const response = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            },
+            // Upload binary base64 string
+            body: Uint8Array.from(atob(emptyXlsxBase64), c => c.charCodeAt(0))
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error?.message || 'Failed to create Excel file');
+        }
+
+        const data = await response.json();
+
+        const result = { success: true, fileId: data.id, webUrl: data.webUrl, name: data.name };
+        if (config.variableName) {
+            variableManager.set(config.variableName, result);
+        }
+
+        return result;
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
     }

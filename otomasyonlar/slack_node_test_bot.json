@@ -1,0 +1,187 @@
+{
+  "name": "Slack Node Test (Send + Read)",
+  "description": "Sends a Slack message with SLACK_SEND, waits 5s, then reads newer channel messages via conversations.history.",
+  "category": "communication",
+  "icon": "logo-slack",
+  "color": "#4A154B",
+  "nodes": [
+    {
+      "id": "trigger-1",
+      "type": "MANUAL_TRIGGER",
+      "label": "Start",
+      "config": {},
+      "position": {
+        "x": 220,
+        "y": 60
+      }
+    },
+    {
+      "id": "input-token",
+      "type": "OVERLAY_INPUT",
+      "label": "1) Bot Token (xoxb)",
+      "config": {
+        "title": "Slack Bot Token (xoxb-...)",
+        "message": "Paste your Slack Bot Token (xoxb-...). This is NOT the message text.",
+        "placeholder": "xoxb-...",
+        "variableName": "slack_bot_token"
+      },
+      "position": {
+        "x": 220,
+        "y": 180
+      }
+    },
+    {
+      "id": "input-channel",
+      "type": "OVERLAY_INPUT",
+      "label": "2) Channel ID",
+      "config": {
+        "title": "Slack Channel ID",
+        "message": "Enter channel ID (recommended, e.g. C...).",
+        "placeholder": "C1234567890",
+        "variableName": "slack_channel"
+      },
+      "position": {
+        "x": 220,
+        "y": 300
+      }
+    },
+    {
+      "id": "input-message",
+      "type": "OVERLAY_INPUT",
+      "label": "3) Message",
+      "config": {
+        "title": "Slack Message",
+        "message": "Enter the message to send.",
+        "placeholder": "selammm",
+        "variableName": "slack_message"
+      },
+      "position": {
+        "x": 220,
+        "y": 420
+      }
+    },
+    {
+      "id": "slack-send-1",
+      "type": "SLACK_SEND",
+      "label": "Send Slack Message",
+      "config": {
+        "mode": "bot",
+        "apiToken": "{{slack_bot_token}}",
+        "channel": "{{slack_channel}}",
+        "message": "{{slack_message}}",
+        "apiUrl": "https://slack.com/api/chat.postMessage",
+        "variableName": "slack_send_result"
+      },
+      "position": {
+        "x": 220,
+        "y": 540
+      }
+    },
+    {
+      "id": "delay-1",
+      "type": "DELAY",
+      "label": "Wait 5s",
+      "config": {
+        "duration": 5,
+        "unit": "sec"
+      },
+      "position": {
+        "x": 220,
+        "y": 660
+      }
+    },
+    {
+      "id": "http-read-1",
+      "type": "HTTP_REQUEST",
+      "label": "Read Newer Channel Messages",
+      "config": {
+        "url": "https://slack.com/api/conversations.history",
+        "method": "GET",
+        "variableName": "slack_history_result",
+        "timeout": 30000,
+        "queryParameters": {
+          "channel": "{{slack_channel}}",
+          "oldest": "{{slack_send_result.ts}}",
+          "inclusive": "false",
+          "limit": "1"
+        },
+        "authentication": {
+          "type": "bearer",
+          "token": "{{slack_bot_token}}"
+        }
+      },
+      "position": {
+        "x": 220,
+        "y": 780
+      }
+    },
+    {
+      "id": "show-result",
+      "type": "SHOW_OVERLAY",
+      "label": "Show Result",
+      "config": {
+        "message": "Slack send + read sonuc\\n\\nSend success: {{slack_send_result.success}}\\nPost API ok: {{slack_send_result.response.ok}}\\nPost channel: {{slack_send_result.channel}}\\nPost ts: {{slack_send_result.ts}}\\n\\nRead HTTP ok: {{slack_history_result.ok}}\\nRead API ok: {{slack_history_result.data.ok}}\\nRead error: {{slack_history_result.data.error}}\\nNew msg count: {{slack_history_result.data.messages.length}}\\nLatest user: {{slack_history_result.data.messages[0].user}}\\nLatest text: {{slack_history_result.data.messages[0].text}}\\n\\nIf read fails with missing_scope, add channels:history (public) or groups:history (private) to your Slack app and reinstall."
+      },
+      "position": {
+        "x": 220,
+        "y": 900
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "sourceNodeId": "trigger-1",
+      "targetNodeId": "input-token",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e2",
+      "sourceNodeId": "input-token",
+      "targetNodeId": "input-channel",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e3",
+      "sourceNodeId": "input-channel",
+      "targetNodeId": "input-message",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e4",
+      "sourceNodeId": "input-message",
+      "targetNodeId": "slack-send-1",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e5",
+      "sourceNodeId": "slack-send-1",
+      "targetNodeId": "delay-1",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e5b",
+      "sourceNodeId": "slack-send-1",
+      "targetNodeId": "show-result",
+      "sourcePort": "error"
+    },
+    {
+      "id": "e6",
+      "sourceNodeId": "delay-1",
+      "targetNodeId": "http-read-1",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e7",
+      "sourceNodeId": "http-read-1",
+      "targetNodeId": "show-result",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e8",
+      "sourceNodeId": "http-read-1",
+      "targetNodeId": "show-result",
+      "sourcePort": "error"
+    }
+  ]
+}

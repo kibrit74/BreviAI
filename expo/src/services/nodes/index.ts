@@ -25,6 +25,7 @@ export { executeRealtimeAI } from './realtime_ai';
 export {
     executeGoogleSheetsRead,
     executeGoogleSheetsWrite,
+    executeGoogleSheetsCreate,
     executeGoogleDriveUpload,
     executeGmailSend,
     executeGmailRead
@@ -34,6 +35,7 @@ export {
     executeOutlookRead,
     executeExcelRead,
     executeExcelWrite,
+    executeExcelCreate,
     executeOneDriveUpload,
     executeOneDriveDownload,
     executeOneDriveList

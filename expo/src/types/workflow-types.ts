@@ -139,6 +139,7 @@ export type NodeType =
     | 'GMAIL_READ'
     | 'SHEETS_READ'
     | 'SHEETS_WRITE'
+    | 'SHEETS_CREATE'
     | 'DRIVE_UPLOAD'
     // Sensors (4)
     | 'LIGHT_SENSOR'
@@ -158,6 +159,7 @@ export type NodeType =
     | 'OUTLOOK_READ'
     | 'EXCEL_READ'
     | 'EXCEL_WRITE'
+    | 'EXCEL_CREATE'
     | 'ONEDRIVE_UPLOAD'
     | 'ONEDRIVE_DOWNLOAD'
     | 'ONEDRIVE_LIST'
@@ -573,6 +575,7 @@ export interface SlackSendConfig {
     apiToken?: string; // Alias for botToken (UI-friendly label)
     botToken?: string;
     apiUrl?: string; // Optional override, default chat.postMessage
+    variableName?: string; // Optional result variable
 }
 
 export interface DiscordSendConfig {
@@ -888,6 +891,11 @@ export interface ExcelWriteConfig {
     variableName: string;
 }
 
+export interface ExcelCreateConfig {
+    fileName: string; // e.g., "MyNewSpreadsheet"
+    variableName?: string; // To store result (file id/url)
+}
+
 export interface OneDriveUploadConfig {
     filePath: string;      // File variable or path to upload
     fileName?: string;     // Target name in OneDrive
@@ -918,7 +926,13 @@ export interface GoogleSheetsWriteConfig {
     spreadsheetId: string;
     range: string;
     values: string;
+    operation?: 'append' | 'update';
     append?: boolean;
+}
+
+export interface GoogleSheetsCreateConfig {
+    title: string;
+    variableName?: string;
 }
 
 export interface GoogleDriveUploadConfig {
@@ -1075,8 +1089,10 @@ export type NodeConfig =
     | OutlookReadConfig
     | ExcelReadConfig
     | ExcelWriteConfig
+    | ExcelCreateConfig
     | GoogleSheetsReadConfig
     | GoogleSheetsWriteConfig
+    | GoogleSheetsCreateConfig
     | GoogleDriveUploadConfig
     | LightSensorConfig
     | PedometerConfig
@@ -1903,7 +1919,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
     RSS_READ: {
         type: 'RSS_READ',
         category: 'web',
-        name: 'RSS Okuyucu',
+        name: 'Haber/RSS Okuyucu',
         description: 'Haber/RSS beslemesini okur',
         icon: 'radio',
         color: '#FFA500', // Orange
@@ -2085,6 +2101,16 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         hasInputPort: true,
         outputPorts: ['default'],
     },
+    SHEETS_CREATE: {
+        type: 'SHEETS_CREATE',
+        category: 'google',
+        name: 'Sheets Oluştur',
+        description: 'Yeni bir Google Spreadsheet dosyası oluşturur',
+        icon: 'add-circle-outline',
+        color: '#34A853',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
     DRIVE_UPLOAD: {
         type: 'DRIVE_UPLOAD',
         category: 'google',
@@ -2132,6 +2158,16 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         name: 'Excel Yaz',
         description: 'OneDrive üzerindeki Excel\'e yazar',
         icon: 'create',
+        color: '#1D6F42',
+        hasInputPort: true,
+        outputPorts: ['default'],
+    },
+    EXCEL_CREATE: {
+        type: 'EXCEL_CREATE',
+        category: 'microsoft',
+        name: 'Excel Oluştur',
+        description: 'OneDrive üzerinde yeni bir Excel dosyası oluşturur',
+        icon: 'add-circle-outline',
         color: '#1D6F42',
         hasInputPort: true,
         outputPorts: ['default'],
@@ -2631,8 +2667,10 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'OUTLOOK_READ': return { folderName: 'Inbox', maxResults: 10, unreadOnly: true, variableName: 'emails' };
         case 'EXCEL_READ': return { fileId: '', range: 'Sheet1!A1:Z10', variableName: 'excelData' };
         case 'EXCEL_WRITE': return { fileId: '', range: 'Sheet1!A1', values: '[[]]', variableName: 'result' };
+        case 'EXCEL_CREATE': return { fileName: 'Yeni Excel Tablosu', variableName: 'createdExcel' };
         case 'SHEETS_READ': return { spreadsheetId: '', range: 'A1:D10', variableName: 'sheetData' };
         case 'SHEETS_WRITE': return { spreadsheetId: '', range: 'A1', values: '[[]]', append: false };
+        case 'SHEETS_CREATE': return { title: 'Yeni Google Tablosu', variableName: 'createdSheet' };
 
         case 'DRIVE_UPLOAD': return { filePath: '{{selectedFile}}', fileName: 'upload.pdf', mimeType: 'application/pdf', variableName: 'driveFile' };
         // Sensors

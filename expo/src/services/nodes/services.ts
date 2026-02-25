@@ -324,13 +324,17 @@ export async function executeSlackSend(
                 throw new Error(`Slack API Error: ${errText}`);
             }
 
-            return {
+            const botResult = {
                 success: true,
                 mode: 'bot',
                 channel: data.channel,
                 ts: data.ts,
                 response: data
             };
+            if (config.variableName) {
+                variableManager.set(config.variableName, botResult);
+            }
+            return botResult;
         }
 
         if (!webhookUrl) {
@@ -355,13 +359,21 @@ export async function executeSlackSend(
             throw new Error(`Slack API Error: ${errText}`);
         }
 
-        return { success: true, mode: 'webhook' };
+        const webhookResult = { success: true, mode: 'webhook' };
+        if (config.variableName) {
+            variableManager.set(config.variableName, webhookResult);
+        }
+        return webhookResult;
 
     } catch (error) {
-        return {
+        const errorResult = {
             success: false,
             error: error instanceof Error ? error.message : 'Slack send failed'
         };
+        if (config.variableName) {
+            variableManager.set(config.variableName, errorResult);
+        }
+        return errorResult;
     }
 }
 // --- Discord ---
