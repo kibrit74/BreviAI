@@ -1951,35 +1951,34 @@ const EmailSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
 
 const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
     const showAdvanced = !!isAdvanced;
+    const selectedMode = (config.mode || ((config.apiToken || config.botToken) ? 'bot' : 'webhook')) as 'webhook' | 'bot';
 
     return (
         <>
             <ApiDocLink
                 title="Slack Entegrasyonu"
                 url="https://api.slack.com/messaging/webhooks"
-                brief="Slack'e mesaj göndermek için Webhook URL'si veya Bot Token kullanabilirsiniz."
+                brief="Slack'e mesaj gondermek icin Webhook URL'si veya Slack API (Bot Token) kullanabilirsiniz."
             />
 
-            {showAdvanced && (
-                <View style={styles.field}>
-                    <Text style={styles.fieldLabel}>Gönderim Modu</Text>
-                    <View style={styles.buttonRow}>
-                        {['webhook', 'bot'].map(m => (
-                            <TouchableOpacity
-                                key={m}
-                                style={[styles.unitButton, (config.mode || 'webhook') === m && styles.unitButtonSelected]}
-                                onPress={() => updateConfig('mode', m)}
-                            >
-                                <Text style={[styles.unitButtonText, (config.mode || 'webhook') === m && styles.unitButtonTextSelected]}>
-                                    {m === 'webhook' ? 'Webhook' : 'Bot Token'}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Gonderim Modu</Text>
+                <View style={styles.buttonRow}>
+                    {['webhook', 'bot'].map((m) => (
+                        <TouchableOpacity
+                            key={m}
+                            style={[styles.unitButton, selectedMode === m && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('mode', m)}
+                        >
+                            <Text style={[styles.unitButtonText, selectedMode === m && styles.unitButtonTextSelected]}>
+                                {m === 'webhook' ? 'Webhook' : 'Slack API'}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
-            )}
+            </View>
 
-            {(config.mode || 'webhook') === 'webhook' || !showAdvanced ? (
+            {selectedMode === 'webhook' ? (
                 <View style={styles.field}>
                     <Text style={styles.fieldLabel}>Webhook URL</Text>
                     <TextInput
@@ -1990,25 +1989,26 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                         placeholderTextColor="#666"
                         keyboardType="url"
                     />
-                    {!showAdvanced && (
-                        <Text style={styles.fieldHint}>Bot Token kullanmak için Gelişmiş moda geçin.</Text>
-                    )}
+                    <Text style={styles.fieldHint}>Alternatif olarak Slack API modu ile xoxb bot token kullanabilirsiniz.</Text>
                 </View>
             ) : (
                 <>
                     <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>Bot Token (xoxb-...)</Text>
+                        <Text style={styles.fieldLabel}>Slack API Token / Bot Token (xoxb-...)</Text>
                         <TextInput
                             style={styles.input}
-                            value={config.botToken || ''}
-                            onChangeText={(t) => updateConfig('botToken', t)}
+                            value={config.apiToken || config.botToken || ''}
+                            onChangeText={(t) => {
+                                updateConfig('apiToken', t);
+                                updateConfig('botToken', t);
+                            }}
                             placeholder="xoxb-1234..."
                             placeholderTextColor="#666"
                             secureTextEntry
                         />
                     </View>
                     <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>Kanal ID veya Adı</Text>
+                        <Text style={styles.fieldLabel}>Kanal ID veya Adi</Text>
                         <TextInput
                             style={styles.input}
                             value={config.channel || ''}
@@ -2017,6 +2017,19 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                             placeholderTextColor="#666"
                         />
                     </View>
+                    {showAdvanced && (
+                        <View style={styles.field}>
+                            <Text style={styles.fieldLabel}>Slack API URL (Opsiyonel)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={config.apiUrl || 'https://slack.com/api/chat.postMessage'}
+                                onChangeText={(t) => updateConfig('apiUrl', t)}
+                                placeholder="https://slack.com/api/chat.postMessage"
+                                placeholderTextColor="#666"
+                                keyboardType="url"
+                            />
+                        </View>
+                    )}
                 </>
             )}
 
@@ -2025,8 +2038,8 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                 <ExpandableTextInput
                     value={config.message || ''}
                     onChangeText={(t) => updateConfig('message', t)}
-                    placeholder="Slack'e gönderilecek mesaj..."
-                    label="Mesaj İçeriği"
+                    placeholder="Slack'e gonderilecek mesaj..."
+                    label="Mesaj Icerigi"
                     minHeight={80}
                 />
             </View>
@@ -2040,7 +2053,7 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                         placeholder='[{"type": "section", "text": {"type": "mrkdwn", "text": "Hello"}}]'
                         label="Block Kit JSON"
                         minHeight={120}
-                        hint="Slack Block Kit Builder ile oluşturulan JSON dizisi."
+                        hint="Slack Block Kit Builder ile olusturulan JSON dizisi."
                     />
                 </View>
             )}
@@ -6706,5 +6719,4 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
 };
 
 export default NodeConfigModal;
-
 

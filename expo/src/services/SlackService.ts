@@ -154,103 +154,134 @@ class SlackService {
             console.log('[SlackService] Callback URI:', redirectUri);
 
             let capturedRedirectUrl: string | null = null;
+            let callbackPromiseResolve: ((url: string) => void) | null = null;
+            let callbackPromiseSettled = false;
+            const callbackPromise = new Promise<string>((resolve) => {
+                callbackPromiseResolve = resolve;
+            });
+            const resolveCallbackUrl = (url: string) => {
+                if (callbackPromiseSettled) return;
+                callbackPromiseSettled = true;
+                capturedRedirectUrl = url;
+                callbackPromiseResolve?.(url);
+            };
             const linkingSubscription = Linking.addEventListener('url', ({ url }) => {
                 if (typeof url === 'string' && url.startsWith(redirectUriPrefix)) {
-                    capturedRedirectUrl = url;
+                    resolveCallbackUrl(url);
                     console.log('[SlackService] Captured OAuth deep link:', url);
                 }
             });
 
-            // Open browser to backend auth start
-            let result: WebBrowser.WebBrowserAuthSessionResult;
+            const waitForSlackCallback = async (timeoutMs: number): Promise<string | null> => {
+                if (capturedRedirectUrl) {
+                    return capturedRedirectUrl;
+                }
+
+                try {
+                    const initialUrl = await Linking.getInitialURL();
+                    if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
+                        console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
+                        resolveCallbackUrl(initialUrl);
+                        return initialUrl;
+                    }
+                } catch {
+                    // no-op
+                }
+
+                return await Promise.race([
+                    callbackPromise,
+                    new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+                ]);
+            };
+
+            // Open browser to backend auth start (wrapped to avoid unhandled promise if deep link wins first)
+            const authOutcomePromise = WebBrowser.openAuthSessionAsync(authUrl, redirectUri)
+                .then((authResult) => ({ kind: 'auth' as const, authResult }))
+                .catch((authError) => ({ kind: 'auth_error' as const, authError }));
+
+            let result: WebBrowser.WebBrowserAuthSessionResult | null = null;
             try {
-                result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-            } finally {
-                linkingSubscription.remove();
-            }
+                const firstOutcome = await Promise.race([
+                    authOutcomePromise,
+                    waitForSlackCallback(120000).then((url) => ({ kind: 'callback' as const, url })),
+                ]);
 
-            console.log('[SlackService] Auth result type:', result.type);
+                let callbackUrl: string | null = null;
 
-            let callbackUrl: string | null = null;
-            if (result.type === 'success' && result.url) {
-                callbackUrl = result.url;
-            } else if (result.type === 'dismiss') {
-                console.log('[SlackService] Auth session dismissed; waiting for Slack app callback...');
-
-                callbackUrl = await new Promise<string | null>((resolve) => {
-                    let settled = false;
-                    const finish = (url: string | null) => {
-                        if (settled) return;
-                        settled = true;
-                        callbackWaitSub.remove();
-                        clearTimeout(timeoutId);
-                        resolve(url);
-                    };
-
-                    const callbackWaitSub = Linking.addEventListener('url', ({ url }) => {
-                        if (typeof url === 'string' && url.startsWith(redirectUriPrefix)) {
-                            console.log('[SlackService] Captured delayed OAuth deep link:', url);
-                            finish(url);
+                if (firstOutcome.kind === 'callback') {
+                    if (firstOutcome.url) {
+                        callbackUrl = firstOutcome.url;
+                        console.log('[SlackService] OAuth callback arrived before auth session resolved');
+                        try {
+                            await WebBrowser.dismissBrowser();
+                        } catch {
+                            // no-op
                         }
-                    });
+                    } else {
+                        const authOutcome = await authOutcomePromise;
+                        if (authOutcome.kind === 'auth_error') {
+                            throw authOutcome.authError;
+                        }
+                        result = authOutcome.authResult;
+                    }
+                } else if (firstOutcome.kind === 'auth_error') {
+                    throw firstOutcome.authError;
+                } else {
+                    result = firstOutcome.authResult;
+                }
 
-                    const timeoutId = setTimeout(() => finish(null), 90000);
+                if (result) {
+                    console.log('[SlackService] Auth result type:', result.type);
 
-                    // Catch callbacks that may have arrived between dismissal and listener setup.
-                    if (capturedRedirectUrl) {
-                        finish(capturedRedirectUrl);
-                        return;
+                    if (result.type === 'success' && result.url) {
+                        callbackUrl = result.url;
+                    } else if (result.type === 'dismiss') {
+                        console.log('[SlackService] Auth session dismissed; waiting for Slack app callback...');
+                        callbackUrl = await waitForSlackCallback(90000);
+                    }
+                }
+
+                if (callbackUrl) {
+                    console.log('[SlackService] Success URL:', callbackUrl);
+
+                    // Parse tokens from deep link query params
+                    // Format: brevi-ai://oauth?slack_token=...&workspace_name=...
+                    const urlObj = new URL(callbackUrl);
+                    const queryParams = new URLSearchParams(urlObj.search);
+
+                    const slackToken = queryParams.get('slack_token');
+                    const workspaceName = queryParams.get('workspace_name') || queryParams.get('team_name');
+                    const botUserId = queryParams.get('bot_user_id');
+                    const error = queryParams.get('error');
+
+                    if (error) {
+                        console.error('[SlackService] OAuth error from backend:', error);
+                        throw new Error(`OAuth hatasi: ${error}`);
                     }
 
-                    Linking.getInitialURL()
-                        .then((initialUrl) => {
-                            if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
-                                console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
-                                finish(initialUrl);
-                            }
-                        })
-                        .catch(() => {
-                            // no-op
-                        });
-                });
-            }
+                    if (slackToken) {
+                        this.accessToken = slackToken;
+                        this.workspaceName = workspaceName || 'Workspace';
+                        this.botUserId = botUserId || null;
 
-            if (callbackUrl) {
-                console.log('[SlackService] Success URL:', callbackUrl);
+                        await this.saveAuth();
 
-                // Parse tokens from deep link query params
-                // Format: brevi-ai://oauth?slack_token=...&workspace_name=...
-                const urlObj = new URL(callbackUrl);
-                const queryParams = new URLSearchParams(urlObj.search);
+                        console.log('[SlackService] Sign in successful. Connected to:', this.workspaceName);
+                        return this.getAuthState();
+                    }
 
-                const slackToken = queryParams.get('slack_token');
-                const workspaceName = queryParams.get('workspace_name') || queryParams.get('team_name');
-                const botUserId = queryParams.get('bot_user_id');
-                const error = queryParams.get('error');
-
-                if (error) {
-                    console.error('[SlackService] OAuth error from backend:', error);
-                    throw new Error(`OAuth hatasi: ${error}`);
+                    throw new Error('Token alinamadi');
+                } else if (result?.type === 'cancel') {
+                    throw new Error('Giris iptal edildi');
+                } else if (result?.type === 'dismiss') {
+                    throw new Error('OAuth ekrani kapandi (callback alinamadi)');
+                } else if (!result) {
+                    throw new Error('OAuth callback zaman asimina ugradi');
+                } else {
+                    throw new Error('OAuth basarisiz oldu');
                 }
-
-                if (slackToken) {
-                    this.accessToken = slackToken;
-                    this.workspaceName = workspaceName || 'Workspace';
-                    this.botUserId = botUserId || null;
-
-                    await this.saveAuth();
-
-                    console.log('[SlackService] Sign in successful. Connected to:', this.workspaceName);
-                    return this.getAuthState();
-                }
-
-                throw new Error('Token alinamadi');
-            } else if (result.type === 'cancel') {
-                throw new Error('Giris iptal edildi');
-            } else if (result.type === 'dismiss') {
-                throw new Error('OAuth ekrani kapandi (callback alinamadi)');
-            } else {
-                throw new Error('OAuth basarisiz oldu');
+            } finally {
+                linkingSubscription.remove();
             }
         } catch (error) {
             console.error('[SlackService] Sign in error:', error);

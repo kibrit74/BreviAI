@@ -29,16 +29,15 @@ const FB_DISCOVERY = {
     tokenEndpoint: 'https://graph.facebook.com/v12.0/oauth/access_token',
 };
 
-/** Facebook App ID'yi güvenli depolamadan çeker */
+/** Facebook App ID'yi gÃ¼venli depolamadan Ã§eker */
 async function getFacebookAppId(): Promise<string> {
     return await secureStorage.getSecure('facebookAppId') || DEFAULT_FB_APP_ID;
 }
-
 // Fallback defaults for image hosting services
 const DEFAULT_IMAGE_HOST_KEY = '6d207e02198a847aa98d0a2a901485a5';
 const DEFAULT_IMGBB_KEY = '3e45e975b8bf0b0e9ee12c28dae0f7e8';
 
-/** Image hosting API key'lerini güvenli depolamadan çeker */
+/** Image hosting API key'lerini gÃ¼venli depolamadan Ã§eker */
 async function getImageHostKeys(): Promise<{ imageHostKey: string; imgbbKey: string }> {
     const imageHostKey = await secureStorage.getSecure('imageHostApiKey') || DEFAULT_IMAGE_HOST_KEY;
     const imgbbKey = await secureStorage.getSecure('imgbbApiKey') || DEFAULT_IMGBB_KEY;
@@ -52,7 +51,7 @@ export async function executeGoogleTranslate(
 ): Promise<any> {
     try {
         const text = variableManager.resolveString(config.text);
-        if (!text) return { success: false, error: 'Çevrilecek metin boş' };
+        if (!text) return { success: false, error: 'Ã‡evrilecek metin boÅŸ' };
 
         const target = config.targetLanguage || 'tr';
         const source = config.sourceLanguage || 'auto';
@@ -131,7 +130,7 @@ export async function executeTelegramSend(
         const operation = config.operation || 'sendMessage';
 
         if (!token || !chatId) {
-            return { success: false, error: 'Telegram ayarları eksik (Token veya ChatID)' };
+            return { success: false, error: 'Telegram ayarlarÄ± eksik (Token veya ChatID)' };
         }
 
         const baseUrl = `https://api.telegram.org/bot${token}`;
@@ -142,7 +141,7 @@ export async function executeTelegramSend(
         if (operation === 'sendMessage') {
             // Support both 'message' and 'text' properties for compatibility
             let message = variableManager.resolveString(config.message || config.text);
-            if (!message) return { success: false, error: 'Mesaj boş olamaz' };
+            if (!message) return { success: false, error: 'Mesaj boÅŸ olamaz' };
 
             // Strip markdown code blocks that cause Telegram parsing errors
             message = message.replace(/```[\w]*\n?/g, '').replace(/```/g, '');
@@ -200,7 +199,7 @@ export async function executeTelegramSend(
             const lat = Number(variableManager.resolveString(String(config.latitude || '')));
             const long = Number(variableManager.resolveString(String(config.longitude || '')));
 
-            if (isNaN(lat) || isNaN(long)) return { success: false, error: 'Geçersiz konum (Lat/Long)' };
+            if (isNaN(lat) || isNaN(long)) return { success: false, error: 'GeÃ§ersiz konum (Lat/Long)' };
 
             url = `${baseUrl}/sendLocation`;
             headers['Content-Type'] = 'application/json';
@@ -218,7 +217,7 @@ export async function executeTelegramSend(
 
             url = `${baseUrl}/${operation}`;
 
-            // FormData oluştur
+            // FormData oluÅŸtur
             const formData = new FormData();
             formData.append('chat_id', chatId);
             if (caption) {
@@ -230,7 +229,7 @@ export async function executeTelegramSend(
             const fileName = filePath.split('/').pop() || 'file';
             const fileType = operation === 'sendPhoto' ? 'image/jpeg' : 'application/octet-stream';
 
-            // React Native'de FormData dosya formatı: { uri, name, type }
+            // React Native'de FormData dosya formatÄ±: { uri, name, type }
             formData.append(operation === 'sendPhoto' ? 'photo' : 'document', {
                 uri: filePath,
                 name: fileName,
@@ -238,8 +237,8 @@ export async function executeTelegramSend(
             } as any);
 
             body = formData;
-            // Content-Type: multipart/form-data browser/RN tarafından otomatik set edilir boundary ile birlikte.
-            // Bu yüzden headers'a eklemiyoruz.
+            // Content-Type: multipart/form-data browser/RN tarafÄ±ndan otomatik set edilir boundary ile birlikte.
+            // Bu yÃ¼zden headers'a eklemiyoruz.
         }
 
         console.log(`[Telegram] Executing ${operation} to ${url}`);
@@ -279,15 +278,76 @@ export async function executeSlackSend(
     try {
         const webhookUrl = variableManager.resolveString(config.webhookUrl);
         const message = variableManager.resolveString(config.message);
+        const mode = (config.mode || (((config.apiToken || config.botToken) && config.channel) ? 'bot' : 'webhook')) as 'webhook' | 'bot';
+        const token = variableManager.resolveString(config.apiToken || config.botToken);
+        const channel = variableManager.resolveString(config.channel);
+        const apiUrl = variableManager.resolveString(config.apiUrl) || 'https://slack.com/api/chat.postMessage';
+        const blocksStr = variableManager.resolveString(config.blocks);
 
-        if (!webhookUrl || !message) {
-            return { success: false, error: 'Webhook URL veya Mesaj boş olamaz' };
+        let parsedBlocks: any[] | undefined;
+        if (blocksStr) {
+            try {
+                const parsed = JSON.parse(blocksStr);
+                if (!Array.isArray(parsed)) {
+                    return { success: false, error: 'Slack Blocks JSON bir dizi (array) olmali' };
+                }
+                parsedBlocks = parsed;
+            } catch {
+                return { success: false, error: 'Slack Blocks JSON gecersiz' };
+            }
         }
+
+        if (mode === 'bot') {
+            if (!token || !channel) {
+                return { success: false, error: 'Slack API modu icin API Token ve Kanal gerekli' };
+            }
+            if (!message && !parsedBlocks) {
+                return { success: false, error: 'Mesaj veya Blocks JSON bos olamaz' };
+            }
+
+            const payload: any = { channel };
+            if (message) payload.text = message;
+            if (parsedBlocks) payload.blocks = parsedBlocks;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json; charset=utf-8',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+                const errText = data?.error || `HTTP ${response.status}`;
+                throw new Error(`Slack API Error: ${errText}`);
+            }
+
+            return {
+                success: true,
+                mode: 'bot',
+                channel: data.channel,
+                ts: data.ts,
+                response: data
+            };
+        }
+
+        if (!webhookUrl) {
+            return { success: false, error: 'Webhook URL bos olamaz' };
+        }
+        if (!message && !parsedBlocks) {
+            return { success: false, error: 'Mesaj veya Blocks JSON bos olamaz' };
+        }
+
+        const webhookPayload: any = {};
+        if (message) webhookPayload.text = message;
+        if (parsedBlocks) webhookPayload.blocks = parsedBlocks;
 
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: message })
+            body: JSON.stringify(webhookPayload)
         });
 
         if (!response.ok) {
@@ -295,7 +355,7 @@ export async function executeSlackSend(
             throw new Error(`Slack API Error: ${errText}`);
         }
 
-        return { success: true };
+        return { success: true, mode: 'webhook' };
 
     } catch (error) {
         return {
@@ -304,7 +364,6 @@ export async function executeSlackSend(
         };
     }
 }
-
 // --- Discord ---
 export async function executeDiscordSend(
     config: DiscordSendConfig,
@@ -315,7 +374,7 @@ export async function executeDiscordSend(
         const message = variableManager.resolveString(config.message);
 
         if (!webhookUrl || !message) {
-            return { success: false, error: 'Webhook URL veya Mesaj boş olamaz' };
+            return { success: false, error: 'Webhook URL veya Mesaj boÅŸ olamaz' };
         }
 
         const payload: any = {
@@ -381,7 +440,7 @@ export async function executeNotionCreate(
         try {
             properties = JSON.parse(propertiesStr);
         } catch (e) {
-            return { success: false, error: 'Properties geçerli bir JSON olmalı' };
+            return { success: false, error: 'Properties geÃ§erli bir JSON olmalÄ±' };
         }
 
         const payload: any = {
@@ -706,7 +765,7 @@ async function uploadImageToPublicHost(localUri: string): Promise<string> {
             return imgbbData.data.url;
         }
 
-        throw new Error('Resim yüklenemedi. Lütfen internet bağlantınızı kontrol edin.');
+        throw new Error('Resim yÃ¼klenemedi. LÃ¼tfen internet baÄŸlantÄ±nÄ±zÄ± kontrol edin.');
     }
 
     console.log('[Instagram] Image uploaded:', uploadData.image.url);
@@ -722,8 +781,8 @@ export async function executeInstagramPost(
         let imageUrl = variableManager.resolveString(config.imageUrl);
         const caption = variableManager.resolveString(config.caption);
 
-        if (!rawToken) return { success: false, error: 'Facebook Access Token bulunamadı' };
-        if (!imageUrl) return { success: false, error: 'Resim URL bulunamadı' };
+        if (!rawToken) return { success: false, error: 'Facebook Access Token bulunamadÄ±' };
+        if (!imageUrl) return { success: false, error: 'Resim URL bulunamadÄ±' };
 
         // Trim whitespace and ensure clean token
         const token = typeof rawToken === 'string' ? rawToken.trim() : String(rawToken).trim();
@@ -842,12 +901,12 @@ export async function executeInstagramPost(
         }
 
         if (!igUserId) {
-            return { success: false, error: 'Bağlı bir Instagram İşletme Hesabı bulunamadı. Lütfen Facebook Sayfanıza bir Instagram hesabı bağlayın.' };
+            return { success: false, error: 'BaÄŸlÄ± bir Instagram Ä°ÅŸletme HesabÄ± bulunamadÄ±. LÃ¼tfen Facebook SayfanÄ±za bir Instagram hesabÄ± baÄŸlayÄ±n.' };
         }
 
         console.log('[Instagram] IG User ID:', igUserId);
 
-        // 2. Create Media Container (use URL params, not JSON body — Facebook Graph API standard)
+        // 2. Create Media Container (use URL params, not JSON body â€” Facebook Graph API standard)
         const containerParams = new URLSearchParams({
             image_url: imageUrl,
             caption: caption || '',
@@ -915,7 +974,7 @@ export async function executePhilipsHue(
         const action = config.action; // 'on' | 'off' | 'toggle' | 'brightness' | 'color' | 'scene'
 
         if (!bridgeIp || !apiKey || isNaN(lightId)) {
-            return { success: false, error: 'Hue Ayarları eksik (Bridge IP, API Key, Light ID)' };
+            return { success: false, error: 'Hue AyarlarÄ± eksik (Bridge IP, API Key, Light ID)' };
         }
 
         const url = `http://${bridgeIp}/api/${apiKey}/lights/${lightId}/state`;
@@ -963,7 +1022,7 @@ export async function executeRememberInfo(
 ): Promise<any> {
     try {
         const text = variableManager.resolveString(config.value || config.key);
-        if (!text) return { success: false, error: 'Kaydedilecek bilgi boş' };
+        if (!text) return { success: false, error: 'Kaydedilecek bilgi boÅŸ' };
 
         console.log('[RememberInfo] Adding to agent memory:', text);
         await AgentMemoryService.saveSemanticMemory(text, { key: config.key });
@@ -993,7 +1052,7 @@ export async function executeSearchMemory(
         const storageType = config.storageType || 'auto';
 
         if (!query) {
-            return { success: false, error: 'Arama sorgusu boş olamaz' };
+            return { success: false, error: 'Arama sorgusu boÅŸ olamaz' };
         }
 
         console.log(`[SearchMemory] Searching for: "${query}" (limit: ${limit}, threshold: ${threshold}, storage: ${storageType})`);
@@ -1049,7 +1108,7 @@ export async function executeAddToMemory(
         const storageType = config.storageType || 'auto';
 
         if (!text) {
-            return { success: false, error: 'Eklenecek metin boş olamaz' };
+            return { success: false, error: 'Eklenecek metin boÅŸ olamaz' };
         }
 
         // Parse metadata if provided
@@ -1116,7 +1175,7 @@ export async function executeBulkAddToMemory(
         const dataVar = variableManager.get(config.data);
 
         if (!dataVar) {
-            return { success: false, error: `Veri bulunamadı: ${config.data}` };
+            return { success: false, error: `Veri bulunamadÄ±: ${config.data}` };
         }
 
         // Parse the data - it should be an array of rows
@@ -1145,7 +1204,7 @@ export async function executeBulkAddToMemory(
         }
 
         if (rows.length === 0) {
-            return { success: false, error: 'Veri dizisi boş' };
+            return { success: false, error: 'Veri dizisi boÅŸ' };
         }
 
         console.log(`[BulkAddToMemory] Processing ${rows.length} rows. Storage: ${storageType}`);
@@ -1278,7 +1337,7 @@ export async function executeClearMemory(
 
         console.log(`[ClearMemory] All memories cleared (Storage: ${storageType})`);
 
-        const result = { success: true, message: 'Tüm hafıza temizlendi' };
+        const result = { success: true, message: 'TÃ¼m hafÄ±za temizlendi' };
 
         if (config.variableName) {
             variableManager.set(config.variableName, result);

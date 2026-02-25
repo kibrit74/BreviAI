@@ -742,14 +742,20 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'send_slack',
-        description: 'Sends a Slack message via webhook.',
+        description: 'Sends a Slack message via webhook or Slack API (bot token).',
         parameters: {
             type: 'OBJECT',
             properties: {
-                webhookUrl: { type: 'STRING', description: 'Slack webhook URL' },
-                message: { type: 'STRING', description: 'Message content' }
+                mode: { type: 'STRING', description: 'webhook or bot (optional, auto-detected)' },
+                webhookUrl: { type: 'STRING', description: 'Slack webhook URL (for webhook mode)' },
+                apiToken: { type: 'STRING', description: 'Slack Bot token xoxb-... (for bot mode)' },
+                botToken: { type: 'STRING', description: 'Alias of apiToken (for compatibility)' },
+                channel: { type: 'STRING', description: 'Slack channel ID or name (for bot mode)' },
+                apiUrl: { type: 'STRING', description: 'Slack API URL override (optional)' },
+                message: { type: 'STRING', description: 'Message content (optional if blocks provided)' },
+                blocks: { type: 'STRING', description: 'Slack Block Kit JSON array string (optional)' }
             },
-            required: ['webhookUrl', 'message']
+            required: []
         },
         nodeType: 'SLACK_SEND'
     },

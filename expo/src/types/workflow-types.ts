@@ -570,7 +570,9 @@ export interface SlackSendConfig {
     blocks?: string; // JSON string for Block Kit
     channel?: string; // Required for Bot Token
     mode?: 'webhook' | 'bot'; // Default 'webhook'
+    apiToken?: string; // Alias for botToken (UI-friendly label)
     botToken?: string;
+    apiUrl?: string; // Optional override, default chat.postMessage
 }
 
 export interface DiscordSendConfig {
@@ -2644,7 +2646,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'WHATSAPP_TRIGGER': return { variableName: 'whatsappInfo' };
         case 'GOOGLE_TRANSLATE': return { text: '{{previous_output}}', targetLanguage: 'tr', variableName: 'translatedText' };
         case 'TELEGRAM_SEND': return { botToken: '', chatId: '', message: '{{previous_output}}' };
-        case 'SLACK_SEND': return { webhookUrl: '', message: '{{previous_output}}' };
+        case 'SLACK_SEND': return { mode: 'webhook', webhookUrl: '', apiToken: '', botToken: '', channel: '', apiUrl: 'https://slack.com/api/chat.postMessage', message: '{{previous_output}}', blocks: '' };
         case 'SWITCH': return { variableName: 'checkVar', cases: [{ value: '1', portId: 'case_1' }, { value: '2', portId: 'case_2' }] };
         case 'CODE_EXECUTION': return { code: '// return { result: "ok" };', variableName: 'codeResult' };
 
