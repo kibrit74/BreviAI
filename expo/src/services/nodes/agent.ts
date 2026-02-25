@@ -539,7 +539,7 @@ Kullanıcı senden bir DEĞER istiyor ('${config.variableName}').
                     cleanText.toLowerCase().includes('başka bir işlem');
 
                 // Prevent infinite loops on things like "How are you?" -> naive check, but mainly for task flows
-                if (isQuestion && toolExecutor) {
+                if (isQuestion && toolExecutor && !config.preventAskUser) {
                     console.log('[AI_AGENT] Detected implied question in text. Converting to "ask_user" tool call.');
 
                     // Inject implicit tool call

@@ -790,6 +790,7 @@ export interface AgentAIConfig {
     memoryKey?: string; // Unique key to store chat history (e.g., 'chat_english_tutor')
     systemPrompt?: string; // Optional override for system prompt
     tools?: string[]; // Optional list of allowed tools
+    preventAskUser?: boolean; // Prevent agent from automatically triggering interactive user prompt loop
 }
 
 export interface RealtimeAIConfig {

@@ -68,6 +68,7 @@
                 "systemPrompt": "Sen bir telefon görüşmesi analiz uzmanısın. Görevin verilen dökümü analiz edip özet çıkarmaktır. ASLA kullanıcıya soru sorma, ASLA JSON formatı kullanma. Sadece düz metin olarak şunları yaz:\n\n1. Görüşmenin kısa özeti (2-3 cümle)\n2. Konuşulan önemli konular (madde madde)\n3. Varsa belirtilen tarihler, saatler veya randevular\n4. Varsa karar alınan veya söz verilen işler\n\nEğer döküm çok kısa veya anlaşılmaz ise, bunu belirt ve eldeki bilgiyle özet çıkar.",
                 "prompt": "Arayan: {{callerInfo}}\nTarih: {{_date}}, Saat: {{_time}}\n\nGörüşme Dökümü:\n{{transcription}}",
                 "variableName": "summary",
+                "preventAskUser": true,
                 "maxTokens": 1024
             },
             "position": {
