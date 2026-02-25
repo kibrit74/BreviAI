@@ -175,16 +175,44 @@ class SlackService {
             if (result.type === 'success' && result.url) {
                 callbackUrl = result.url;
             } else if (result.type === 'dismiss') {
-                await new Promise(resolve => setTimeout(resolve, 600));
-                if (capturedRedirectUrl) {
-                    callbackUrl = capturedRedirectUrl;
-                } else {
-                    const initialUrl = await Linking.getInitialURL();
-                    if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
-                        callbackUrl = initialUrl;
-                        console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
+                console.log('[SlackService] Auth session dismissed; waiting for Slack app callback...');
+
+                callbackUrl = await new Promise<string | null>((resolve) => {
+                    let settled = false;
+                    const finish = (url: string | null) => {
+                        if (settled) return;
+                        settled = true;
+                        callbackWaitSub.remove();
+                        clearTimeout(timeoutId);
+                        resolve(url);
+                    };
+
+                    const callbackWaitSub = Linking.addEventListener('url', ({ url }) => {
+                        if (typeof url === 'string' && url.startsWith(redirectUriPrefix)) {
+                            console.log('[SlackService] Captured delayed OAuth deep link:', url);
+                            finish(url);
+                        }
+                    });
+
+                    const timeoutId = setTimeout(() => finish(null), 90000);
+
+                    // Catch callbacks that may have arrived between dismissal and listener setup.
+                    if (capturedRedirectUrl) {
+                        finish(capturedRedirectUrl);
+                        return;
                     }
-                }
+
+                    Linking.getInitialURL()
+                        .then((initialUrl) => {
+                            if (initialUrl && initialUrl.startsWith(redirectUriPrefix)) {
+                                console.log('[SlackService] Recovered OAuth deep link from initial URL:', initialUrl);
+                                finish(initialUrl);
+                            }
+                        })
+                        .catch(() => {
+                            // no-op
+                        });
+                });
             }
 
             if (callbackUrl) {
