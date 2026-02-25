@@ -1,0 +1,155 @@
+{
+    "name": "Slack Canlı Sohbet (Real-Time Chat)",
+    "description": "Slack kanalıyla karşılıklı (iki yönlü) ve sürekli mesajlaşmayı sağlayan döngüsel otomasyon.",
+    "category": "communication",
+    "icon": "logo-slack",
+    "color": "#4A154B",
+    "nodes": [
+        {
+            "id": "trigger-1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Sohbeti Başlat",
+            "config": {},
+            "position": {
+                "x": 100,
+                "y": 50
+            }
+        },
+        {
+            "id": "input-token",
+            "type": "TEXT_INPUT",
+            "label": "Bot Token Gir",
+            "config": {
+                "prompt": "Slack Bot Token (xoxb-...) giriniz:",
+                "variableName": "slack_bot_token"
+            },
+            "position": {
+                "x": 100,
+                "y": 150
+            }
+        },
+        {
+            "id": "input-channel",
+            "type": "TEXT_INPUT",
+            "label": "Kanal ID Gir",
+            "config": {
+                "prompt": "Slack Kanal/Kişi ID (Örn: C123456) giriniz:",
+                "variableName": "slack_channel"
+            },
+            "position": {
+                "x": 100,
+                "y": 250
+            }
+        },
+        {
+            "id": "http-read-messages",
+            "type": "HTTP_REQUEST",
+            "label": "Son Mesajı Oku",
+            "config": {
+                "url": "https://slack.com/api/conversations.history",
+                "method": "GET",
+                "variableName": "slack_chat_history",
+                "timeout": 15000,
+                "queryParameters": {
+                    "channel": "{{slack_channel}}",
+                    "limit": "1"
+                },
+                "authentication": {
+                    "type": "bearer",
+                    "token": "{{slack_bot_token}}"
+                }
+            },
+            "position": {
+                "x": 100,
+                "y": 350
+            }
+        },
+        {
+            "id": "chat-input",
+            "type": "TEXT_INPUT",
+            "label": "Mesajı Oku & Cevap Yaz",
+            "config": {
+                "prompt": "Slack'ten Gelen Son Mesaj:\n\"{{slack_chat_history.data.messages[0].text}}\"\n\n👉 Karşılık Verin (Otomasyonu durdurmak için İptal'e basın):",
+                "variableName": "user_chat_reply"
+            },
+            "position": {
+                "x": 100,
+                "y": 450
+            }
+        },
+        {
+            "id": "slack-send-reply",
+            "type": "SLACK_SEND",
+            "label": "Cevabı Slack'e İlet",
+            "config": {
+                "mode": "bot",
+                "apiToken": "{{slack_bot_token}}",
+                "channel": "{{slack_channel}}",
+                "message": "{{user_chat_reply}}",
+                "apiUrl": "https://slack.com/api/chat.postMessage",
+                "variableName": "slack_send_status"
+            },
+            "position": {
+                "x": 100,
+                "y": 550
+            }
+        },
+        {
+            "id": "chat-delay",
+            "type": "DELAY",
+            "label": "Senkronizasyon Beklemesi",
+            "config": {
+                "duration": 2,
+                "unit": "sec"
+            },
+            "position": {
+                "x": 100,
+                "y": 650
+            }
+        }
+    ],
+    "edges": [
+        {
+            "id": "e1",
+            "sourceNodeId": "trigger-1",
+            "targetNodeId": "input-token",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e2",
+            "sourceNodeId": "input-token",
+            "targetNodeId": "input-channel",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e3",
+            "sourceNodeId": "input-channel",
+            "targetNodeId": "http-read-messages",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e4",
+            "sourceNodeId": "http-read-messages",
+            "targetNodeId": "chat-input",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e5",
+            "sourceNodeId": "chat-input",
+            "targetNodeId": "slack-send-reply",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e6",
+            "sourceNodeId": "slack-send-reply",
+            "targetNodeId": "chat-delay",
+            "sourcePort": "default"
+        },
+        {
+            "id": "e-loop-back",
+            "sourceNodeId": "chat-delay",
+            "targetNodeId": "http-read-messages",
+            "sourcePort": "default"
+        }
+    ]
+}
