@@ -1,0 +1,55 @@
+{
+    "edges": [
+        {
+            "id": "e1-3",
+            "sourcePort": "default",
+            "sourceNodeId": "1",
+            "targetNodeId": "3"
+        },
+        {
+            "id": "e3-4",
+            "sourcePort": "default",
+            "sourceNodeId": "3",
+            "targetNodeId": "4"
+        }
+    ],
+    "nodes": [
+        {
+            "id": "1",
+            "type": "MANUAL_TRIGGER",
+            "label": "Başlat",
+            "position": {
+                "x": 100,
+                "y": 50
+            }
+        },
+        {
+            "id": "3",
+            "type": "AGENT_AI",
+            "label": "MCP Asistan: Hafızadan Çek & Tablo Yarat",
+            "config": {
+                "model": "gemini-2.5-flash",
+                "prompt": "Sen akıllı bir Asistansın. Tek görevin var: Kullanıcının yerel veritabanında (vektörel hafızasında) bulunan en güncel 'Görüşme Notu'nu bulup, onu özetleyerek YENİ bir Google Sheets dosyası oluşturup içine kaydetmek.\n\nADIM 1: `memory_search` aracını kullanarak 'görüşme notu' araması yap ve en güncel notun özetini çıkar.\nADIM 2: `create_sheet` aracını kullanarak 'Görüşme Özeti' adında yepyeni bir e-tablo oluştur. Bu araç sana yeni tablonun 'spreadsheetId' ve 'spreadsheetUrl' bilgilerini döndürecektir.\nADIM 3: Yeni oluşturduğun tablonun `spreadsheetId` değerini kullanarak, `write_sheet` aracı ile çıkardığın özeti bu tabloya yaz (range olarak örneğin 'A1' verebilirsin).\nADIM 4: Yaptığın işlemin sonucunu (özeti ve yeni tablonun linkini) raporla.",
+                "provider": "gemini",
+                "variableName": "agentResult"
+            },
+            "position": {
+                "x": 100,
+                "y": 200
+            }
+        },
+        {
+            "id": "4",
+            "type": "SHOW_TEXT",
+            "label": "Sonucu Göster",
+            "config": {
+                "title": "İşlem Sonucu",
+                "content": "{{agentResult}}"
+            },
+            "position": {
+                "x": 100,
+                "y": 350
+            }
+        }
+    ]
+}

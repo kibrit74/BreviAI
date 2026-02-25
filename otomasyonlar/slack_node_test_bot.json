@@ -8,7 +8,7 @@
     {
       "id": "trigger-1",
       "type": "MANUAL_TRIGGER",
-      "label": "Start",
+      "label": "Başlat",
       "config": {},
       "position": {
         "x": 220,
@@ -17,12 +17,10 @@
     },
     {
       "id": "input-token",
-      "type": "OVERLAY_INPUT",
-      "label": "1) Bot Token (xoxb)",
+      "type": "TEXT_INPUT",
+      "label": "1) Bot Token",
       "config": {
-        "title": "Slack Bot Token (xoxb-...)",
-        "message": "Paste your Slack Bot Token (xoxb-...). This is NOT the message text.",
-        "placeholder": "xoxb-...",
+        "prompt": "Slack Bot Token (xoxb-...) girin:",
         "variableName": "slack_bot_token"
       },
       "position": {
@@ -32,12 +30,10 @@
     },
     {
       "id": "input-channel",
-      "type": "OVERLAY_INPUT",
+      "type": "TEXT_INPUT",
       "label": "2) Channel ID",
       "config": {
-        "title": "Slack Channel ID",
-        "message": "Enter channel ID (recommended, e.g. C...).",
-        "placeholder": "C1234567890",
+        "prompt": "Slack Channel ID (Örn: C12345678) girin:",
         "variableName": "slack_channel"
       },
       "position": {
@@ -47,12 +43,10 @@
     },
     {
       "id": "input-message",
-      "type": "OVERLAY_INPUT",
-      "label": "3) Message",
+      "type": "TEXT_INPUT",
+      "label": "3) Mesaj",
       "config": {
-        "title": "Slack Message",
-        "message": "Enter the message to send.",
-        "placeholder": "selammm",
+        "prompt": "Gönderilecek mesajı girin:",
         "variableName": "slack_message"
       },
       "position": {
@@ -63,7 +57,7 @@
     {
       "id": "slack-send-1",
       "type": "SLACK_SEND",
-      "label": "Send Slack Message",
+      "label": "Slack Mesajı Gönder",
       "config": {
         "mode": "bot",
         "apiToken": "{{slack_bot_token}}",
@@ -80,7 +74,7 @@
     {
       "id": "delay-1",
       "type": "DELAY",
-      "label": "Wait 5s",
+      "label": "5 Saniye Bekle",
       "config": {
         "duration": 5,
         "unit": "sec"
@@ -93,7 +87,7 @@
     {
       "id": "http-read-1",
       "type": "HTTP_REQUEST",
-      "label": "Read Newer Channel Messages",
+      "label": "Kanaldan Yanıtları Oku",
       "config": {
         "url": "https://slack.com/api/conversations.history",
         "method": "GET",
@@ -117,10 +111,11 @@
     },
     {
       "id": "show-result",
-      "type": "SHOW_OVERLAY",
-      "label": "Show Result",
+      "type": "SHOW_TEXT",
+      "label": "Sonucu Göster",
       "config": {
-        "message": "Slack send + read sonuc\\n\\nSend success: {{slack_send_result.success}}\\nPost API ok: {{slack_send_result.response.ok}}\\nPost channel: {{slack_send_result.channel}}\\nPost ts: {{slack_send_result.ts}}\\n\\nRead HTTP ok: {{slack_history_result.ok}}\\nRead API ok: {{slack_history_result.data.ok}}\\nRead error: {{slack_history_result.data.error}}\\nNew msg count: {{slack_history_result.data.messages.length}}\\nLatest user: {{slack_history_result.data.messages[0].user}}\\nLatest text: {{slack_history_result.data.messages[0].text}}\\n\\nIf read fails with missing_scope, add channels:history (public) or groups:history (private) to your Slack app and reinstall."
+        "title": "Slack Gönderim ve Okuma Sonucu",
+        "content": "Send success: {{slack_send_result.success}}\nPost API ok: {{slack_send_result.response.ok}}\nPost ts: {{slack_send_result.ts}}\n\nRead HTTP ok: {{slack_history_result.ok}}\nRead API data ok: {{slack_history_result.data.ok}}\nNew msg count: {{slack_history_result.data.messages.length}}\nLatest text: {{slack_history_result.data.messages[0].text}}"
       },
       "position": {
         "x": 220,
