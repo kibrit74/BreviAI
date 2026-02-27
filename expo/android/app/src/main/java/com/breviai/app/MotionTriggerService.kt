@@ -189,15 +189,18 @@ class MotionTriggerService : Service(), SensorEventListener {
 
 
     override fun onSensorChanged(event: SensorEvent) {
-        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
-        if (registeredTriggers.isEmpty()) return
-        
+        if (event.sensor.type != Sensor.TYPE_ACCELEROMETER || registeredTriggers.isEmpty()) {
+            return
+        }
+
         detectShake(event)
         detectFlip(event)
         detectTaps(event)
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // no-op
+    }
 
     private fun detectShake(event: SensorEvent) {
         // Tap dizisi sırasında shake algılamayı bastır
@@ -297,11 +300,11 @@ class MotionTriggerService : Service(), SensorEventListener {
                 
                 // Show toast
                 val message = when (gesture) {
-                    GESTURE_SHAKE -> "🔄 Sallama algılandı!"
-                    GESTURE_FLIP -> "↕️ Çevirme algılandı!"
-                    GESTURE_DOUBLE_TAP -> "👆 Çift dokunuş!"
-                    GESTURE_TRIPLE_TAP -> "👆 Üçlü dokunuş!"
-                    else -> "✨ Hareket algılandı!"
+                    GESTURE_SHAKE -> "Sallama algilandi!"
+                    GESTURE_FLIP -> "Cevirme algilandi!"
+                    GESTURE_DOUBLE_TAP -> "Cift dokunus!"
+                    GESTURE_TRIPLE_TAP -> "Uclu dokunus!"
+                    else -> "Hareket algilandi!"
                 }
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 
