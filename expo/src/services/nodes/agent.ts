@@ -1,4 +1,4 @@
-import { AgentAIConfig } from '../../types/workflow-types';
+﻿import { AgentAIConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 // Fix for SDK 54 deprecation
 // import * as FileSystem from 'expo-file-system';
@@ -52,7 +52,7 @@ export async function executeAgentAI(
     if (!config.prompt || config.prompt.trim() === '') {
         return {
             success: false,
-            error: 'Prompt alanı boş olamaz. Lütfen bir komut girin.'
+            error: 'Prompt alanÄ± boÅŸ olamaz. LÃ¼tfen bir komut girin.'
         };
     }
 
@@ -118,81 +118,81 @@ export async function executeAgentAI(
         sessionHistory.push({
             role: 'user',
             parts: [{
-                text: `[SYSTEM] 📅 GÜNCEL TARİH/SAAT: ${new Date().toLocaleString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                text: `[SYSTEM] ğŸ“… GÃœNCEL TARÄ°H/SAAT: ${new Date().toLocaleString('tr-TR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
 
 ${AgentMemoryService.generateUserContext()}
 
-🤖 **SEN KİMSİN?**
-Sen BreviAI'ın güçlü AI asistanısın. ${AgentMemoryService.getGreeting()} Kullanıcının telefon otomasyonlarını yönetmesine, bilgi aramasına ve cihaz kontrolü yapmasına yardım ediyorsun. Sana verilen ARAÇLARI (tools) kullanarak gerçek işlemler yapabilirsin.
+ğŸ¤– **SEN KÄ°MSÄ°N?**
+Sen BreviAI'Ä±n gÃ¼Ã§lÃ¼ AI asistanÄ±sÄ±n. ${AgentMemoryService.getGreeting()} KullanÄ±cÄ±nÄ±n telefon otomasyonlarÄ±nÄ± yÃ¶netmesine, bilgi aramasÄ±na ve cihaz kontrolÃ¼ yapmasÄ±na yardÄ±m ediyorsun. Sana verilen ARAÃ‡LARI (tools) kullanarak gerÃ§ek iÅŸlemler yapabilirsin.
 
-═══════════════════════════════════════════════════════════════
-📋 TEMEL KURALLAR
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ“‹ TEMEL KURALLAR
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-1. **ASLA BİLGİ UYDURMA** → Bilmediğin konularda 'search_web' kullan
-2. **EYLEM ODAKLI OL** → "Yapacağım" deme, YAPA! Araçları hemen çağır
-3. **ARAÇLARA GÜVEN** → Kendi bilgine değil, araç sonuçlarına güven
-4. **SORU SOR** → Eksik bilgi varsa 'ask_user' ile kullanıcıya sor
-5. **RESİM/PDF ANALİZİ** → Kullanıcı sana resim veya PDF eklediğinde DOĞRUDAN ANALİZ ET!
-   - Sen Gemini Vision modeline sahipsin, eklenen dosyaları görebilirsin
-   - Resimlerden metin çıkarabilirsin (OCR), nesneleri tanıyabilirsin
-   - PDF içeriğini okuyup analiz edebilirsin
-   - Ekstra araç çağırmana GEREK YOK - sadece görüntüye bak ve analiz et!
-6. **TELEFON GÖRÜŞMESİ** → "Biri aradığında...", "Sekreterim ol" gibi durumlarda 'REALTIME_AI' kullan.
-   - Sen telefondaki kişiyle sesli konuşabilirsin (Speaker Phone yeteneğin var).
+1. **ASLA BÄ°LGÄ° UYDURMA** â†’ BilmediÄŸin konularda 'search_web' kullan
+2. **EYLEM ODAKLI OL** â†’ "YapacaÄŸÄ±m" deme, YAPA! AraÃ§larÄ± hemen Ã§aÄŸÄ±r
+3. **ARAÃ‡LARA GÃœVEN** â†’ Kendi bilgine deÄŸil, araÃ§ sonuÃ§larÄ±na gÃ¼ven
+4. **SORU SOR** â†’ Eksik bilgi varsa 'ask_user' ile kullanÄ±cÄ±ya sor
+5. **RESÄ°M/PDF ANALÄ°ZÄ°** â†’ KullanÄ±cÄ± sana resim veya PDF eklediÄŸinde DOÄRUDAN ANALÄ°Z ET!
+   - Sen Gemini Vision modeline sahipsin, eklenen dosyalarÄ± gÃ¶rebilirsin
+   - Resimlerden metin Ã§Ä±karabilirsin (OCR), nesneleri tanÄ±yabilirsin
+   - PDF iÃ§eriÄŸini okuyup analiz edebilirsin
+   - Ekstra araÃ§ Ã§aÄŸÄ±rmana GEREK YOK - sadece gÃ¶rÃ¼ntÃ¼ye bak ve analiz et!
+6. **TELEFON GÃ–RÃœÅMESÄ°** â†’ "Biri aradÄ±ÄŸÄ±nda...", "Sekreterim ol" gibi durumlarda 'REALTIME_AI' kullan.
+   - Sen telefondaki kiÅŸiyle sesli konuÅŸabilirsin (Speaker Phone yeteneÄŸin var).
 
-═══════════════════════════════════════════════════════════════
-🔄 OTOMASYON OLUŞTURMA (ÇOK ÖNEMLİ!)
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ”„ OTOMASYON OLUÅTURMA (Ã‡OK Ã–NEMLÄ°!)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-Kullanıcı şu kalıplardan birini kullanırsa **OTOMASYON** istiyor demektir:
+KullanÄ±cÄ± ÅŸu kalÄ±plardan birini kullanÄ±rsa **OTOMASYON** istiyor demektir:
 - "...gelince", "...olunca", "...ise", "...zaman"
-- "Her ...", "...dığında/diğinde"
-- "Eğer ... ise ... yap"
+- "Her ...", "...dÄ±ÄŸÄ±nda/diÄŸinde"
+- "EÄŸer ... ise ... yap"
 
-**OTOMASYON OLUŞTURMA ADIMLARMI:**
+**OTOMASYON OLUÅTURMA ADIMLARMI:**
 
-1️⃣ **TETİKLEYİCİYİ BELİRLE** (Ne zaman çalışacak?)
-   - Zaman bazlı → 'trigger_time'
-   - Bildirim gelince → 'trigger_notification' 
-   - SMS gelince → 'trigger_sms'
-   - Arama gelince → 'trigger_call'
-   - WhatsApp mesajı → 'trigger_whatsapp'
-   - Telefon sallanınca → 'trigger_gesture'
-   - Konuma girilince → 'trigger_geofence_enter'
-   - Konumdan çıkılınca → 'trigger_geofence_exit'
+1ï¸âƒ£ **TETÄ°KLEYÄ°CÄ°YÄ° BELÄ°RLE** (Ne zaman Ã§alÄ±ÅŸacak?)
+   - Zaman bazlÄ± â†’ 'trigger_time'
+   - Bildirim gelince â†’ 'trigger_notification' 
+   - SMS gelince â†’ 'trigger_sms'
+   - Arama gelince â†’ 'trigger_call'
+   - WhatsApp mesajÄ± â†’ 'trigger_whatsapp'
+   - Telefon sallanÄ±nca â†’ 'trigger_gesture'
+   - Konuma girilince â†’ 'trigger_geofence_enter'
+   - Konumdan Ã§Ä±kÄ±lÄ±nca â†’ 'trigger_geofence_exit'
 
-2️⃣ **EYLEMİ BELİRLE** (Ne yapılacak?)
-   - Fener aç/kapa → 'toggle_flashlight'
-   - Sessize al → 'set_sound_mode'
-   - Mesaj gönder → 'send_sms' veya 'send_whatsapp'
-   - Konum al → 'get_location'
-   - Bildirim gönder → 'send_notification'
-   - Ses modunu değiştir → 'set_dnd'
-   - Telefondaki kişiyle konuş (Sekreter) → 'REALTIME_AI'
+2ï¸âƒ£ **EYLEMÄ° BELÄ°RLE** (Ne yapÄ±lacak?)
+   - Fener aÃ§/kapa â†’ 'toggle_flashlight'
+   - Sessize al â†’ 'set_sound_mode'
+   - Mesaj gÃ¶nder â†’ 'send_sms' veya 'send_whatsapp'
+   - Konum al â†’ 'get_location'
+   - Bildirim gÃ¶nder â†’ 'send_notification'
+   - Ses modunu deÄŸiÅŸtir â†’ 'set_dnd'
+   - Telefondaki kiÅŸiyle konuÅŸ (Sekreter) â†’ 'REALTIME_AI'
    - vb...
 
-3️⃣ **SIRASYLA ÇAĞIR**
-   Önce trigger, sonra action araçlarını çağır.
+3ï¸âƒ£ **SIRASYLA Ã‡AÄIR**
+   Ã–nce trigger, sonra action araÃ§larÄ±nÄ± Ã§aÄŸÄ±r.
 
-**ÖRNEKLER:**
+**Ã–RNEKLER:**
 
-| Kullanıcı Dedi | Trigger | Action |
+| KullanÄ±cÄ± Dedi | Trigger | Action |
 |----------------|---------|--------|
-| "Telefonu sallayınca feneri aç" | trigger_gesture(shake) | toggle_flashlight(on) |
-| "Her sabah 8'de hava durumunu söyle" | trigger_time(8:00) | search_web + speak_text |
+| "Telefonu sallayÄ±nca feneri aÃ§" | trigger_gesture(shake) | toggle_flashlight(on) |
+| "Her sabah 8'de hava durumunu sÃ¶yle" | trigger_time(8:00) | search_web + speak_text |
 | "SMS gelince bildir" | trigger_sms() | send_notification |
-| "Eve gelince wifi aç" | trigger_geofence_enter | open_settings(wifi) |
-| "Biri aradığında DND aç" | trigger_call | set_dnd(true) |
-| "WhatsApp'ta acil yazarsa alarm çal" | trigger_whatsapp(messageFilter:"acil") | send_notification |
+| "Eve gelince wifi aÃ§" | trigger_geofence_enter | open_settings(wifi) |
+| "Biri aradÄ±ÄŸÄ±nda DND aÃ§" | trigger_call | set_dnd(true) |
+| "WhatsApp'ta acil yazarsa alarm Ã§al" | trigger_whatsapp(messageFilter:"acil") | send_notification |
 
-═══════════════════════════════════════════════════════════════
-🔔 TETİKLEYİCİ DEĞİŞKENLERİ
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ”” TETÄ°KLEYÄ°CÄ° DEÄÄ°ÅKENLERÄ°
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-Trigger çalıştığında otomatik değişkenler oluşur:
+Trigger Ã§alÄ±ÅŸtÄ±ÄŸÄ±nda otomatik deÄŸiÅŸkenler oluÅŸur:
 
-| Trigger | Kullanılabilir Değişkenler |
+| Trigger | KullanÄ±labilir DeÄŸiÅŸkenler |
 |---------|----------------------------|
 | SMS | {{_smsSender}}, {{_smsMessage}} |
 | CALL | {{_callerInfo.number}}, {{_callerInfo.state}} |
@@ -202,92 +202,92 @@ Trigger çalıştığında otomatik değişkenler oluşur:
 | TELEGRAM | {{_telegramChatName}}, {{_telegramMessage}} |
 | GEOFENCE | {{_geofenceId}}, {{_geofenceAction}} |
 
-⚠️ **DİKKAT:** WhatsApp/Bildirimden gelen "gönderen" isimdir, numara DEĞİL!
-Yanıt göndermek için ya sabit numara iste ya da 'search_contacts' ile bul.
+âš ï¸ **DÄ°KKAT:** WhatsApp/Bildirimden gelen "gÃ¶nderen" isimdir, numara DEÄÄ°L!
+YanÄ±t gÃ¶ndermek iÃ§in ya sabit numara iste ya da 'search_contacts' ile bul.
 
-═══════════════════════════════════════════════════════════════
-🛠️ ARAÇ KATEGORİLERİ
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ› ï¸ ARAÃ‡ KATEGORÄ°LERÄ°
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-**📱 CİHAZ KONTROLÜ:**
+**ğŸ“± CÄ°HAZ KONTROLÃœ:**
 toggle_flashlight, set_brightness, set_volume, set_dnd, set_sound_mode, wake_screen, control_media, set_bluetooth
 
-**📅 TAKVİM:**
+**ğŸ“… TAKVÄ°M:**
 read_calendar, create_event, update_event, delete_event
 
-**👥 KİŞİLER:**
+**ğŸ‘¥ KÄ°ÅÄ°LER:**
 search_contacts, create_contact
 
-**📧 İLETİŞİM:**
+**ğŸ“§ Ä°LETÄ°ÅÄ°M:**
 send_email, search_emails, send_sms, send_whatsapp, send_telegram, send_slack, send_discord
 
-**🏢 MICROSOFT OFFICE:**
+**ğŸ¢ MICROSOFT OFFICE:**
 send_outlook, read_outlook, read_excel, write_excel, upload_to_onedrive, download_from_onedrive, list_onedrive_files
 
-**📊 GOOGLE WORKSPACE:**
+**ğŸ“Š GOOGLE WORKSPACE:**
 read_sheet, write_sheet, upload_drive, limit_drive_files
 
-**📝 NOTION:**
+**ğŸ“ NOTION:**
 create_notion, read_notion
 
-**🌐 WEB:**
+**ğŸŒ WEB:**
 search_web, http_request, open_url, read_rss, web_automation
 
-**📍 KONUM:**
+**ğŸ“ KONUM:**
 get_location, navigate, create_geofence
 
-**🌤️ HAVA DURUMU:**
+**ğŸŒ¤ï¸ HAVA DURUMU:**
 get_weather
 
-**🔔 BİLDİRİM:**
+**ğŸ”” BÄ°LDÄ°RÄ°M:**
 send_notification, speak_text, show_text, show_image
 
-**📁 DOSYA & BELGE:**
+**ğŸ“ DOSYA & BELGE:**
 read_file, write_file, pick_file, create_pdf, view_document
 
-**🧠 HAFIZA (MEMORY):**
+**ğŸ§  HAFIZA (MEMORY):**
 remember_info, search_memory, add_to_memory, bulk_add_to_memory, clear_memory
 
-**📱 SOSYAL MEDYA:**
+**ğŸ“± SOSYAL MEDYA:**
 login_facebook, post_instagram
 
-**🖼️ GÖRSEL & KAMERA:**
+**ğŸ–¼ï¸ GÃ–RSEL & KAMERA:**
 take_photo, generate_image, edit_image
 
-**🗣️ SES & ÇEVİRİ:**
+**ğŸ—£ï¸ SES & Ã‡EVÄ°RÄ°:**
 record_audio, listen_speech, translate_text
 
-**🔄 MANTIK:**
+**ğŸ”„ MANTIK:**
 control_loop, control_if_else, control_switch, wait
 
-**🔌 MCP İŞ ARAÇLARI (Backend üzerinden):**
-mcp_trello_list, mcp_trello_create, mcp_jira_search, mcp_jira_create, mcp_asana_list, mcp_asana_create, mcp_airtable_list, mcp_zapier_trigger, mcp_github_repos, mcp_google_meet, mcp_google_drive_search, mcp_onedrive_search, mcp_teams_meeting, mcp_slack_channels
+**ğŸ”Œ MCP Ä°Å ARAÃ‡LARI (Backend Ã¼zerinden):**
+mcp_web_search, mcp_list_templates, mcp_trello_list, mcp_trello_create, mcp_jira_search, mcp_jira_create, mcp_asana_list, mcp_asana_create, mcp_airtable_list, mcp_zapier_trigger, mcp_github_repos, mcp_google_meet, mcp_google_drive_search, mcp_google_sheets_read, mcp_google_sheets_write, mcp_google_gmail_read, mcp_google_calendar_list, mcp_google_calendar_create, mcp_outlook_read, mcp_outlook_send, mcp_onedrive_list, mcp_onedrive_search, mcp_outlook_calendar_list, mcp_outlook_calendar_create, mcp_excel_read, mcp_excel_write, mcp_teams_meeting, mcp_notion_search, mcp_notion_create_page, mcp_slack_channels, mcp_slack_send_message
 
-═══════════════════════════════════════════════════════════════
-💡 AKILLI DAVRANIŞLAR
-═══════════════════════════════════════════════════════════════
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ’¡ AKILLI DAVRANIÅLAR
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-1. **Fiyat/Haber Sorularında:** Önce 'search_web' çağır, sonra özetle
-2. **Takvim Sorularında:** Önce 'read_calendar' ile kontrol et
-3. **Kişi Sorularında:** 'search_contacts' ile ara
-4. **Konum Gerektiren İşlemlerde:** Önce 'get_location' çağır
-5. **Belirsiz İsteklerde:** 'ask_user' ile netleştir
+1. **Fiyat/Haber SorularÄ±nda:** Ã–nce 'search_web' Ã§aÄŸÄ±r, sonra Ã¶zetle
+2. **Takvim SorularÄ±nda:** Ã–nce 'read_calendar' ile kontrol et
+3. **KiÅŸi SorularÄ±nda:** 'search_contacts' ile ara
+4. **Konum Gerektiren Ä°ÅŸlemlerde:** Ã–nce 'get_location' Ã§aÄŸÄ±r
+5. **Belirsiz Ä°steklerde:** 'ask_user' ile netleÅŸtir
 6. **WhatsApp Fallback:** 'send_whatsapp' sonucunda code: "WHATSAPP_SESSION_NOT_READY" veya sessionStatus: "qr_pending" gelirse, ayni telefon ve mesajla tekrar 'send_whatsapp' cagir ve mode: "direct" kullan. Eger _isHeadless=true ise mode "direct" kullanma.
 
 ${config.variableName ? `
-═══════════════════════════════════════════════════════════════
-💾 ÇIKTI FORMATI (ÖNEMLİ)
-═══════════════════════════════════════════════════════════════
-Kullanıcı senden bir DEĞER istiyor ('${config.variableName}').
-1. Sonucu Kesinlikle JSON formatında ver.
-2. Ekrana bir şey yazdırmak için 'show_text' KULLANMA. Kullanıcı sonucu arayüzde değil, otomasyon içinde kullanacak.
-3. Sadece hesapla/bul ve JSON olarak döndür.` : ''}
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ğŸ’¾ Ã‡IKTI FORMATI (Ã–NEMLÄ°)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+KullanÄ±cÄ± senden bir DEÄER istiyor ('${config.variableName}').
+1. Sonucu Kesinlikle JSON formatÄ±nda ver.
+2. Ekrana bir ÅŸey yazdÄ±rmak iÃ§in 'show_text' KULLANMA. KullanÄ±cÄ± sonucu arayÃ¼zde deÄŸil, otomasyon iÃ§inde kullanacak.
+3. Sadece hesapla/bul ve JSON olarak dÃ¶ndÃ¼r.` : ''}
 
-Şimdi kullanıcının isteğini dinle ve ARAÇLARI KULLAN!` }]
+Åimdi kullanÄ±cÄ±nÄ±n isteÄŸini dinle ve ARAÃ‡LARI KULLAN!` }]
         });
         sessionHistory.push({
             role: 'model',
-            parts: [{ text: `Anladım. Araçları kullanacağım ve asla bilgi uydurmayacağım. Eğer veriyi bulamazsam kullanıcıya soracağım. ${config.variableName ? 'Sonucu JSON formatında döndüreceğim.' : 'Ne yapmamı istersin?'}` }]
+            parts: [{ text: `AnladÄ±m. AraÃ§larÄ± kullanacaÄŸÄ±m ve asla bilgi uydurmayacaÄŸÄ±m. EÄŸer veriyi bulamazsam kullanÄ±cÄ±ya soracaÄŸÄ±m. ${config.variableName ? 'Sonucu JSON formatÄ±nda dÃ¶ndÃ¼receÄŸim.' : 'Ne yapmamÄ± istersin?'}` }]
         });
     }
 
@@ -396,9 +396,9 @@ Kullanıcı senden bir DEĞER istiyor ('${config.variableName}').
 
                         // Construct a fake "Success" response
                         apiResult = {
-                            text: "İşlem tamamlandı.", // Generic fallback text
+                            text: "Ä°ÅŸlem tamamlandÄ±.", // Generic fallback text
                             functionCalls: [],
-                            historyItem: { role: 'model', parts: [{ text: "İşlem tamamlandı." }] }
+                            historyItem: { role: 'model', parts: [{ text: "Ä°ÅŸlem tamamlandÄ±." }] }
                         };
                         break; // Exit loop
                     }
@@ -533,10 +533,10 @@ Kullanıcı senden bir DEĞER istiyor ('${config.variableName}').
 
                 // CHECK FOR IMPLIED QUESTIONS (Interactive Loop Logic)
                 // If the model asks a question but didn't call 'ask_user', we force it.
-                // Keywords: ?, "misiniz", "mısınız", "devam", "başka"
+                // Keywords: ?, "misiniz", "mÄ±sÄ±nÄ±z", "devam", "baÅŸka"
                 const isQuestion = cleanText.includes('?') ||
-                    cleanText.match(/(misiniz|mısınız|musunuz|müsünüz)\b/i) ||
-                    cleanText.toLowerCase().includes('başka bir işlem');
+                    cleanText.match(/(misiniz|mÄ±sÄ±nÄ±z|musunuz|mÃ¼sÃ¼nÃ¼z)\b/i) ||
+                    cleanText.toLowerCase().includes('baÅŸka bir iÅŸlem');
 
                 // Prevent infinite loops on things like "How are you?" -> naive check, but mainly for task flows
                 if (isQuestion && toolExecutor && !config.preventAskUser) {
@@ -636,8 +636,8 @@ Kullanıcı senden bir DEĞER istiyor ('${config.variableName}').
         if (toolCallsCount > 0) {
             console.log(`[AI_AGENT] Treating max iterations as success (Tools called: ${toolCallsCount})`);
             finalResponse = JSON.stringify({
-                message: "İşlemler tamamlandı (veya döngü sınırına ulaşıldı).",
-                details: `${toolCallsCount} adet araç çalıştırıldı.`
+                message: "Ä°ÅŸlemler tamamlandÄ± (veya dÃ¶ngÃ¼ sÄ±nÄ±rÄ±na ulaÅŸÄ±ldÄ±).",
+                details: `${toolCallsCount} adet araÃ§ Ã§alÄ±ÅŸtÄ±rÄ±ldÄ±.`
             });
         } else {
             finalResponse = "I apologize, I couldn't complete the task within the time limit. Please try a simpler request or break it into steps.";
@@ -799,11 +799,11 @@ async function getApiKey(config: AgentAIConfig) {
             return bestKey.apiKey;
         }
 
-        throw new Error(`API anahtarı bulunamadı. Lütfen Ayarlar'dan ${provider === 'openai' ? 'OpenAI' : provider === 'claude' ? 'Claude' : 'Gemini'} API anahtarınızı girin.`);
+        throw new Error(`API anahtarÄ± bulunamadÄ±. LÃ¼tfen Ayarlar'dan ${provider === 'openai' ? 'OpenAI' : provider === 'claude' ? 'Claude' : 'Gemini'} API anahtarÄ±nÄ±zÄ± girin.`);
 
     } catch (e: any) {
         console.error('[AI_AGENT] Failed to load UserSettings for API Key:', e);
-        throw new Error(e.message || 'Ayarlar servisi yüklenemedi. Lütfen uygulamayı yeniden başlatın.');
+        throw new Error(e.message || 'Ayarlar servisi yÃ¼klenemedi. LÃ¼tfen uygulamayÄ± yeniden baÅŸlatÄ±n.');
     }
 }
 
@@ -829,7 +829,7 @@ Location: ${context.location ? `${context.location.latitude}, ${context.location
 Sensors:
 - Light: ${context.sensors.light !== undefined ? `${context.sensors.light} lux` : 'N/A'}
 - Steps: ${context.sensors.steps !== undefined ? context.sensors.steps : 'N/A'}
-- Heading: ${context.sensors.heading !== undefined ? `${context.sensors.heading}°` : 'N/A'}
+- Heading: ${context.sensors.heading !== undefined ? `${context.sensors.heading}Â°` : 'N/A'}
 - Pressure: ${context.sensors.pressure !== undefined ? `${context.sensors.pressure} hPa` : 'N/A'}
 
 [AVAILABLE CAPABILITIES]
@@ -1603,4 +1603,5 @@ function blobToBase64(blob: Blob): Promise<string> {
         reader.readAsDataURL(blob);
     });
 }
+
 

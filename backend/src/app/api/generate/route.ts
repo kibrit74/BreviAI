@@ -6,6 +6,7 @@ import { recordExecution } from '@/lib/api/execution-history';
 import { getClientIp } from '@/lib/api/rate-limit';
 import { createRequestId } from '@/lib/api/response';
 import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
+import { validateShortcut } from '@/lib/json-validator';
 
 // CORS headers
 const corsHeaders = {
@@ -523,6 +524,19 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             workflowData.nodes = nodes;
             workflowData.edges = edges;
         }
+
+        const validatedWorkflow = validateShortcut({
+            name: workflowData.name || 'Yeni AkÄ±ÅŸ',
+            nodes: workflowData.nodes || [],
+            edges: workflowData.edges || [],
+        });
+
+        if (!validatedWorkflow.valid) {
+            throw new Error(`Workflow schema validation failed: ${validatedWorkflow.error}`);
+        }
+
+        workflowData.nodes = validatedWorkflow.shortcut?.nodes || workflowData.nodes || [];
+        workflowData.edges = validatedWorkflow.shortcut?.edges || workflowData.edges || [];
 
         const responseBody = {
             success: true,

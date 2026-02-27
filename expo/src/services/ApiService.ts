@@ -138,13 +138,20 @@ INSTRUCTIONS:
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 120000); // 120s timeout for complex AI generation
 
+            const isWebAgentMode = userContext === 'WEB_AGENT_MODE';
+            const payloadUserContext =
+                !isWebAgentMode && userContext && typeof userContext === 'object'
+                    ? userContext
+                    : '';
+
             const response = await fetch(`${API_BASE_URL}/api/generate`, {
                 signal: controller.signal,
                 method: 'POST',
                 headers: this.headers,
                 body: JSON.stringify({
                     prompt: finalPrompt,
-                    user_context: userContext || '',
+                    user_context: payloadUserContext,
+                    context: isWebAgentMode ? 'WEB_AGENT_MODE' : undefined,
                     system_prompt: SYSTEM_PROMPT_TURKISH,
                 }),
             }).finally(() => clearTimeout(timeoutId));

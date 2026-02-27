@@ -54,10 +54,15 @@ const TRIGGER_NODE_TYPES = new Set([
     'MANUAL_TRIGGER',
     'TIME_TRIGGER',
     'NOTIFICATION_TRIGGER',
+    'CALL_TRIGGER',
     'SMS_TRIGGER',
     'WHATSAPP_TRIGGER',
     'EMAIL_TRIGGER',
-    'WEBHOOK_TRIGGER',
+    'GESTURE_TRIGGER',
+    'STEP_TRIGGER',
+    'CHAT_INPUT_TRIGGER',
+    'WEB_HOOK_TRIGGER',
+    'GEOFENCE_TRIGGER',
     'GEOFENCE_ENTER_TRIGGER',
     'GEOFENCE_EXIT_TRIGGER',
 ]);
@@ -81,13 +86,16 @@ const REQUIRED_FIELDS_BY_NODE: Record<string, string[]> = {
     EMAIL_SEND: ['to', 'subject'],
     GMAIL_SEND: ['to', 'subject'],
     OUTLOOK_SEND: ['to', 'subject'],
-    APP_LAUNCH: ['packageName'],
     WEB_AUTOMATION: ['url'],
-    IMAGE_GENERATE: ['prompt'],
-    DB_READ: ['table'],
-    DB_WRITE: ['table'],
+    IMAGE_GENERATOR: ['prompt'],
+    DB_READ: ['tableName'],
+    DB_WRITE: ['tableName'],
     FILE_WRITE: ['filename', 'content'],
     LOCATION_GET: [],
+};
+
+const REQUIRED_ANY_FIELD_BY_NODE: Record<string, string[]> = {
+    APP_LAUNCH: ['packageName', 'appName'],
 };
 
 const PERMISSION_BY_NODE: Record<string, keyof NonNullable<PreflightInput['permissions']>> = {
@@ -98,19 +106,26 @@ const PERMISSION_BY_NODE: Record<string, keyof NonNullable<PreflightInput['permi
     LOCATION_GET: 'location',
     GEOFENCE_ENTER_TRIGGER: 'location',
     GEOFENCE_EXIT_TRIGGER: 'location',
-    CONTACT_FIND: 'contacts',
-    CONTACT_CREATE: 'contacts',
+    CONTACTS_READ: 'contacts',
+    CONTACTS_WRITE: 'contacts',
     SPEECH_TO_TEXT: 'microphone',
-    VOICE_TRIGGER: 'microphone',
 };
 
 const INTEGRATION_BY_NODE: Record<string, keyof NonNullable<PreflightInput['integrations']>> = {
     GMAIL_SEND: 'googleConnected',
     GMAIL_READ: 'googleConnected',
-    GOOGLE_SHEETS_READ: 'googleConnected',
-    GOOGLE_DRIVE_UPLOAD: 'googleConnected',
+    SHEETS_READ: 'googleConnected',
+    SHEETS_WRITE: 'googleConnected',
+    SHEETS_CREATE: 'googleConnected',
+    DRIVE_UPLOAD: 'googleConnected',
     OUTLOOK_SEND: 'outlookConnected',
     OUTLOOK_READ: 'outlookConnected',
+    EXCEL_READ: 'outlookConnected',
+    EXCEL_WRITE: 'outlookConnected',
+    EXCEL_CREATE: 'outlookConnected',
+    ONEDRIVE_UPLOAD: 'outlookConnected',
+    ONEDRIVE_DOWNLOAD: 'outlookConnected',
+    ONEDRIVE_LIST: 'outlookConnected',
     WHATSAPP_SEND: 'whatsappConnected',
     EMAIL_SEND: 'smtpConfigured',
 };
@@ -118,7 +133,7 @@ const INTEGRATION_BY_NODE: Record<string, keyof NonNullable<PreflightInput['inte
 const API_KEY_REQUIREMENTS: Record<string, string[]> = {
     AGENT_AI: ['GEMINI_API_KEY|OPENAI_API_KEY|CLAUDE_API_KEY'],
     AI_PROCESSOR: ['GEMINI_API_KEY|OPENAI_API_KEY|CLAUDE_API_KEY'],
-    IMAGE_GENERATE: ['GEMINI_API_KEY|OPENAI_API_KEY'],
+    IMAGE_GENERATOR: ['GEMINI_API_KEY|OPENAI_API_KEY'],
     WEATHER_GET: ['OPENWEATHER_API_KEY'],
 };
 
@@ -267,6 +282,32 @@ export function runWorkflowPreflight(input: PreflightInput): PreflightResult {
             }
         }
 
+        const requiredAnyFields = REQUIRED_ANY_FIELD_BY_NODE[nodeType] || [];
+        if (requiredAnyFields.length > 0) {
+            const hasAnyField = requiredAnyFields.some((field) => {
+                const value = config[field];
+                return !(
+                    value === undefined ||
+                    value === null ||
+                    (typeof value === 'string' && value.trim().length === 0)
+                );
+            });
+
+            if (!hasAnyField) {
+                missingConfigFields += 1;
+                errors.push(
+                    issue({
+                        severity: 'error',
+                        code: 'CONFIG_FIELD_MISSING',
+                        message: `${nodeType} iÃ§in en az bir alan zorunlu: ${requiredAnyFields.join(' | ')}.`,
+                        nodeId,
+                        nodeType,
+                        fix: `${requiredAnyFields.join(' veya ')} alanlarÄ±ndan birini doldurun.`,
+                    })
+                );
+            }
+        }
+
         const permissionKey = PERMISSION_BY_NODE[nodeType];
         if (permissionKey) {
             const permissionValue = input.permissions?.[permissionKey];
@@ -295,7 +336,18 @@ export function runWorkflowPreflight(input: PreflightInput): PreflightResult {
             }
         }
 
-        const integrationKey = INTEGRATION_BY_NODE[nodeType];
+        let integrationKey: keyof NonNullable<PreflightInput['integrations']> | undefined =
+            INTEGRATION_BY_NODE[nodeType];
+
+        if (!integrationKey && nodeType === 'MCP_TOOL') {
+            const toolName = String(config.toolName || '').trim().toLowerCase();
+            if (toolName.startsWith('breviai.google.')) {
+                integrationKey = 'googleConnected';
+            } else if (toolName.startsWith('breviai.microsoft.')) {
+                integrationKey = 'outlookConnected';
+            }
+        }
+
         if (integrationKey) {
             const integrationValue = input.integrations?.[integrationKey];
             if (integrationValue === false) {

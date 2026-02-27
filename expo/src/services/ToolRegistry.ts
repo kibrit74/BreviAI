@@ -1766,6 +1766,309 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         nodeType: 'MCP_CALL',
         mcpToolName: 'breviai.slack.list_channels',
         permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+
+    // --- GENERAL MCP GATEWAY TOOLS ---
+    {
+        name: 'mcp_web_search',
+        description: 'Runs backend MCP web search and returns structured web results.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                query: { type: 'STRING', description: 'Search query text' },
+                limit: { type: 'INTEGER', description: 'Maximum result count (default: 5)' }
+            },
+            required: ['query']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.web_search',
+        permissions: { requiresConfirmation: false, isSensitive: false }
+    },
+    {
+        name: 'mcp_list_templates',
+        description: 'Lists BreviAI templates via backend MCP service.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                category: { type: 'STRING', description: 'Optional template category filter' },
+                limit: { type: 'INTEGER', description: 'Maximum templates to return' }
+            },
+            required: []
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.list_templates',
+        permissions: { requiresConfirmation: false, isSensitive: false }
+    },
+
+    // --- GOOGLE MCP TOOLS ---
+    {
+        name: 'mcp_google_sheets_read',
+        description: 'Reads rows from Google Sheets via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token (optional for public sheets)' },
+                spreadsheetId: { type: 'STRING', description: 'Google Sheets spreadsheet ID' },
+                range: { type: 'STRING', description: 'A1 notation range, e.g. Sheet1!A1:D50' }
+            },
+            required: ['spreadsheetId', 'range']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.sheets_read',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_google_sheets_write',
+        description: 'Writes or appends rows to Google Sheets via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                spreadsheetId: { type: 'STRING', description: 'Google Sheets spreadsheet ID' },
+                range: { type: 'STRING', description: 'A1 notation range' },
+                values: { type: 'STRING', description: 'JSON stringified 2D array values' },
+                mode: { type: 'STRING', description: 'append or update' }
+            },
+            required: ['accessToken', 'spreadsheetId', 'range', 'values']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.sheets_write',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+    {
+        name: 'mcp_google_gmail_read',
+        description: 'Reads Gmail messages via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                searchQuery: { type: 'STRING', description: 'Gmail query, e.g. is:unread' },
+                maxResults: { type: 'INTEGER', description: 'Maximum email count' }
+            },
+            required: ['accessToken']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.gmail_read',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_google_calendar_list',
+        description: 'Lists Google Calendar events via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                calendarId: { type: 'STRING', description: 'Calendar ID (default: primary)' },
+                maxResults: { type: 'INTEGER', description: 'Maximum event count' },
+                timeMin: { type: 'STRING', description: 'RFC3339 lower bound' },
+                query: { type: 'STRING', description: 'Free text query filter' }
+            },
+            required: ['accessToken']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.calendar_list',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_google_calendar_create',
+        description: 'Creates Google Calendar events via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                summary: { type: 'STRING', description: 'Event title' },
+                description: { type: 'STRING', description: 'Event description (optional)' },
+                startDateTime: { type: 'STRING', description: 'Event start RFC3339 datetime' },
+                endDateTime: { type: 'STRING', description: 'Event end RFC3339 datetime' },
+                location: { type: 'STRING', description: 'Event location (optional)' },
+                attendees: { type: 'STRING', description: 'Comma-separated attendee emails (optional)' },
+                calendarId: { type: 'STRING', description: 'Calendar ID (default: primary)' }
+            },
+            required: ['accessToken', 'summary', 'startDateTime', 'endDateTime']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.calendar_create',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- MICROSOFT MCP TOOLS ---
+    {
+        name: 'mcp_outlook_read',
+        description: 'Reads Outlook/Microsoft 365 mailbox messages via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                maxResults: { type: 'INTEGER', description: 'Maximum email count' },
+                filter: { type: 'STRING', description: 'OData $filter, e.g. isRead eq false' },
+                search: { type: 'STRING', description: 'Free text message search' }
+            },
+            required: ['accessToken']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.outlook_read',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_outlook_send',
+        description: 'Sends Outlook/Microsoft 365 email via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                to: { type: 'STRING', description: 'Comma-separated recipient emails' },
+                subject: { type: 'STRING', description: 'Email subject' },
+                body: { type: 'STRING', description: 'Email body (HTML supported)' },
+                cc: { type: 'STRING', description: 'Comma-separated CC emails (optional)' }
+            },
+            required: ['accessToken', 'to', 'subject', 'body']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.outlook_send',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+    {
+        name: 'mcp_onedrive_list',
+        description: 'Lists OneDrive files/folders via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                folderId: { type: 'STRING', description: 'Optional OneDrive folder item ID' },
+                limit: { type: 'INTEGER', description: 'Maximum item count' }
+            },
+            required: ['accessToken']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.onedrive_list',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_outlook_calendar_list',
+        description: 'Lists Outlook Calendar events via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                maxResults: { type: 'INTEGER', description: 'Maximum event count' },
+                startDateTime: { type: 'STRING', description: 'Start ISO datetime (optional)' },
+                endDateTime: { type: 'STRING', description: 'End ISO datetime (optional)' }
+            },
+            required: ['accessToken']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.calendar_list',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_outlook_calendar_create',
+        description: 'Creates Outlook Calendar events via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                subject: { type: 'STRING', description: 'Event subject/title' },
+                body: { type: 'STRING', description: 'Event notes (optional)' },
+                startDateTime: { type: 'STRING', description: 'Start ISO datetime' },
+                endDateTime: { type: 'STRING', description: 'End ISO datetime' },
+                timeZone: { type: 'STRING', description: 'Time zone, e.g. Europe/Istanbul' },
+                location: { type: 'STRING', description: 'Location (optional)' },
+                attendees: { type: 'STRING', description: 'Comma-separated attendee emails (optional)' },
+                isOnlineMeeting: { type: 'BOOLEAN', description: 'Create Teams meeting link if true' }
+            },
+            required: ['accessToken', 'subject', 'startDateTime', 'endDateTime']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.calendar_create',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+    {
+        name: 'mcp_excel_read',
+        description: 'Reads a cell range from OneDrive Excel via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                itemId: { type: 'STRING', description: 'OneDrive item ID for Excel file' },
+                worksheetName: { type: 'STRING', description: 'Worksheet/tab name' },
+                range: { type: 'STRING', description: 'A1 range, e.g. A1:D20' }
+            },
+            required: ['accessToken', 'itemId', 'worksheetName', 'range']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.excel_read',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_excel_write',
+        description: 'Writes values to OneDrive Excel via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 token' },
+                itemId: { type: 'STRING', description: 'OneDrive item ID for Excel file' },
+                worksheetName: { type: 'STRING', description: 'Worksheet/tab name' },
+                range: { type: 'STRING', description: 'A1 range, e.g. A1:B2' },
+                values: { type: 'STRING', description: 'JSON stringified 2D array values' }
+            },
+            required: ['accessToken', 'itemId', 'worksheetName', 'range', 'values']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.excel_write',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- NOTION MCP TOOLS ---
+    {
+        name: 'mcp_notion_search',
+        description: 'Searches Notion pages/databases via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Notion integration token' },
+                query: { type: 'STRING', description: 'Search query text' },
+                limit: { type: 'INTEGER', description: 'Maximum result count' }
+            },
+            required: ['token', 'query']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.notion.search',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_notion_create_page',
+        description: 'Creates Notion pages via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Notion integration token' },
+                parentPageId: { type: 'STRING', description: 'Parent page ID' },
+                title: { type: 'STRING', description: 'Page title' },
+                content: { type: 'STRING', description: 'Page body text (optional)' }
+            },
+            required: ['token', 'parentPageId', 'title']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.notion.create_page',
+        permissions: { requiresConfirmation: true, isSensitive: true }
+    },
+
+    // --- SLACK MCP TOOLS ---
+    {
+        name: 'mcp_slack_send_message',
+        description: 'Sends Slack messages via MCP.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                token: { type: 'STRING', description: 'Slack Bot OAuth token (xoxb-...)' },
+                channel: { type: 'STRING', description: 'Slack channel ID (e.g. C01234567)' },
+                text: { type: 'STRING', description: 'Message text' }
+            },
+            required: ['token', 'channel', 'text']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.slack.send_message',
+        permissions: { requiresConfirmation: true, isSensitive: true }
     }
 ];
 

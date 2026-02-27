@@ -142,6 +142,7 @@ import {
 import { debugLog } from './DebugLogger';
 import { userSettingsService } from './UserSettingsService';
 import { getToolByName } from './ToolRegistry';
+import { apiService } from './ApiService';
 import { notificationController, ACTION_PAUSE, ACTION_RESUME, ACTION_STOP } from './NotificationController';
 
 // ═══════════════════════════════════════════════════════════════
@@ -984,14 +985,23 @@ export class WorkflowEngine {
                         }
                     }
                     try {
-                        const { ApiService } = require('./ApiService');
-                        const mcpResp = await ApiService.getInstance().callMcpTool(mcpTool, resolvedParams);
+                        const mcpResp = await apiService.callMcpTool(mcpTool, resolvedParams);
+                        if (!mcpResp.success || !mcpResp.result) {
+                            throw new Error(mcpResp.error || 'MCP tool call failed');
+                        }
+
                         // Extract useful data from MCP response
-                        let mcpData: any = mcpResp;
-                        if (mcpResp?.content) {
-                            const jc = mcpResp.content.find((c: any) => c.type === 'json');
-                            const tc = mcpResp.content.find((c: any) => c.type === 'text');
-                            mcpData = jc?.json || tc?.text || mcpResp;
+                        let mcpData: any = mcpResp.result;
+                        if (mcpResp.result?.content) {
+                            const jc = mcpResp.result.content.find((c: any) => c.type === 'json');
+                            const tc = mcpResp.result.content.find((c: any) => c.type === 'text');
+                            if (jc && 'json' in jc) {
+                                mcpData = jc.json;
+                            } else if (tc && 'text' in tc) {
+                                mcpData = tc.text;
+                            } else {
+                                mcpData = mcpResp.result;
+                            }
                         }
                         if (mcpConfig.variableName) {
                             this.variableManager.set(mcpConfig.variableName, mcpData);
@@ -1558,16 +1568,25 @@ export class WorkflowEngine {
                         throw new Error(`MCP tool name missing for '${toolName}'`);
                     }
                     try {
-                        const { ApiService } = require('./ApiService');
-                        const mcpResponse = await ApiService.getInstance().callMcpTool(mcpToolNameToCall, args);
-                        // MCP returns { content: [...], metadata: {...} }
+                        const mcpResponse = await apiService.callMcpTool(mcpToolNameToCall, args);
+                        if (!mcpResponse.success || !mcpResponse.result) {
+                            throw new Error(mcpResponse.error || 'MCP tool call failed');
+                        }
+
+                        // MCP returns { result: { content: [...], metadata: {...} } }
                         // Extract the useful data for the agent
-                        if (mcpResponse?.content) {
-                            const jsonContent = mcpResponse.content.find((c: any) => c.type === 'json');
-                            const textContent = mcpResponse.content.find((c: any) => c.type === 'text');
-                            result = jsonContent?.json || textContent?.text || mcpResponse;
+                        if (mcpResponse.result?.content) {
+                            const jsonContent = mcpResponse.result.content.find((c: any) => c.type === 'json');
+                            const textContent = mcpResponse.result.content.find((c: any) => c.type === 'text');
+                            if (jsonContent && 'json' in jsonContent) {
+                                result = jsonContent.json;
+                            } else if (textContent && 'text' in textContent) {
+                                result = textContent.text;
+                            } else {
+                                result = mcpResponse.result;
+                            }
                         } else {
-                            result = mcpResponse;
+                            result = mcpResponse.result;
                         }
                         console.log(`[WorkflowEngine] MCP tool '${mcpToolNameToCall}' executed successfully`);
                     } catch (mcpErr: any) {
