@@ -18,6 +18,120 @@ const corsHeaders = {
 // Triggering Re-deploy for AI Fix
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
+const MCP_INTENT_HINTS: Array<{
+    tool: string;
+    keywords: string[];
+    guide: string;
+}> = [
+    {
+        tool: 'breviai.jira.search_issues / breviai.jira.create_issue',
+        keywords: ['jira', 'issue', 'ticket', 'bug kaydi', 'bug kaydı'],
+        guide: 'Jira iş takibi',
+    },
+    {
+        tool: 'breviai.trello.list_cards / breviai.trello.create_card',
+        keywords: ['trello', 'kart', 'card'],
+        guide: 'Trello kart yönetimi',
+    },
+    {
+        tool: 'breviai.notion.search / breviai.notion.create_page',
+        keywords: ['notion', 'wiki', 'not al', 'dokuman sayfasi', 'doküman sayfası'],
+        guide: 'Notion sayfa/arama',
+    },
+    {
+        tool: 'breviai.slack.send_message / breviai.slack.list_channels',
+        keywords: ['slack', 'kanal', 'channel'],
+        guide: 'Slack mesajlaşma',
+    },
+    {
+        tool: 'breviai.asana.list_tasks / breviai.asana.create_task',
+        keywords: ['asana', 'task', 'gorev', 'görev'],
+        guide: 'Asana görev yönetimi',
+    },
+    {
+        tool: 'breviai.airtable.list_records',
+        keywords: ['airtable'],
+        guide: 'Airtable kayıt okuma',
+    },
+    {
+        tool: 'breviai.github.repos_list',
+        keywords: ['github', 'repo', 'repository'],
+        guide: 'GitHub repo listeleme',
+    },
+    {
+        tool: 'breviai.zapier.trigger_webhook',
+        keywords: ['zapier', 'webhook tetikle'],
+        guide: 'Zapier entegrasyonu',
+    },
+    {
+        tool: 'breviai.google.drive_list',
+        keywords: ['google drive', 'drive dosya', 'drive file', 'dosya ara drive'],
+        guide: 'Google Drive dosya arama/listeleme',
+    },
+    {
+        tool: 'breviai.google.sheets_read / breviai.google.sheets_write',
+        keywords: ['google sheets', 'google tablo', 'spreadsheet', 'sheet', 'tablolar'],
+        guide: 'Google Sheets okuma/yazma',
+    },
+    {
+        tool: 'breviai.google.gmail_read',
+        keywords: ['gmail', 'google mail'],
+        guide: 'Gmail okuma',
+    },
+    {
+        tool: 'breviai.google.calendar_list / breviai.google.calendar_create',
+        keywords: ['google calendar', 'google takvim', 'meet planla', 'google meet'],
+        guide: 'Google Calendar/Meet',
+    },
+    {
+        tool: 'breviai.microsoft.onedrive_search / breviai.microsoft.onedrive_list',
+        keywords: ['onedrive', 'one drive', 'microsoft drive'],
+        guide: 'OneDrive dosya arama/listeleme',
+    },
+    {
+        tool: 'breviai.microsoft.outlook_read / breviai.microsoft.outlook_send',
+        keywords: ['outlook', 'hotmail', 'live.com mail'],
+        guide: 'Outlook e-posta',
+    },
+    {
+        tool: 'breviai.microsoft.excel_read / breviai.microsoft.excel_write',
+        keywords: ['excel', 'xlsx', 'workbook'],
+        guide: 'Microsoft Excel',
+    },
+    {
+        tool: 'breviai.microsoft.teams_meeting',
+        keywords: ['teams', 'microsoft teams'],
+        guide: 'Teams toplantı',
+    },
+];
+
+function buildMcpDirective(prompt: string): string {
+    const lower = String(prompt || '').toLowerCase();
+    if (!lower.trim()) return '';
+
+    const matches = MCP_INTENT_HINTS.filter((hint) =>
+        hint.keywords.some((kw) => lower.includes(kw))
+    );
+
+    if (!matches.length) return '';
+
+    const lines = matches.map(
+        (hint) => `- ${hint.guide} => ${hint.tool}`
+    );
+
+    return [
+        '',
+        'MCP_ONCELIK_KURALI:',
+        '- Bu istekte MCP destekli servisler tespit edildi.',
+        '- MCP destekli adimlarda native node yerine MCP_TOOL kullan.',
+        '- MCP_TOOL config formati: {"toolName":"breviai.xxx", "params": {...}, "variableName":"mcpResult"}',
+        '- accessToken parametresini bos birakabilirsin; runtime mevcut Google/Microsoft tokenlarini otomatik enjekte etmeyi dener.',
+        '- Ayni is icin AGENT_AI yerine oncelikle dogrudan MCP_TOOL tercih et.',
+        '- Tespit edilen MCP eslesmeleri:',
+        ...lines,
+    ].join('\n');
+}
+
 /**
  * Check rate limit
  */
@@ -245,6 +359,12 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
             fullPrompt += `\n\nâš ï¸ Ã–NEMLÄ°: Bu istek yapay zeka/sohbet botu iÃ§eriyor. MUTLAKA AGENT_AI node'u kullan!
 1. MANUAL_TRIGGER â†’ 2. TEXT_INPUT (kullanÄ±cÄ±dan mesaj al) â†’ 3. AGENT_AI (mesajÄ± iÅŸle) â†’ 4. SHOW_TEXT (yanÄ±tÄ± gÃ¶ster)`;
             console.log('[Generate] AI request detected, adding AGENT_AI instruction');
+        }
+
+        const mcpDirective = buildMcpDirective(prompt);
+        if (mcpDirective) {
+            fullPrompt += `\n\n${mcpDirective}`;
+            console.log('[Generate] MCP-capable intent detected, adding MCP priority instruction');
         }
 
         if (user_context) {

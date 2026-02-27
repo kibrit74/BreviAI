@@ -6,6 +6,58 @@ const dns = require('dns');
 const net = require('net');
 const webhookService = require('./webhook');
 
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+// AI GenAI Instance
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const aiModel = genAI ? genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }) : null;
+
+// Fake Redis In-Memory Cache (5 min TTL)
+const scrapeCache = new Map();
+function getCachedScrape(key) {
+    const entry = scrapeCache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+        scrapeCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+function setCachedScrape(key, data, ttlSec = 300) {
+    scrapeCache.set(key, { data, expiresAt: Date.now() + ttlSec * 1000 });
+}
+
+async function aiSummarizeText(text, maxTokens = 30000) {
+    if (!aiModel || text.length <= maxTokens * 4) {
+        return text.substring(0, maxTokens * 4);
+    }
+    console.log('[Browser] Text too long, starting AI Summarization (Chunking)...');
+    
+    // Split into 10k chunks
+    const chunkSize = 10000;
+    const chunks = [];
+    for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.substring(i, i + chunkSize));
+    }
+    
+    // Limit to 5 chunks to avoid massive costs
+    const limitedChunks = chunks.slice(0, 5); 
+    
+    const summaries = await Promise.all(limitedChunks.map(async (chunk) => {
+        try {
+            const prompt = `Bu web sitesi metin parçasından ÖNEMLİ BİLGİLERİ (haber başlıkları, fiyatlar, döviz kurları, tarihler, sıcaklıklar) çıkar. Çıkan sonucu net, kısa Türkçe cümlelerle yaz. Gereksiz veya spam içerikleri yoksay.\n\nMetin:\n${chunk}`;
+            const result = await aiModel.generateContent(prompt);
+            return result.response.text();
+        } catch (e) {
+            console.error('[Browser] AI Chunk error:', e.message);
+            return '';
+        }
+    }));
+    
+    return summaries.filter(s => s.trim().length > 0).join('\n---\n');
+}
+
+
 const router = express.Router();
 
 // ═══════════════════════════════════════════════════
@@ -448,25 +500,33 @@ class BrowserService {
 
     // 1. Scrape Text/HTML
     async scrape(url, selectorOrOptions, extractArg = 'text') {
+        const isOptionsObject = selectorOrOptions && typeof selectorOrOptions === 'object' && !Array.isArray(selectorOrOptions);
+        const selector = isOptionsObject ? selectorOrOptions.selector : selectorOrOptions;
+        const waitForSelector = isOptionsObject ? (selectorOrOptions.waitForSelector || selectorOrOptions.selector) : selector;
+        const extract = (isOptionsObject ? selectorOrOptions.extract : extractArg) || 'text';
+        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data'].includes(extract) ? extract : 'text';
+        const targetSelector = selector || waitForSelector;
+
+        // CHECK CACHE FIRST (for clean_text and smart_data only to be safe)
+        if (extractMode === 'clean_text' || extractMode === 'smart_data') {
+            const cacheKey = `scrape:${url}:${extractMode}`;
+            const cached = getCachedScrape(cacheKey);
+            if (cached) {
+                console.log(`[Browser] Cache hit for ${url}`);
+                return cached;
+            }
+        }
+
         let page = null;
         try {
             await assertSafeHttpUrl(url);
             page = await this.getPage();
-            console.log(`[Browser] Scraping ${url}...`);
+            console.log(`[Browser] Scraping ${url} (Mode: ${extractMode})...`);
 
-            const isOptionsObject = selectorOrOptions && typeof selectorOrOptions === 'object' && !Array.isArray(selectorOrOptions);
-            const selector = isOptionsObject ? selectorOrOptions.selector : selectorOrOptions;
-            const waitForSelector = isOptionsObject ? (selectorOrOptions.waitForSelector || selectorOrOptions.selector) : selector;
-            const extract = (isOptionsObject ? selectorOrOptions.extract : extractArg) || 'text';
-            const extractMode = ['text', 'html', 'list'].includes(extract) ? extract : 'text';
-            const targetSelector = selector || waitForSelector;
-
-            // Use 'domcontentloaded' for faster response, 'networkidle2' is too slow for dynamic sites
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
             await assertSafeHttpUrl(page.url());
 
             if (waitForSelector) {
-                // Wait for a specific selector before extracting (dynamic pages)
                 await page.waitForSelector(waitForSelector, { timeout: 30000 });
             }
 
@@ -484,17 +544,110 @@ class BrowserService {
                     result = await page.content();
                 }
             } else if (extractMode === 'list') {
-                // Return array of text items
                 if (targetSelector) {
                     result = await page.$$eval(targetSelector, elements => elements.map(el => el.innerText));
                 } else {
                     throw new Error('Selector required for list extraction');
                 }
+            } else if (extractMode === 'clean_text' || extractMode === 'smart_data') {
+                
+                // SMART DATA EXTRACTION (Priority Phase)
+                if (extractMode === 'smart_data') {
+                    const structuredData = await page.evaluate(() => {
+                        let jsonLdData = null;
+                        const jsonLdElement = document.querySelector('script[type="application/ld+json"]');
+                        if (jsonLdElement) {
+                            try { jsonLdData = JSON.parse(jsonLdElement.textContent); } catch (e) {}
+                        }
+                        const ogTags = {};
+                        document.querySelectorAll('meta[property^="og:"]').forEach(meta => {
+                            ogTags[meta.getAttribute('property')] = meta.getAttribute('content');
+                        });
+                        return { jsonLd: jsonLdData, openGraph: ogTags };
+                    });
+
+                    // If it has strong product or article info
+                    if ((structuredData.jsonLd && (structuredData.jsonLd.price || structuredData.jsonLd.headline)) || 
+                        structuredData.openGraph['og:price:amount'] || structuredData.openGraph['og:title']) {
+                        result = { type: 'structured', data: structuredData };
+                    }
+                }
+
+                // If no smart data found OR user explicitly wanted clean_text
+                if (!result) {
+                    // DOM Selective Stripping
+                    const rawCleanText = await page.evaluate(() => {
+                        const alwaysRemove = ['script', 'style', 'noscript', 'iframe', 'svg', 'canvas', 'video', 'audio'];
+                        const conditionalRemove = ['nav', 'footer', 'aside', 'header'];
+
+                        alwaysRemove.forEach(tag => document.querySelectorAll(tag).forEach(el => el.remove()));
+
+                        conditionalRemove.forEach(tag => {
+                            document.querySelectorAll(tag).forEach(el => {
+                                const text = el.innerText ? el.innerText.toLowerCase() : '';
+                                if (/(\d+[.,]\d+|tl|usd|eur|dolar|euro|hava|derece|°c)/i.test(text) ||
+                                    el.querySelectorAll('article, .news, .price').length > 0) {
+                                    return; // Koru
+                                }
+                                el.remove();
+                            });
+                        });
+                        return document.body.innerText;
+                    });
+                    
+                    // Collapse excessive newlines and whitespace
+                    const collapsedText = rawCleanText.replace(/\n{3,}/g, '\n\n').trim();
+                    
+                    // Call AI chunk summarizer
+                    const finalText = await aiSummarizeText(collapsedText, 30000);
+                    
+                    result = {
+                        type: 'clean_text',
+                        data: finalText
+                    };
+                }
+
+                // Save to Cache
+                const cacheKey = `scrape:${url}:${extractMode}`;
+                setCachedScrape(cacheKey, result, 300);
             }
 
             return result;
         } catch (err) {
-            console.error('[Browser] Scrape error:', err);
+            console.error('[Browser] Puppeteer Scrape error:', err.message);
+            // FALLBACK CHAIN: Trigger Jina AI if blocked
+            if (extractMode === 'clean_text' || extractMode === 'smart_data') {
+                if (err.message.includes('blocked') || err.message.includes('timeout') || err.message.includes('ERR_')) {
+                    console.log('[Browser] Captcha/Block detected. Falling back to r.jina.ai proxy...');
+                    try {
+                        let jinaResponse = null;
+                        if (typeof fetch !== 'undefined') {
+                            const controller = new AbortController();
+                            const id = setTimeout(() => controller.abort(), 10000);
+                            jinaResponse = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
+                            clearTimeout(id);
+                        } else {
+                            // node-fetch fallback if fetch is not native
+                            const https = require('https');
+                            jinaResponse = await new Promise((res, rej) => {
+                                https.get(`https://r.jina.ai/${url}`, (response) => {
+                                    let data = '';
+                                    response.on('data', chunk => data += chunk);
+                                    response.on('end', () => res({ ok: response.statusCode === 200, text: () => Promise.resolve(data) }));
+                                }).on('error', rej);
+                            });
+                        }
+
+                        if (jinaResponse && jinaResponse.ok) {
+                            const textData = await jinaResponse.text();
+                            const finalText = await aiSummarizeText(textData, 30000);
+                            return { type: 'fallback_jina', data: finalText };
+                        }
+                    } catch (jinaErr) {
+                         console.error('[Browser] Fallback Jina AI failed:', jinaErr.message);
+                    }
+                }
+            }
             throw err;
         } finally {
             if (page) await page.close();
@@ -536,7 +689,7 @@ router.post('/scrape', scrapeRateLimit, async (req, res) => {
     try {
         const { url, selector, waitForSelector, extract } = req.body || {};
         if (!url) return res.status(400).json({ error: 'url required' });
-        const extractMode = ['text', 'html', 'list'].includes(extract) ? extract : 'text';
+        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data'].includes(extract) ? extract : 'text';
         const startedAt = Date.now();
 
         const data = await service.scrape(url, { selector, waitForSelector, extract: extractMode });

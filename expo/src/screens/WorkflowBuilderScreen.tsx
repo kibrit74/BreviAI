@@ -337,9 +337,26 @@ export const WorkflowBuilderScreen: React.FC = () => {
                         };
 
                         const convertedNodes: WorkflowNode[] = mcpSteps.map((step: any, idx: number) => {
-                            const nodeType = (toolToNodeType[step.tool] || 'AGENT_AI') as NodeType;
+                            const isBackendMcpTool = typeof step.tool === 'string' && step.tool.startsWith('breviai.');
+                            const nodeType = (
+                                isBackendMcpTool
+                                    ? 'MCP_TOOL'
+                                    : (toolToNodeType[step.tool] || 'AGENT_AI')
+                            ) as NodeType;
                             const node = createNode(nodeType, { x: 100, y: 120 + idx * 130 });
                             node.label = step.name || step.id || `Step ${idx + 1}`;
+
+                            if (isBackendMcpTool) {
+                                const rawArgs = step.args && typeof step.args === 'object' ? step.args : {};
+                                const { variableName, ...params } = rawArgs as any;
+                                node.config = {
+                                    ...(node.config || {}),
+                                    toolName: step.tool,
+                                    params,
+                                    variableName: variableName || `${step.id || `mcp_${idx + 1}`}_result`,
+                                } as any;
+                                return node;
+                            }
 
                             // Use specific config mapper if available, else merge args
                             const mapper = toolConfigMapper[step.tool];

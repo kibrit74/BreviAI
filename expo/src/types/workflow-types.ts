@@ -829,7 +829,7 @@ export interface BrowserScrapeConfig {
     url: string;
     waitForSelector?: string;
     selector?: string; // CSS selector to extract text from
-    extract?: 'text' | 'html' | 'list';
+    extract?: 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
     variableName: string;
 }
 

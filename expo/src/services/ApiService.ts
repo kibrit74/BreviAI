@@ -570,12 +570,40 @@ INSTRUCTIONS:
         args: Record<string, unknown> = {}
     ): Promise<{ success: boolean; result?: McpToolResult; error?: string }> {
         try {
+            let resolvedArgs: Record<string, unknown> = { ...args };
+
+            // Auto-inject Google OAuth token for Google MCP tools.
+            if (toolName.startsWith('breviai.google.') && !resolvedArgs.accessToken) {
+                try {
+                    const { googleService } = require('./GoogleService');
+                    const googleToken = googleService?.getAuthState?.()?.accessToken || null;
+                    if (googleToken) {
+                        resolvedArgs = { ...resolvedArgs, accessToken: googleToken };
+                    }
+                } catch (e) {
+                    console.warn('[ApiService] Google token auto-injection failed:', e);
+                }
+            }
+
+            // Auto-inject Microsoft OAuth token for Microsoft MCP tools.
+            if (toolName.startsWith('breviai.microsoft.') && !resolvedArgs.accessToken) {
+                try {
+                    const { microsoftService } = require('./MicrosoftService');
+                    const microsoftToken = await microsoftService?.getAccessToken?.();
+                    if (microsoftToken) {
+                        resolvedArgs = { ...resolvedArgs, accessToken: microsoftToken };
+                    }
+                } catch (e) {
+                    console.warn('[ApiService] Microsoft token auto-injection failed:', e);
+                }
+            }
+
             // Auto-inject Slack token for Slack MCP tools
-            if (toolName.startsWith('breviai.slack.') && !args.token) {
+            if (toolName.startsWith('breviai.slack.') && !resolvedArgs.token) {
                 const { slackService } = require('./SlackService');
                 const token = await slackService.getAccessToken();
                 if (token) {
-                    args = { ...args, token };
+                    resolvedArgs = { ...resolvedArgs, token };
                 } else {
                     return { success: false, error: 'Slack bağlı değil. Lütfen Ayarlar sayfasından Slack hesabınızı bağlayın.' };
                 }
@@ -591,7 +619,7 @@ INSTRUCTIONS:
                 body: JSON.stringify({
                     action: 'call_tool',
                     toolName,
-                    arguments: args,
+                    arguments: resolvedArgs,
                 }),
             }).finally(() => clearTimeout(timeoutId));
 

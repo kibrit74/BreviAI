@@ -5833,7 +5833,7 @@ const CameraCaptureFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
 // ═══════════════════════════════════════════════════════════════
 
 const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
-    const extractMode = (config.extract || 'text') as 'text' | 'html' | 'list';
+    const extractMode = (config.extract || 'text') as 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
 
     return (
         <>
@@ -5884,6 +5884,8 @@ const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
                         { value: 'text', label: 'Metin' },
                         { value: 'html', label: 'HTML' },
                         { value: 'list', label: 'Liste' },
+                        { value: 'clean_text', label: '🤖 AI Metin' },
+                        { value: 'smart_data', label: '📊 Akıllı Veri' },
                     ].map((opt) => (
                         <TouchableOpacity
                             key={opt.value}
@@ -5896,7 +5898,11 @@ const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
                         </TouchableOpacity>
                     ))}
                 </View>
-                <Text style={styles.fieldHint}>`list` seciliyse tum eslesen elemanlar dizi olarak doner.</Text>
+                <Text style={styles.fieldHint}>
+                    {extractMode === 'clean_text' ? '🤖 Sayfa metni temizlenip AI ile özetlenir. Selector gerekmez.' :
+                        extractMode === 'smart_data' ? '📊 Önce JSON-LD/OpenGraph verileri aranır, yoksa temiz metin çekilir.' :
+                            '`list` seciliyse tum eslesen elemanlar dizi olarak doner.'}
+                </Text>
             </View>
 
             <View style={styles.field}>

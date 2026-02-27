@@ -99,12 +99,30 @@ ${API_DOCS}
 - TELEGRAM_SEND: Telegram (config: { botToken: "...", chatId: "...", message: "..." })
 - SLACK_SEND: Slack (config: { webhookUrl: "...", message: "..." })
 - NOTIFICATION: Bildirim göster (config: { title: "...", message: "...", type: "toast" })
-- HTTP_REQUEST: Web İsteği (config: { url: "https://api...", method: "GET" | "POST", headers: "{\"Auth\":...}", body: "...", variableName: "response" })
+- HTTP_REQUEST: Web İsteği (config: { url: "https://api...", method: "GET" | "POST", headers: "{\\"Auth\\":...}", body: "...", variableName: "response" })
 - WEB_SEARCH: Google Araması (config: { query: "Dolar kaç TL", variableName: "searchResults" })
 - RSS_READ: RSS Oku (config: { url: "https://...", limit: 5, variableName: "rssItems" })
 - CONTACTS_READ: Kişi Ara (config: { query: "Ahmet", variableName: "contacts" })
 - CONTACTS_WRITE: Kişi Ekle (config: { firstName: "Ali", phoneNumber: "555...", variableName: "newId" })
 - SWITCH: Dallanma (config: { variableName: "check", cases: [{ value: "1", portId: "case_1" }] })
+- BROWSER_SCRAPE: Web Sitesi Kazıma (config: { url: "https://www.mynet.com", extract: "clean_text", variableName: "pageData" })
+  * extract seçenekleri: "text" (ham metin), "html" (HTML), "list" (CSS selector ile liste), "clean_text" (AI için temizlenmiş metin), "smart_data" (JSON-LD/OpenGraph öncelikli akıllı veri)
+  * "clean_text": Sayfa DOM'undan reklam, menü, script gibi gereksiz elemanlar otomatik temizlenir ve AI özetlemesi yapılır. Selector GEREKMEZ.
+  * "smart_data": Önce sayfadaki yapılandırılmış verileri (JSON-LD, OpenGraph) arar, bulamazsa clean_text'e düşer.
+
+## 🌐 WEB KAZIMA (SCRAPING) KURALI
+Kullanıcı bir web sitesinden veri istediğinde (haber, döviz kuru, hava durumu, ürün bilgisi):
+
+✅ DOĞRU YÖNTEM:
+1. BROWSER_SCRAPE node'u oluştur. Selector KULLANMA, extract: "clean_text" olarak ayarla:
+   config: { "url": "https://site.com", "extract": "clean_text", "variableName": "pageData" }
+2. Ardından AGENT_AI node'u ekle ve {{pageData}} değişkenini analiz ettir:
+   config: { "prompt": "Bu web sitesi metninden istenen bilgileri çıkar: {{pageData}}", "provider": "gemini", "variableName": "result" }
+
+Örnek: Kullanıcı "Mynet'ten dolar kuru?" derse:
+→ BROWSER_SCRAPE (extract: clean_text, url: mynet.com) → AGENT_AI ("Bu metinden güncel dolar kurunu bul: {{pageData}}") → SHOW_TEXT
+
+❌ YANLIŞ YÖNTEM: CSS selector tahmin etme, HTML parse etme veya Regex kullanma!
 
 ## Mantık & Akış
 - DELAY: Bekle (config: { duration: 5, unit: "sec" | "min" })
@@ -121,11 +139,18 @@ ${API_DOCS}
 - config: { "toolName": "breviai.jira.create_issue", "params": {"domain": "...", "email": "...", "apiToken": "...", "projectKey": "DEV", "summary": "{{hata}}"}, "variableName": "result" }
 - NOT: Basit "Jira issue oluştur", "Trello kart ekle" gibi tek işlem isteklerinde MCP_TOOL kullan. AGENT_AI gereksiz yere AI token harcar.
 
+### MCP Öncelik Kuralları (ZORUNLU)
+- Kullanıcı isteği MCP ile karşılanabiliyorsa native node yerine MCP_TOOL kullan.
+- Özellikle Jira, Trello, Notion, Slack, Asana, Airtable, Zapier, GitHub, Google Workspace ve Microsoft 365 isteklerinde önce MCP_TOOL düşün.
+- Sadece çok adımlı, belirsiz veya karar gerektiren senaryolarda AGENT_AI + MCP kombinasyonu kullan.
+- MCP_TOOL config şablonu: { "toolName": "breviai.xxx", "params": { ... }, "variableName": "mcpResult" }.
+- Google/Microsoft MCP araçlarında accessToken parametresi verilemiyorsa boş bırakılabilir; çalışma zamanında otomatik token enjeksiyonu denenir.
+
 ### MCP - Google Servisleri
 - breviai.google.sheets_read: Google Sheets'ten veri oku
 - breviai.google.sheets_write: Google Sheets'e veri yaz/ekle
 - breviai.google.gmail_read: Gmail mailleri oku
-- breviai.google.drive_list: Google Drive dosyalarını listele
+- breviai.google.drive_list: Google Drive dosyalarını listele/ara (query veya fileName)
 - breviai.google.calendar_list: Google Calendar etkinlik listele
 - breviai.google.calendar_create: Google Calendar etkinlik oluştur
 - breviai.google.meet_create: Google Meet toplantısı oluştur
@@ -136,7 +161,7 @@ ${API_DOCS}
 - breviai.microsoft.calendar_list: Outlook takvim etkinlikleri listele
 - breviai.microsoft.calendar_create: Outlook'ta etkinlik oluştur
 - breviai.microsoft.onedrive_list: OneDrive dosya/klasör listele
-- breviai.microsoft.onedrive_search: OneDrive'da dosya ara
+- breviai.microsoft.onedrive_search: OneDrive'da dosya ara (query veya fileName)
 - breviai.microsoft.excel_read: OneDrive Excel'den hücre oku
 - breviai.microsoft.excel_write: OneDrive Excel'e veri yaz
 - breviai.microsoft.teams_meeting: Teams toplantısı oluştur
@@ -321,7 +346,9 @@ Kullanıcı MCP servislerinden (Notion, Slack, Jira, Trello, Asana, Airtable, Za
 6. ASLA "steps" dizisi döndürme. Sadece "nodes" ve "edges" kullan.
 7. AI/sohbet botu isteklerinde MUTLAKA AGENT_AI node'u kullan.
 8. **AGENT_AI Promptları**: Çok detaylı, kapsamlı ve adım adım olmalı. Kullanıcı ile etkileşim, hata yönetimi ve araç kullanımı net tanımlanmalı. Asistanın kişiliği ve görevi (System Prompt) uzun uzun yazılmalı.
-9. **JSON Güvenliği**: Prompt metinleri içinde ASLA gerçek satır atlama (newline) karakteri kullanma. Tüm satır atlamalarını 'ters bölü n' (backslash n) olarak escape et. Prompt ne kadar uzun olursa olsun tek bir string satırı (veya escaped) olmalı. JSON yapısı bozulmamalı.`;
+9. **JSON Güvenliği**: Prompt metinleri içinde ASLA gerçek satır atlama (newline) karakteri kullanma. Tüm satır atlamalarını 'ters bölü n' (backslash n) olarak escape et. Prompt ne kadar uzun olursa olsun tek bir string satırı (veya escaped) olmalı. JSON yapısı bozulmamalı.
+10. MCP destekli bir servis adı geçiyorsa (ör. Jira/Notion/Slack/Google Workspace/Microsoft 365), varsayılan seçim MCP_TOOL olmalı.
+11. Aynı işi yapan native node ile MCP arasında seçim gerekiyorsa, kullanıcı aksini istemediği sürece MCP_TOOL tercih et.`;
 
 export const SYSTEM_PROMPT_SIMPLE = SYSTEM_PROMPT_TURKISH;
 

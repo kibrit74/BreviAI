@@ -239,7 +239,7 @@ export async function executeBrowserScrape(
     const url = variableManager.resolveString(config.url);
     const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
     const selector = config.selector ? variableManager.resolveString(config.selector) : undefined;
-    const extract = (config.extract || 'text') as 'text' | 'html' | 'list';
+    const extract = (config.extract || 'text') as 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
 
     console.log('[BrowserScrape] Scraping URL:', url);
 

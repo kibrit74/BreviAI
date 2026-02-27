@@ -483,6 +483,11 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
                         type: 'string',
                         description: 'OAuth2 access token for Google Drive',
                     },
+                    fileName: {
+                        type: 'string',
+                        description:
+                            'Optional file name text to search for. If provided without query, the tool searches by file name.',
+                    },
                     query: {
                         type: 'string',
                         description:
@@ -508,13 +513,21 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
                 });
             }
 
+            const fileName = String(args.fileName || '').trim();
             const query = String(args.query || '').trim();
             const limit = normalizeLimit(args.limit, 10, 50);
+            const escapeDriveQueryValue = (value: string) =>
+                value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const effectiveQuery =
+                query ||
+                (fileName
+                    ? `name contains '${escapeDriveQueryValue(fileName)}' and trashed=false`
+                    : '');
 
             try {
                 let url = `https://www.googleapis.com/drive/v3/files?pageSize=${limit}&fields=files(id,name,mimeType,size,modifiedTime,webViewLink,owners)`;
-                if (query) {
-                    url += `&q=${encodeURIComponent(query)}`;
+                if (effectiveQuery) {
+                    url += `&q=${encodeURIComponent(effectiveQuery)}`;
                 }
 
                 const response = await withTimeout(
@@ -560,14 +573,17 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
                         {
                             type: 'json',
                             json: {
-                                query: query || '(all files)',
+                                query: effectiveQuery || '(all files)',
+                                fileName: fileName || undefined,
                                 count: files.length,
                                 files,
                             },
                         },
                         {
                             type: 'text',
-                            text: `Listed ${files.length} files from Google Drive.`,
+                            text: fileName
+                                ? `Found ${files.length} files matching "${fileName}" in Google Drive.`
+                                : `Listed ${files.length} files from Google Drive.`,
                         },
                     ],
                     metadata: {
@@ -1541,6 +1557,11 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
                         type: 'string',
                         description: 'Microsoft Graph OAuth2 access token',
                     },
+                    fileName: {
+                        type: 'string',
+                        description:
+                            'Optional file name text to search for (alias of query).',
+                    },
                     query: {
                         type: 'string',
                         description: 'Search query text',
@@ -1552,15 +1573,15 @@ const TOOL_REGISTRY: Record<string, McpToolRegistration> = {
                         default: 10,
                     },
                 },
-                required: ['accessToken', 'query'],
+                required: ['accessToken'],
                 additionalProperties: false,
             },
         },
         handler: async (args, context) => {
             const accessToken = String(args.accessToken || '').trim();
-            const query = String(args.query || '').trim();
+            const query = String(args.query || args.fileName || '').trim();
             if (!accessToken || !query) {
-                return toolError('accessToken and query are required', {
+                return toolError('accessToken and query/fileName are required', {
                     requestId: context.requestId,
                 });
             }

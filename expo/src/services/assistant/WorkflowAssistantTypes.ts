@@ -15,6 +15,7 @@ export interface AssistantRoutingResult {
 
 export type AssistantPatchChangeType =
     | 'update_node_config'
+    | 'update_node_type'
     | 'update_node_label'
     | 'replace_text_template'
     | 'add_edge'

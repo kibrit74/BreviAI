@@ -1698,6 +1698,38 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         mcpToolName: 'breviai.google.meet_create',
         permissions: { requiresConfirmation: true, isSensitive: false }
     },
+    {
+        name: 'mcp_google_drive_search',
+        description: 'Searches files in Google Drive by file name.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Google OAuth2 access token' },
+                fileName: { type: 'STRING', description: 'File name text to search (e.g. "invoice")' },
+                limit: { type: 'INTEGER', description: 'Max files to return (default: 10)' }
+            },
+            required: ['accessToken', 'fileName']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.google.drive_list',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
+    {
+        name: 'mcp_onedrive_search',
+        description: 'Searches files in OneDrive by file name.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                accessToken: { type: 'STRING', description: 'Microsoft Graph OAuth2 access token' },
+                fileName: { type: 'STRING', description: 'File name text to search (e.g. "invoice")' },
+                limit: { type: 'INTEGER', description: 'Max files to return (default: 10)' }
+            },
+            required: ['accessToken', 'fileName']
+        },
+        nodeType: 'MCP_CALL',
+        mcpToolName: 'breviai.microsoft.onedrive_search',
+        permissions: { requiresConfirmation: false, isSensitive: true }
+    },
 
     // --- MICROSOFT TEAMS ---
     {

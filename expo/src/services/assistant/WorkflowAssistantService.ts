@@ -16,6 +16,7 @@ const DEFAULT_FALLBACK: Omit<AssistantResponse, 'provider' | 'model'> = {
 
 const ALLOWED_CHANGE_TYPES = new Set([
     'update_node_config',
+    'update_node_type',
     'update_node_label',
     'replace_text_template',
     'add_edge',

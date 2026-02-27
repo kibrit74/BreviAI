@@ -240,13 +240,19 @@ JSON çıktısını üretmeden önce şu adımları zihninde (veya açıklama k�
   | breviai.airtable.list_records | Airtable kayıtları oku |
   | breviai.zapier.trigger_webhook | Zapier webhook tetikle |
   | breviai.github.repos_list | GitHub repoları listele |
+  | breviai.google.drive_list | Google Drive dosya ara/listele |
   | breviai.google.meet_create | Google Meet toplantısı oluştur |
+  | breviai.microsoft.onedrive_search | OneDrive dosya ara |
+  | breviai.microsoft.onedrive_list | OneDrive dosya/klasör listele |
   | breviai.microsoft.teams_meeting | Teams toplantısı oluştur |
   | breviai.slack.list_channels | Slack kanalları listele |
   | breviai.slack.send_message | Slack mesaj gönder |
   | breviai.notion.search | Notion'da ara |
   | breviai.notion.create_page | Notion sayfası oluştur |
 - NOT: Basit, tekrarlayan iş araçları için AGENT_AI yerine MCP_TOOL kullan (token tasarrufu + hız).
+- MCP Öncelik: MCP ile çözülebilen isteklerde (Jira, Notion, Slack, Trello, Asana, Airtable, Zapier, GitHub, Google Workspace, Microsoft 365) varsayılan node seçimi MCP_TOOL olmalı.
+- MCP_TOOL şablonu: {"toolName":"breviai.xxx","params":{...},"variableName":"mcpResult"}
+- accessToken gerekiyorsa parametreye eklenebilir; eklenmese de çalışma zamanında uygun token otomatik enjekte edilmeye çalışılır.
 
 # KISITLAMALAR & KURALLAR
 1.  **JSON Formatı:** Çıktı SADECE geçerli bir JSON olmalı. Başka metin ekleme.

@@ -37,6 +37,15 @@ class WorkflowPatchService {
                 continue;
             }
 
+            if (change.type === 'update_node_type') {
+                const node = getNodeById(next, change.nodeId);
+                if (!node) continue;
+                const nextType = String(change.newValue || '').trim();
+                if (!nextType) continue;
+                node.type = nextType as any;
+                continue;
+            }
+
             if (change.type === 'replace_text_template') {
                 const node = getNodeById(next, change.nodeId);
                 if (!node || !change.path) continue;
