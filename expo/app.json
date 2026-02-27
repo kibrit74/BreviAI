@@ -107,6 +107,7 @@
       "./plugins/withNotificationListener",
       "./plugins/withCallDetection",
       "./plugins/withAllowBackupFix",
+      "./plugins/withWidgetHeadlessFix",
       "expo-audio",
       "expo-video",
       "expo-secure-store",

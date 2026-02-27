@@ -16,6 +16,50 @@ export async function getBackendConfig() {
     return { url, key };
 }
 
+function hasOwnKey<T extends object>(obj: T, key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+function unwrapScrapeEnvelope(payload: any): any {
+    let current = payload;
+
+    for (let i = 0; i < 3; i++) {
+        if (!current || typeof current !== 'object' || Array.isArray(current)) {
+            return current;
+        }
+
+        const hasData = hasOwnKey(current, 'data');
+        const hasResult = hasOwnKey(current, 'result');
+        const hasSuccess = hasOwnKey(current, 'success');
+        const hasMeta = hasOwnKey(current, 'meta');
+
+        if (hasData && (hasSuccess || hasMeta)) {
+            current = current.data;
+            continue;
+        }
+
+        if (hasResult && (hasSuccess || hasMeta)) {
+            current = current.result;
+            continue;
+        }
+
+        return current;
+    }
+
+    return current;
+}
+
+function isEmptyScrapeValue(value: any): boolean {
+    if (value == null) return true;
+    if (typeof value === 'string') return value.trim().length === 0;
+    if (Array.isArray(value)) {
+        return value.length === 0 || value.every(item =>
+            item == null || (typeof item === 'string' && item.trim().length === 0)
+        );
+    }
+    return false;
+}
+
 /**
  * Execute CRON_CREATE node
  * Creates a scheduled task on the backend
@@ -195,6 +239,7 @@ export async function executeBrowserScrape(
     const url = variableManager.resolveString(config.url);
     const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
     const selector = config.selector ? variableManager.resolveString(config.selector) : undefined;
+    const extract = (config.extract || 'text') as 'text' | 'html' | 'list';
 
     console.log('[BrowserScrape] Scraping URL:', url);
 
@@ -213,6 +258,7 @@ export async function executeBrowserScrape(
                 url,
                 waitForSelector,
                 selector,
+                extract,
             }),
             signal: controller.signal
         });
@@ -222,15 +268,35 @@ export async function executeBrowserScrape(
             throw new Error(`Backend error: ${response.status} ${response.statusText}`);
         }
 
-        const data = await response.json();
-        const result = data.data || data.result || data;
+        const payload = await response.json();
+        const result = unwrapScrapeEnvelope(payload);
+        const empty = isEmptyScrapeValue(result);
+        const meta =
+            payload && typeof payload === 'object' && !Array.isArray(payload) && hasOwnKey(payload, 'meta')
+                ? payload.meta
+                : undefined;
+
+        if (empty) {
+            console.warn('[BrowserScrape] Scrape completed but returned empty data', {
+                url,
+                waitForSelector,
+                selector,
+                extract,
+            });
+        }
 
         // Store result in the configured variable name
         if (config.variableName) {
             variableManager.set(config.variableName, result);
         }
 
-        return { success: true, data: result };
+        return {
+            success: true,
+            data: result,
+            empty,
+            warning: empty ? 'Scrape completed but returned empty data' : undefined,
+            meta,
+        };
     } catch (error: any) {
         if (error.name === 'AbortError') {
             throw new Error('Scraping request timed out after 60 seconds');

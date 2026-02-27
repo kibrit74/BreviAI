@@ -5,6 +5,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import android.content.Context
 import android.content.Intent
 import android.app.NotificationManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 
@@ -64,6 +65,44 @@ class BreviSettingsModule : Module() {
             }
         }
         return null
+    }
+
+    private fun normalizeBreviDeepLink(rawValue: String): Uri {
+        val raw = rawValue.trim()
+        if (raw.isBlank()) {
+            return Uri.parse("com.breviai.app://")
+        }
+        if (
+            raw.startsWith("com.breviai.app://") ||
+            raw.startsWith("brevi-ai://") ||
+            raw.startsWith("exp+breviai://")
+        ) {
+            return Uri.parse(raw)
+        }
+        return Uri.parse("com.breviai.app://${raw.removePrefix("/")}")
+    }
+
+    private fun buildBreviDeepLink(payload: Map<String, Any?>?): Uri {
+        if (payload.isNullOrEmpty()) {
+            return Uri.parse("com.breviai.app://")
+        }
+
+        val directLink = (payload["deepLink"] ?: payload["url"] ?: payload["uri"])?.toString()
+        if (!directLink.isNullOrBlank()) {
+            return normalizeBreviDeepLink(directLink)
+        }
+
+        val route = (payload["route"] ?: payload["path"])?.toString()
+        if (!route.isNullOrBlank()) {
+            return normalizeBreviDeepLink(route)
+        }
+
+        val widgetId = payload["widgetId"]?.toString()
+        if (!widgetId.isNullOrBlank()) {
+            return Uri.parse("com.breviai.app://widget-config?widgetId=$widgetId")
+        }
+
+        return Uri.parse("com.breviai.app://")
     }
 
   override fun definition() = ModuleDefinition {
@@ -539,11 +578,8 @@ class BreviSettingsModule : Module() {
     AsyncFunction("openBreviAI") { payload: Map<String, Any?> ->
         val context = appContext.reactContext
             ?: throw Exception("React context is not available")
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?: throw Exception("Launch intent not found for package ${context.packageName}")
-
-        launchIntent.apply {
-            putExtra("widget_payload", java.util.HashMap(payload))
+        val launchIntent = Intent(Intent.ACTION_VIEW, buildBreviDeepLink(payload)).apply {
+            setPackage(context.packageName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         context.startActivity(launchIntent)

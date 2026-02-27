@@ -58,7 +58,7 @@ export async function executeDeviceNode(
     }
 }
 
-async function executeSoundMode(
+export async function executeSoundMode(
     config: SoundModeConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -112,7 +112,7 @@ async function executeSoundMode(
     }
 }
 
-async function executeScreenWake(
+export async function executeScreenWake(
     config: ScreenWakeConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -188,7 +188,7 @@ async function executeAppLaunch(
     }
 }
 
-async function executeDNDControl(
+export async function executeDNDControl(
     config: DNDControlConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -257,7 +257,7 @@ async function executeDNDControl(
     }
 }
 
-async function executeBrightnessControl(
+export async function executeBrightnessControl(
     config: BrightnessControlConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -379,7 +379,7 @@ export async function executeFlashlightControl(
     }
 }
 
-async function executeGlobalAction(
+export async function executeGlobalAction(
     config: GlobalActionConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -437,7 +437,7 @@ async function executeGlobalAction(
     }
 }
 
-async function executeMediaControl(
+export async function executeMediaControl(
     config: MediaControlConfig,
     variableManager: VariableManager
 ): Promise<any> {
@@ -507,7 +507,7 @@ export async function getAppList(): Promise<{ label: string; packageName: string
 // Track Bluetooth state for toggle (approximate, since we can't always read it instantly)
 let bluetoothState = true;
 
-async function executeBluetoothControl(
+export async function executeBluetoothControl(
     config: BluetoothControlConfig,
     _variableManager: VariableManager
 ): Promise<any> {

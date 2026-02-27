@@ -829,6 +829,7 @@ export interface BrowserScrapeConfig {
     url: string;
     waitForSelector?: string;
     selector?: string; // CSS selector to extract text from
+    extract?: 'text' | 'html' | 'list';
     variableName: string;
 }
 
@@ -1024,6 +1025,7 @@ export interface DatabaseWriteConfig {
 }
 
 export type NodeConfig =
+    | McpToolConfig
     | ExecuteWorkflowConfig
     | ManualTriggerConfig
     | TimeTriggerConfig
@@ -1416,6 +1418,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         hasInputPort: true,
         outputPorts: ['default'],
     },
+
     SET_VALUES: {
         type: 'SET_VALUES',
         category: 'processing',
@@ -2569,7 +2572,7 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         category: 'web',
         name: 'MCP Araç',
         description: 'Backend MCP servisini çağırır (Jira, Trello, Asana, vb.)',
-        icon: 'extension',
+        icon: 'briefcase',
         color: '#8B5CF6',
         hasInputPort: true,
         outputPorts: ['default'],
@@ -2704,10 +2707,11 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'GEOFENCE_CREATE': return { latitude: 0, longitude: 0, radius: 100, identifier: 'home_fence', name: 'Ev' };
 
         // Backend nodes
-        case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', selector: '', variableName: 'scrapedData' };
+        case 'BROWSER_SCRAPE': return { url: 'https://example.com', waitForSelector: '', selector: '', extract: 'text', variableName: 'scrapedData' };
         case 'CRON_CREATE': return { name: 'My Cron', schedule: '*/5 * * * *', actionType: 'log', actionPayload: '{}' };
         case 'CRON_DELETE': return { jobId: '', variableName: 'cronDeleteResult' };
         case 'CRON_LIST': return { variableName: 'cronJobs' };
+        case 'MCP_TOOL': return { toolName: '', params: {}, variableName: 'mcpResult' };
 
         case 'REALTIME_AI': return {
             systemPrompt: 'Sen BreviAI sesli asistanısın ve Türkçe konuşuyorsun.',

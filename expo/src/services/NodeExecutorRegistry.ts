@@ -163,6 +163,18 @@ import {
     executeSearchMemory,
     executeBulkAddToMemory,
     executeClearMemory,
+    executeSoundMode,
+    executeScreenWake,
+    executeDNDControl,
+    executeBrightnessControl,
+    executeFlashlightControl,
+    executeGlobalAction,
+    executeMediaControl,
+    executeBluetoothControl,
+    executeRealtimeAI,
+    executeShowOverlay,
+    executeOverlayInput,
+    executeOverlayClear,
 } from './nodes';
 
 import {
@@ -326,6 +338,20 @@ const executorRegistry: Partial<Record<NodeType, ExecutorEntry>> = {
 
     // Device
     'APP_LAUNCH': { executor: executeAppLaunch },
+    'SOUND_MODE': { executor: executeSoundMode },
+    'SCREEN_WAKE': { executor: executeScreenWake },
+    'DND_CONTROL': { executor: executeDNDControl },
+    'BRIGHTNESS_CONTROL': { executor: executeBrightnessControl },
+    'FLASHLIGHT_CONTROL': { executor: executeFlashlightControl },
+    'GLOBAL_ACTION': { executor: executeGlobalAction },
+    'MEDIA_CONTROL': { executor: executeMediaControl },
+    'BLUETOOTH_CONTROL': { executor: executeBluetoothControl },
+
+    // Real-time AI and Overlay
+    'REALTIME_AI': { executor: executeRealtimeAI },
+    'SHOW_OVERLAY': { executor: executeShowOverlay },
+    'OVERLAY_INPUT': { executor: executeOverlayInput },
+    'OVERLAY_CLEAR': { executor: executeOverlayClear },
 
     // Sensors
     'LIGHT_SENSOR': { executor: executeLightSensor },

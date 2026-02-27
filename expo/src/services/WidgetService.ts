@@ -11,6 +11,8 @@ import {
   normalizeWidgetButtons
 } from '../types/widget';
 import { Platform, NativeModules } from 'react-native';
+import { WorkflowStorage } from './WorkflowStorage';
+import { workflowEngine } from './WorkflowEngine';
 
 const { BreviHelperModule } = NativeModules;
 
@@ -35,7 +37,17 @@ type NativeWidgetManager = {
 
 function resolveNativeWidgetManager(): NativeWidgetManager | null {
   if (Platform.OS !== 'android') return null;
-  return (BreviSettingsModule as NativeWidgetManager) ?? (BreviHelperModule as NativeWidgetManager) ?? null;
+  const helper = BreviHelperModule as NativeWidgetManager | undefined;
+  const settings = BreviSettingsModule as NativeWidgetManager | undefined;
+
+  if (!helper && !settings) {
+    return null;
+  }
+
+  return {
+    ...(helper || {}),
+    ...(settings || {}),
+  };
 }
 
 export class WidgetService {
@@ -428,18 +440,25 @@ export class WidgetService {
 
   private async executeWorkflowAction(shortcutId: string): Promise<WidgetExecutionResult> {
     try {
-      if (this.nativeWidgetManager?.executeWidgetWorkflow) {
-        const result = await this.nativeWidgetManager.executeWidgetWorkflow(shortcutId);
-        if (result) {
-          return {
-            success: true,
-            executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
-          };
-        }
-        throw new Error('Native widget workflow execution returned false');
+      const workflow = await WorkflowStorage.getById(shortcutId);
+      if (!workflow) {
+        throw new Error(`Workflow not found: ${shortcutId}`);
       }
 
-      throw new Error('Native widget workflow bridge is not available');
+      const result = await workflowEngine.execute(workflow, {
+        _triggerType: 'widget',
+        _widgetSource: 'in_app_widget',
+        _widgetShortcutId: shortcutId,
+      });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Workflow execution failed');
+      }
+
+      return {
+        success: true,
+        executionId: `widget_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
+      };
     } catch (error: any) {
       return {
         success: false,
@@ -505,13 +524,30 @@ export class WidgetService {
       throw new Error('Native openBreviAI is not available');
     }
 
+    if (typeof payload === 'string') {
+      const trimmed = payload.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          await this.nativeWidgetManager.openBreviAI(JSON.parse(trimmed));
+          return;
+        } catch {
+          // Fallback to legacy string bridge below.
+        }
+      }
+
+      try {
+        await this.nativeWidgetManager.openBreviAI({ deepLink: payload });
+        return;
+      } catch {
+        await this.nativeWidgetManager.openBreviAI(payload);
+        return;
+      }
+    }
+
     try {
       await this.nativeWidgetManager.openBreviAI(payload);
     } catch (error) {
       // Legacy bridge fallback: some RN modules accept only string payload.
-      if (typeof payload === 'string') {
-        throw error;
-      }
       await this.nativeWidgetManager.openBreviAI(JSON.stringify(payload));
     }
   }

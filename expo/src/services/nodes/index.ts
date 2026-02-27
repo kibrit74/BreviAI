@@ -7,7 +7,18 @@ export { executeTriggerNode } from './triggers';
 export { executeControlNode, executeWorkflowNode } from './controls';
 export { executeInputNode, executeClipboardReader, executeShowText, executeTextInput, executeShowMenu, executeShowImage } from './inputs';
 export { executeOutputNode, executeNotification } from './outputs';
-export { executeDeviceNode } from './devices';
+export {
+    executeDeviceNode,
+    executeSoundMode,
+    executeScreenWake,
+    executeDNDControl,
+    executeBrightnessControl,
+    executeFlashlightControl,
+    executeGlobalAction,
+    executeMediaControl,
+    executeBluetoothControl
+} from './devices';
+export { executeShowOverlay, executeOverlayInput, executeOverlayClear } from './overlay';
 export { executeCalendarRead, executeCalendarCreate, executeCalendarUpdate, executeCalendarDelete } from './calendar';
 export { executeContactsRead, executeContactsWrite } from './contacts';
 export { executeLocationGet, executeBatteryCheck, executeNetworkCheck, executeGeofenceCreate, executeWeatherGet } from './state';

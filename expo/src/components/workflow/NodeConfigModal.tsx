@@ -61,6 +61,7 @@ import {
     ShowTextConfig,
     FilePickConfig,
     ViewUdfConfig,
+    McpToolConfig,
 } from '../../types/workflow-types';
 
 interface NodeConfigModalProps {
@@ -275,6 +276,111 @@ const ExecuteWorkflowFields: React.FC<ConfigFieldsProps> = ({ config, updateConf
         </View>
     </>
 );
+
+const McpToolFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
+    const mcpConfig = (config || {}) as Partial<McpToolConfig>;
+    const [paramsText, setParamsText] = useState(() => {
+        try {
+            return JSON.stringify(
+                mcpConfig.params && typeof mcpConfig.params === 'object' && !Array.isArray(mcpConfig.params)
+                    ? mcpConfig.params
+                    : {},
+                null,
+                2
+            );
+        } catch {
+            return '{}';
+        }
+    });
+    const [paramsError, setParamsError] = useState<string>('');
+
+    useEffect(() => {
+        try {
+            const next = JSON.stringify(
+                mcpConfig.params && typeof mcpConfig.params === 'object' && !Array.isArray(mcpConfig.params)
+                    ? mcpConfig.params
+                    : {},
+                null,
+                2
+            );
+            setParamsText(next);
+            setParamsError('');
+        } catch {
+            setParamsText('{}');
+        }
+    }, [mcpConfig.params]);
+
+    const handleParamsChange = (text: string) => {
+        setParamsText(text);
+
+        const trimmed = text.trim();
+        if (!trimmed) {
+            updateConfig('params', {});
+            setParamsError('');
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(text);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                setParamsError('Parametreler JSON object olmalı. Örn: {\"project\":\"ABC\"}');
+                return;
+            }
+            updateConfig('params', parsed);
+            setParamsError('');
+        } catch {
+            setParamsError('Geçersiz JSON. Düzeltilene kadar kaydedilen değer değişmez.');
+        }
+    };
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>MCP Tool Adı</Text>
+                <TextInput
+                    style={styles.input}
+                    value={mcpConfig.toolName || ''}
+                    onChangeText={(t) => updateConfig('toolName', t)}
+                    placeholder="breviai.jira.search_issues"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
+                <Text style={styles.fieldHint}>
+                    Backend MCP tool adı. Örn: `breviai.trello.list_cards`
+                </Text>
+            </View>
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Parametreler (JSON)</Text>
+                <ExpandableTextInput
+                    value={paramsText}
+                    onChangeText={handleParamsChange}
+                    placeholder='{"query":"bug", "limit": 10}'
+                    label="MCP Params JSON"
+                    hint='JSON object girin. Değişken desteği: {"project":"{{projectKey}}"}'
+                    minHeight={100}
+                />
+                <Text style={[styles.fieldHint, paramsError ? { color: '#F87171' } : null]}>
+                    {paramsError || 'Boş bırakılırsa {} gönderilir.'}
+                </Text>
+            </View>
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sonuç Değişkeni (Opsiyonel)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={mcpConfig.variableName || ''}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="mcpResult"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                />
+            </View>
+        </>
+    );
+};
 
 // API Dokümantasyon Linki
 interface ApiDocLinkProps {
@@ -5726,51 +5832,87 @@ const CameraCaptureFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
 // BROWSER SCRAPE FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Web Adresi (URL)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.url || ''}
-                onChangeText={(t) => updateConfig('url', t)}
-                placeholder="https://example.com"
-                placeholderTextColor="#666"
-                autoCapitalize="none"
-                keyboardType="url"
-            />
-            <Text style={styles.fieldHint}>Verilerin çekileceği web sayfası adresi.</Text>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>CSS Seçici (Opsiyonel)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.waitForSelector || ''}
-                onChangeText={(t) => updateConfig('waitForSelector', t)}
-                placeholder="#content, .main-text"
-                placeholderTextColor="#666"
-                autoCapitalize="none"
-            />
-            <Text style={styles.fieldHint}>Sayfada beklenecek HTML elemanının CSS seçicisi.</Text>
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
-            <TextInput
-                style={styles.input}
-                value={config.variableName || ''}
-                onChangeText={(t) => updateConfig('variableName', t)}
-                placeholder="scrapedData"
-                placeholderTextColor="#666"
-            />
-            <Text style={styles.fieldHint}>Çekilen veri bu değişkene atanır.</Text>
-        </View>
-    </>
-);
+const BrowserScrapeFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
+    const extractMode = (config.extract || 'text') as 'text' | 'html' | 'list';
 
-// ═══════════════════════════════════════════════════════════════
-// CRON CREATE FIELDS
-// ═══════════════════════════════════════════════════════════════
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Web Adresi (URL)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.url || ''}
+                    onChangeText={(t) => updateConfig('url', t)}
+                    placeholder="https://example.com"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                    keyboardType="url"
+                />
+                <Text style={styles.fieldHint}>Verilerin cekilecegi web sayfasi adresi.</Text>
+            </View>
 
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Bekleme Secicisi (Opsiyonel)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.waitForSelector || ''}
+                    onChangeText={(t) => updateConfig('waitForSelector', t)}
+                    placeholder="#app, .loaded"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                />
+                <Text style={styles.fieldHint}>Dinamik sayfalarda once bu element gorunene kadar bekler.</Text>
+            </View>
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Veri Secicisi (Opsiyonel)</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.selector || ''}
+                    onChangeText={(t) => updateConfig('selector', t)}
+                    placeholder=".price, h1.title"
+                    placeholderTextColor="#666"
+                    autoCapitalize="none"
+                />
+                <Text style={styles.fieldHint}>Bos birakilirsa sayfanin tamami okunur. `list` modunda selector gerekir.</Text>
+            </View>
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Cikti Turu</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {[
+                        { value: 'text', label: 'Metin' },
+                        { value: 'html', label: 'HTML' },
+                        { value: 'list', label: 'Liste' },
+                    ].map((opt) => (
+                        <TouchableOpacity
+                            key={opt.value}
+                            style={[styles.unitButton, extractMode === opt.value && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('extract', opt.value)}
+                        >
+                            <Text style={[styles.unitButtonText, extractMode === opt.value && styles.unitButtonTextSelected]}>
+                                {opt.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+                <Text style={styles.fieldHint}>`list` seciliyse tum eslesen elemanlar dizi olarak doner.</Text>
+            </View>
+
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sonuc Degiskeni</Text>
+                <TextInput
+                    style={styles.input}
+                    value={config.variableName || ''}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="scrapedData"
+                    placeholderTextColor="#666"
+                />
+                <Text style={styles.fieldHint}>Cekilen veri bu degiskene atanir.</Text>
+            </View>
+        </>
+    );
+};
 const CronCreateFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
         <View style={styles.field}>
@@ -6547,6 +6689,8 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <AlarmSetFields config={config} updateConfig={updateConfig} />;
             case 'EXECUTE_WORKFLOW':
                 return <ExecuteWorkflowFields config={config} updateConfig={updateConfig} />;
+            case 'MCP_TOOL':
+                return <McpToolFields config={config} updateConfig={updateConfig} />;
             case 'SPEECH_TO_TEXT':
                 return <SpeechToTextFields config={config} updateConfig={updateConfig} />;
             case 'AGENT_AI':
@@ -6719,4 +6863,3 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
 };
 
 export default NodeConfigModal;
-
