@@ -9,16 +9,17 @@ class ProviderRouterService {
         return unique.filter(provider => !!status[provider]);
     }
 
-    async resolveProviderAndModel(): Promise<AssistantRoutingResult> {
+    async resolveProviderCandidates(): Promise<AssistantRoutingResult[]> {
         await userSettingsService.ensureLoaded();
         const settings = userSettingsService.getSettings();
         const status = userSettingsService.getApiKeyStatus() as Record<AIProvider, boolean>;
         const providerOrder = this.getAvailableProvidersInOrder(settings.preferredProvider, status);
 
         if (!providerOrder.length) {
-            throw new Error('API anahtarı bulunamadı. Ayarlar ekranından en az bir AI provider anahtarı girin.');
+            throw new Error('API anahtari bulunamadi. Ayarlar ekranindan en az bir AI provider anahtari girin.');
         }
 
+        const candidates: AssistantRoutingResult[] = [];
         let lastError: Error | null = null;
 
         for (const provider of providerOrder) {
@@ -27,13 +28,22 @@ class ProviderRouterService {
             try {
                 const models = await modelCatalogService.getModels(provider, apiKey);
                 const model = modelCatalogService.pickDefaultModel(provider, models);
-                return { provider, apiKey, model };
+                candidates.push({ provider, apiKey, model });
             } catch (error: any) {
                 lastError = error instanceof Error ? error : new Error(String(error));
             }
         }
 
-        throw lastError || new Error('Uygun provider seçilemedi.');
+        if (!candidates.length) {
+            throw lastError || new Error('Uygun provider secilemedi.');
+        }
+
+        return candidates;
+    }
+
+    async resolveProviderAndModel(): Promise<AssistantRoutingResult> {
+        const candidates = await this.resolveProviderCandidates();
+        return candidates[0];
     }
 }
 

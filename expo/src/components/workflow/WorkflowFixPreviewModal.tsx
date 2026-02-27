@@ -19,19 +19,29 @@ export const WorkflowFixPreviewModal: React.FC<WorkflowFixPreviewModalProps> = (
     colors,
     isDark,
 }) => {
+    const formatValue = (value: any): string => {
+        if (value == null) return String(value);
+        if (typeof value === 'string') return value;
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    };
+
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
             <View style={styles.overlay}>
                 <View style={[styles.card, { backgroundColor: isDark ? '#121214' : colors.card, borderColor: colors.border }]}>
                     <View style={styles.header}>
-                        <Text style={[styles.title, { color: colors.text }]}>Düzeltme Önizleme</Text>
+                        <Text style={[styles.title, { color: colors.text }]}>Duzeltme Onizleme</Text>
                         <TouchableOpacity onPress={onClose}>
                             <Text style={[styles.close, { color: colors.textSecondary }]}>x</Text>
                         </TouchableOpacity>
                     </View>
 
                     {!suggestion && (
-                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Önizlenecek bir değişiklik yok.</Text>
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Onizlenecek bir degisiklik yok.</Text>
                     )}
 
                     {suggestion && (
@@ -51,12 +61,12 @@ export const WorkflowFixPreviewModal: React.FC<WorkflowFixPreviewModalProps> = (
                                         )}
                                         {change.oldValue !== undefined && (
                                             <Text style={[styles.changeMeta, { color: colors.textSecondary }]}>
-                                                Önce: {String(change.oldValue)}
+                                                Once: {formatValue(change.oldValue)}
                                             </Text>
                                         )}
                                         {change.newValue !== undefined && (
                                             <Text style={[styles.changeMeta, { color: colors.textSecondary }]}>
-                                                Sonra: {String(change.newValue)}
+                                                Sonra: {formatValue(change.newValue)}
                                             </Text>
                                         )}
                                     </View>
@@ -64,7 +74,7 @@ export const WorkflowFixPreviewModal: React.FC<WorkflowFixPreviewModalProps> = (
                             </ScrollView>
 
                             <TouchableOpacity style={styles.applyButton} onPress={() => onApply(suggestion)}>
-                                <Text style={styles.applyButtonText}>Değişiklikleri Uygula</Text>
+                                <Text style={styles.applyButtonText}>Degisiklikleri Uygula</Text>
                             </TouchableOpacity>
                         </>
                     )}

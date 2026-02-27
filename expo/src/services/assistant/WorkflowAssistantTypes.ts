@@ -16,6 +16,7 @@ export interface AssistantRoutingResult {
 export type AssistantPatchChangeType =
     | 'update_node_config'
     | 'update_node_type'
+    | 'add_node'
     | 'update_node_label'
     | 'replace_text_template'
     | 'add_edge'
@@ -24,6 +25,8 @@ export type AssistantPatchChangeType =
 export interface AssistantPatchChange {
     type: AssistantPatchChangeType;
     nodeId?: string;
+    nodeType?: string;
+    position?: { x: number; y: number };
     edgeId?: string;
     sourceNodeId?: string;
     targetNodeId?: string;
