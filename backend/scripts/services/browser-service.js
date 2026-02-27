@@ -140,6 +140,29 @@ function toFiniteNumber(raw) {
     return Number.isFinite(parsed) ? parsed : null;
 }
 
+function getValueByPath(payload, rawPath) {
+    const path = String(rawPath || '').trim();
+    if (!path) return undefined;
+
+    // Supports paths like: current.temperature_2m or results[0].name
+    const tokens = path
+        .replace(/\[(\d+)\]/g, '.$1')
+        .split('.')
+        .map(t => t.trim())
+        .filter(Boolean);
+
+    let current = payload;
+    for (const token of tokens) {
+        if (current == null) return undefined;
+        if (Array.isArray(current) && /^\d+$/.test(token)) {
+            current = current[Number(token)];
+            continue;
+        }
+        current = current[token];
+    }
+    return current;
+}
+
 function getRequestIdentity(req) {
     const authHeader = req.headers['x-auth-key'];
     const authKey = Array.isArray(authHeader) ? authHeader[0] : authHeader;
@@ -550,7 +573,10 @@ class BrowserService {
         const selector = isOptionsObject ? selectorOrOptions.selector : selectorOrOptions;
         const waitForSelector = isOptionsObject ? (selectorOrOptions.waitForSelector || selectorOrOptions.selector) : selector;
         const extract = (isOptionsObject ? selectorOrOptions.extract : extractArg) || 'text';
-        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data'].includes(extract) ? extract : 'text';
+        const fieldPath = isOptionsObject ? selectorOrOptions.fieldPath : null;
+        const fieldMode = isOptionsObject ? (selectorOrOptions.fieldMode || 'text') : 'text';
+        const attribute = isOptionsObject ? selectorOrOptions.attribute : null;
+        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data', 'field', 'json_path'].includes(extract) ? extract : 'text';
         const targetSelector = selector || waitForSelector;
 
         // CHECK CACHE FIRST (for clean_text and smart_data only to be safe)
@@ -566,6 +592,41 @@ class BrowserService {
         let page = null;
         try {
             await assertSafeHttpUrl(url);
+
+            if (extractMode === 'json_path') {
+                if (!fieldPath) {
+                    throw createHttpError('fieldPath required for json_path extraction', 400, 'FIELD_PATH_REQUIRED');
+                }
+
+                const response = await withTimeout(
+                    fetch(url, { headers: { accept: 'application/json' } }),
+                    12000,
+                    'JSON fetch timeout'
+                );
+
+                if (!response.ok) {
+                    throw createHttpError(`JSON fetch failed: ${response.status}`, 502, 'JSON_FETCH_HTTP');
+                }
+
+                let payload;
+                try {
+                    payload = await response.json();
+                } catch (err) {
+                    throw createHttpError(`JSON parse failed: ${err.message}`, 502, 'JSON_PARSE_FAILED');
+                }
+
+                const value = getValueByPath(payload, fieldPath);
+                if (typeof value === 'undefined') {
+                    throw createHttpError(`fieldPath not found: ${fieldPath}`, 404, 'FIELD_PATH_NOT_FOUND');
+                }
+
+                return {
+                    type: 'json_path',
+                    fieldPath,
+                    data: value,
+                };
+            }
+
             page = await this.getPage();
             console.log(`[Browser] Scraping ${url} (Mode: ${extractMode})...`);
 
@@ -595,6 +656,29 @@ class BrowserService {
                 } else {
                     throw new Error('Selector required for list extraction');
                 }
+            } else if (extractMode === 'field') {
+                if (!targetSelector) {
+                    throw createHttpError('selector required for field extraction', 400, 'SELECTOR_REQUIRED');
+                }
+
+                result = await page.$eval(
+                    targetSelector,
+                    (el, mode, attr) => {
+                        const safeMode = String(mode || 'text').toLowerCase();
+                        if (safeMode === 'html') return el.innerHTML;
+                        if (safeMode === 'value') {
+                            const hasValue = Object.prototype.hasOwnProperty.call(el, 'value') || 'value' in el;
+                            return hasValue ? String(el.value ?? '') : null;
+                        }
+                        if (safeMode === 'attr') {
+                            if (!attr) return null;
+                            return el.getAttribute(attr);
+                        }
+                        return el.innerText;
+                    },
+                    fieldMode,
+                    attribute
+                );
             } else if (extractMode === 'clean_text' || extractMode === 'smart_data') {
                 
                 // SMART DATA EXTRACTION (Priority Phase)
@@ -837,73 +921,124 @@ class BrowserService {
         }
     }
 
-    // 4. Google Weather
+    // 4. Weather (Open-Meteo backend, endpoint kept as /google/weather for compatibility)
     async googleWeather(city = 'Istanbul', options = {}) {
         const targetCity = String(city || 'Istanbul').trim() || 'Istanbul';
-        const hl = String(options.hl || GOOGLE_DEFAULT_HL || 'tr').trim() || 'tr';
-        const gl = String(options.gl || GOOGLE_DEFAULT_GL || 'tr').trim() || 'tr';
-        const query = `${targetCity} hava durumu`;
-        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`;
-        let page = null;
+        const lang = String(options.hl || GOOGLE_DEFAULT_HL || 'tr').trim() || 'tr';
 
+        const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(targetCity)}&count=1&language=${encodeURIComponent(lang)}&format=json`;
+        let geoResponse;
         try {
-            await assertSafeHttpUrl(url);
-            page = await this.getPage();
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
-            await assertSafeHttpUrl(page.url());
-
-            await page.waitForSelector('#wob_tm', { timeout: 10000 }).catch(() => null);
-
-            const extracted = await page.evaluate(() => {
-                const pick = (selector) => {
-                    const el = document.querySelector(selector);
-                    return el ? (el.textContent || '').trim() : '';
-                };
-
-                return {
-                    location: pick('#wob_loc'),
-                    temperature: pick('#wob_tm'),
-                    condition: pick('#wob_dc'),
-                    humidity: pick('#wob_hm'),
-                    wind: pick('#wob_ws'),
-                    precipitation: pick('#wob_pp'),
-                    pageTitle: document.title || '',
-                    bodyText: document.body?.innerText || '',
-                    finalUrl: location.href || ''
-                };
-            });
-
-            let temperatureC = toFiniteNumber(extracted.temperature);
-            if (temperatureC == null) {
-                const tempMatch = String(extracted.bodyText || '').match(/(-?\d{1,2}(?:[.,]\d+)?)\s*°?\s*C/i);
-                if (tempMatch) {
-                    temperatureC = toFiniteNumber(tempMatch[1]);
-                }
-            }
-
-            if (temperatureC == null) {
-                throw createHttpError('Google Weather sicaklik verisi parse edilemedi', 502, 'GOOGLE_WEATHER_PARSE_FAILED');
-            }
-
-            return {
-                source: 'google_weather',
-                city: targetCity,
-                location: extracted.location || targetCity,
-                temperatureC,
-                condition: extracted.condition || null,
-                humidity: extracted.humidity || null,
-                wind: extracted.wind || null,
-                precipitation: extracted.precipitation || null,
-                pageTitle: extracted.pageTitle || null,
-                url: extracted.finalUrl || url,
-                retrievedAt: new Date().toISOString()
-            };
-        } finally {
-            if (page) await page.close();
+            geoResponse = await withTimeout(
+                fetch(geoUrl, { headers: { accept: 'application/json' } }),
+                12000,
+                'Open-Meteo geocoding timeout'
+            );
+        } catch (err) {
+            throw createHttpError(`Open-Meteo geocoding failed: ${err.message}`, 502, 'OPEN_METEO_GEOCODE_FAILED');
         }
+
+        if (!geoResponse.ok) {
+            throw createHttpError(`Open-Meteo geocoding HTTP ${geoResponse.status}`, 502, 'OPEN_METEO_GEOCODE_HTTP');
+        }
+
+        let geoPayload;
+        try {
+            geoPayload = await geoResponse.json();
+        } catch (err) {
+            throw createHttpError(`Open-Meteo geocoding parse failed: ${err.message}`, 502, 'OPEN_METEO_GEOCODE_PARSE');
+        }
+
+        const first = Array.isArray(geoPayload?.results) ? geoPayload.results[0] : null;
+        if (!first || !Number.isFinite(first.latitude) || !Number.isFinite(first.longitude)) {
+            throw createHttpError(`City not found: ${targetCity}`, 404, 'OPEN_METEO_CITY_NOT_FOUND');
+        }
+
+        const forecastUrl =
+            `https://api.open-meteo.com/v1/forecast?latitude=${first.latitude}&longitude=${first.longitude}` +
+            `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&timezone=auto`;
+
+        let weatherResponse;
+        try {
+            weatherResponse = await withTimeout(
+                fetch(forecastUrl, { headers: { accept: 'application/json' } }),
+                12000,
+                'Open-Meteo forecast timeout'
+            );
+        } catch (err) {
+            throw createHttpError(`Open-Meteo forecast failed: ${err.message}`, 502, 'OPEN_METEO_FORECAST_FAILED');
+        }
+
+        if (!weatherResponse.ok) {
+            throw createHttpError(`Open-Meteo forecast HTTP ${weatherResponse.status}`, 502, 'OPEN_METEO_FORECAST_HTTP');
+        }
+
+        let weatherPayload;
+        try {
+            weatherPayload = await weatherResponse.json();
+        } catch (err) {
+            throw createHttpError(`Open-Meteo forecast parse failed: ${err.message}`, 502, 'OPEN_METEO_FORECAST_PARSE');
+        }
+
+        const current = weatherPayload?.current || {};
+        const temperatureC = toFiniteNumber(current.temperature_2m);
+        if (temperatureC == null) {
+            throw createHttpError('Open-Meteo temperature parse failed', 502, 'OPEN_METEO_TEMPERATURE_PARSE');
+        }
+
+        const humidityValue = toFiniteNumber(current.relative_humidity_2m);
+        const windValue = toFiniteNumber(current.wind_speed_10m);
+        const weatherCode = Number.isFinite(Number(current.weather_code)) ? Number(current.weather_code) : null;
+
+        return {
+            source: 'open_meteo',
+            city: targetCity,
+            location: [first.name, first.admin1, first.country].filter(Boolean).join(', ') || targetCity,
+            temperatureC,
+            condition: this.mapOpenMeteoWeatherCode(weatherCode),
+            humidity: humidityValue == null ? null : `${humidityValue}%`,
+            wind: windValue == null ? null : `${windValue} km/h`,
+            precipitation: null,
+            pageTitle: null,
+            url: forecastUrl,
+            retrievedAt: new Date().toISOString()
+        };
+    }
+
+    mapOpenMeteoWeatherCode(code) {
+        const map = {
+            0: 'Acik',
+            1: 'Genelde acik',
+            2: 'Parcali bulutlu',
+            3: 'Kapali',
+            45: 'Sisli',
+            48: 'Kiragi sisli',
+            51: 'Hafif ciseleme',
+            53: 'Orta ciseleme',
+            55: 'Yogun ciseleme',
+            56: 'Hafif donan ciseleme',
+            57: 'Yogun donan ciseleme',
+            61: 'Hafif yagmur',
+            63: 'Orta yagmur',
+            65: 'Yogun yagmur',
+            66: 'Hafif donan yagmur',
+            67: 'Yogun donan yagmur',
+            71: 'Hafif kar',
+            73: 'Orta kar',
+            75: 'Yogun kar',
+            77: 'Kar tanesi',
+            80: 'Hafif saganak',
+            81: 'Orta saganak',
+            82: 'Siddetli saganak',
+            85: 'Hafif kar saganagi',
+            86: 'Yogun kar saganagi',
+            95: 'Gok gurultulu firtina',
+            96: 'Dolu ihtimalli firtina',
+            99: 'Yogun dolulu firtina',
+        };
+        return code == null ? null : (map[code] || `Kod ${code}`);
     }
 }
-
 const service = new BrowserService();
 
 // ═══════════════════════════════════════════════════
@@ -912,12 +1047,19 @@ const service = new BrowserService();
 
 router.post('/scrape', scrapeRateLimit, async (req, res) => {
     try {
-        const { url, selector, waitForSelector, extract } = req.body || {};
+        const { url, selector, waitForSelector, extract, fieldPath, fieldMode, attribute } = req.body || {};
         if (!url) return res.status(400).json({ error: 'url required' });
-        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data'].includes(extract) ? extract : 'text';
+        const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data', 'field', 'json_path'].includes(extract) ? extract : 'text';
         const startedAt = Date.now();
 
-        const data = await service.scrape(url, { selector, waitForSelector, extract: extractMode });
+        const data = await service.scrape(url, {
+            selector,
+            waitForSelector,
+            extract: extractMode,
+            fieldPath,
+            fieldMode,
+            attribute,
+        });
         const durationMs = Date.now() - startedAt;
 
         res.json({
@@ -928,6 +1070,9 @@ router.post('/scrape', scrapeRateLimit, async (req, res) => {
                 selector: selector || null,
                 waitForSelector: waitForSelector || null,
                 extract: extractMode,
+                fieldPath: fieldPath || null,
+                fieldMode: fieldMode || null,
+                attribute: attribute || null,
                 durationMs,
                 empty: isEmptyScrapeData(data),
             },
