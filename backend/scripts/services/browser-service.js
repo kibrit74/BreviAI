@@ -73,6 +73,8 @@ const DNS_LOOKUP_TIMEOUT_MS = 4000;
 const RATE_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.BROWSER_RATE_LIMIT_WINDOW_MS || 60000));
 const SCRAPE_RATE_LIMIT_MAX = Math.max(0, Number(process.env.BROWSER_SCRAPE_RATE_LIMIT_MAX || 20));
 const SCREENSHOT_RATE_LIMIT_MAX = Math.max(0, Number(process.env.BROWSER_SCREENSHOT_RATE_LIMIT_MAX || 10));
+const GOOGLE_DEFAULT_HL = String(process.env.GOOGLE_DEFAULT_HL || 'tr').trim() || 'tr';
+const GOOGLE_DEFAULT_GL = String(process.env.GOOGLE_DEFAULT_GL || 'tr').trim() || 'tr';
 const BROWSER_ALLOWED_HOSTS = String(process.env.BROWSER_ALLOWED_HOSTS || '')
     .split(',')
     .map(v => v.trim().toLowerCase())
@@ -92,6 +94,50 @@ function createHttpError(message, statusCode = 500, code) {
     err.statusCode = statusCode;
     if (code) err.code = code;
     return err;
+}
+
+function normalizeNumberString(raw) {
+    const cleaned = String(raw || '')
+        .replace(/[^\d.,-]/g, '')
+        .trim();
+    if (!cleaned) return '';
+
+    let normalized = cleaned;
+    const hasComma = normalized.includes(',');
+    const hasDot = normalized.includes('.');
+
+    if (hasComma && hasDot) {
+        const commaIdx = normalized.lastIndexOf(',');
+        const dotIdx = normalized.lastIndexOf('.');
+        if (commaIdx > dotIdx) {
+            normalized = normalized.replace(/\./g, '').replace(',', '.');
+        } else {
+            normalized = normalized.replace(/,/g, '');
+        }
+    } else if (hasComma && !hasDot) {
+        const parts = normalized.split(',');
+        const decimals = parts[1] || '';
+        if (decimals.length > 0 && decimals.length <= 6) {
+            normalized = `${parts[0].replace(/\./g, '')}.${decimals}`;
+        } else {
+            normalized = normalized.replace(/,/g, '');
+        }
+    } else {
+        const dotParts = normalized.split('.');
+        if (dotParts.length > 2) {
+            const last = dotParts.pop();
+            normalized = `${dotParts.join('')}.${last}`;
+        }
+    }
+
+    return normalized;
+}
+
+function toFiniteNumber(raw) {
+    const normalized = normalizeNumberString(raw);
+    if (!normalized) return null;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
 }
 
 function getRequestIdentity(req) {
@@ -677,6 +723,185 @@ class BrowserService {
             if (page) await page.close();
         }
     }
+
+    // 3. Google Finance (Currency Pair)
+    async googleFinanceRate(base = 'USD', quote = 'TRY', options = {}) {
+        const from = String(base || 'USD').trim().toUpperCase();
+        const to = String(quote || 'TRY').trim().toUpperCase();
+        const hl = String(options.hl || GOOGLE_DEFAULT_HL || 'tr').trim() || 'tr';
+        const gl = String(options.gl || GOOGLE_DEFAULT_GL || 'tr').trim() || 'tr';
+
+        const url = `https://www.google.com/finance/quote/${encodeURIComponent(from)}-${encodeURIComponent(to)}?hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`;
+        let page = null;
+
+        try {
+            await assertSafeHttpUrl(url);
+            page = await this.getPage();
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+            await assertSafeHttpUrl(page.url());
+
+            await new Promise(resolve => setTimeout(resolve, 1500));
+
+            const extracted = await page.evaluate((baseCode, quoteCode) => {
+                const selectors = [
+                    '[data-last-price]',
+                    'div.YMlKec.fxKbKc',
+                    'div.YMlKec',
+                    '[class*="YMlKec"]',
+                    'main [class*="fxKbKc"]',
+                    '[aria-label*="price"]'
+                ];
+
+                let selectorText = '';
+                let dataLastPrice = '';
+
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (!el) continue;
+                    if (!dataLastPrice) {
+                        const attr = el.getAttribute('data-last-price');
+                        if (attr && attr.trim()) dataLastPrice = attr.trim();
+                    }
+                    if (!selectorText) {
+                        const txt = (el.textContent || '').trim();
+                        if (txt) selectorText = txt;
+                    }
+                    if (dataLastPrice || selectorText) break;
+                }
+
+                const bodyText = (document.body?.innerText || '').replace(/\u00a0/g, ' ');
+                const lines = bodyText.split('\n').map(line => line.trim()).filter(Boolean);
+                const pairNeedles = [
+                    `${baseCode} / ${quoteCode}`,
+                    `${baseCode}/${quoteCode}`,
+                    `${baseCode}-${quoteCode}`
+                ].map(v => v.toUpperCase());
+
+                const nearPairLines = [];
+                for (let i = 0; i < lines.length; i++) {
+                    const current = lines[i].toUpperCase();
+                    if (pairNeedles.some(needle => current.includes(needle))) {
+                        for (let j = i; j < Math.min(lines.length, i + 8); j++) {
+                            nearPairLines.push(lines[j]);
+                        }
+                    }
+                }
+
+                return {
+                    selectorText,
+                    dataLastPrice,
+                    nearPairLines,
+                    pageTitle: document.title || '',
+                    finalUrl: location.href || ''
+                };
+            }, from, to);
+
+            const candidateTexts = [
+                extracted.dataLastPrice,
+                extracted.selectorText,
+                ...(Array.isArray(extracted.nearPairLines) ? extracted.nearPairLines : [])
+            ].filter(Boolean);
+
+            let parsedRate = null;
+            let parsedFrom = '';
+
+            for (const text of candidateTexts) {
+                const numericParts = String(text).match(/-?\d[\d.,]*/g) || [];
+                for (const part of numericParts) {
+                    const value = toFiniteNumber(part);
+                    if (value == null) continue;
+                    if (value <= 0 || value > 10000000) continue;
+                    parsedRate = value;
+                    parsedFrom = part;
+                    break;
+                }
+                if (parsedRate != null) break;
+            }
+
+            if (parsedRate == null) {
+                throw createHttpError('Google Finance kur verisi parse edilemedi', 502, 'GOOGLE_FINANCE_PARSE_FAILED');
+            }
+
+            return {
+                source: 'google_finance',
+                base: from,
+                quote: to,
+                rate: parsedRate,
+                raw: parsedFrom || null,
+                pageTitle: extracted.pageTitle || null,
+                url: extracted.finalUrl || url,
+                retrievedAt: new Date().toISOString()
+            };
+        } finally {
+            if (page) await page.close();
+        }
+    }
+
+    // 4. Google Weather
+    async googleWeather(city = 'Istanbul', options = {}) {
+        const targetCity = String(city || 'Istanbul').trim() || 'Istanbul';
+        const hl = String(options.hl || GOOGLE_DEFAULT_HL || 'tr').trim() || 'tr';
+        const gl = String(options.gl || GOOGLE_DEFAULT_GL || 'tr').trim() || 'tr';
+        const query = `${targetCity} hava durumu`;
+        const url = `https://www.google.com/search?q=${encodeURIComponent(query)}&hl=${encodeURIComponent(hl)}&gl=${encodeURIComponent(gl)}`;
+        let page = null;
+
+        try {
+            await assertSafeHttpUrl(url);
+            page = await this.getPage();
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+            await assertSafeHttpUrl(page.url());
+
+            await page.waitForSelector('#wob_tm', { timeout: 10000 }).catch(() => null);
+
+            const extracted = await page.evaluate(() => {
+                const pick = (selector) => {
+                    const el = document.querySelector(selector);
+                    return el ? (el.textContent || '').trim() : '';
+                };
+
+                return {
+                    location: pick('#wob_loc'),
+                    temperature: pick('#wob_tm'),
+                    condition: pick('#wob_dc'),
+                    humidity: pick('#wob_hm'),
+                    wind: pick('#wob_ws'),
+                    precipitation: pick('#wob_pp'),
+                    pageTitle: document.title || '',
+                    bodyText: document.body?.innerText || '',
+                    finalUrl: location.href || ''
+                };
+            });
+
+            let temperatureC = toFiniteNumber(extracted.temperature);
+            if (temperatureC == null) {
+                const tempMatch = String(extracted.bodyText || '').match(/(-?\d{1,2}(?:[.,]\d+)?)\s*°?\s*C/i);
+                if (tempMatch) {
+                    temperatureC = toFiniteNumber(tempMatch[1]);
+                }
+            }
+
+            if (temperatureC == null) {
+                throw createHttpError('Google Weather sicaklik verisi parse edilemedi', 502, 'GOOGLE_WEATHER_PARSE_FAILED');
+            }
+
+            return {
+                source: 'google_weather',
+                city: targetCity,
+                location: extracted.location || targetCity,
+                temperatureC,
+                condition: extracted.condition || null,
+                humidity: extracted.humidity || null,
+                wind: extracted.wind || null,
+                precipitation: extracted.precipitation || null,
+                pageTitle: extracted.pageTitle || null,
+                url: extracted.finalUrl || url,
+                retrievedAt: new Date().toISOString()
+            };
+        } finally {
+            if (page) await page.close();
+        }
+    }
 }
 
 const service = new BrowserService();
@@ -705,6 +930,79 @@ router.post('/scrape', scrapeRateLimit, async (req, res) => {
                 extract: extractMode,
                 durationMs,
                 empty: isEmptyScrapeData(data),
+            },
+        });
+    } catch (err) {
+        const status = (err && err.statusCode) || 500;
+        res.status(status).json({ error: err.message, code: err.code });
+    }
+});
+
+router.post('/google/finance', scrapeRateLimit, async (req, res) => {
+    try {
+        const { base = 'USD', quote = 'TRY', hl, gl } = req.body || {};
+        const startedAt = Date.now();
+        const data = await service.googleFinanceRate(base, quote, { hl, gl });
+
+        res.json({
+            success: true,
+            data,
+            meta: {
+                base: String(base || 'USD').toUpperCase(),
+                quote: String(quote || 'TRY').toUpperCase(),
+                durationMs: Date.now() - startedAt,
+            },
+        });
+    } catch (err) {
+        const status = (err && err.statusCode) || 500;
+        res.status(status).json({ error: err.message, code: err.code });
+    }
+});
+
+router.post('/google/weather', scrapeRateLimit, async (req, res) => {
+    try {
+        const { city = 'Istanbul', hl, gl } = req.body || {};
+        const startedAt = Date.now();
+        const data = await service.googleWeather(city, { hl, gl });
+
+        res.json({
+            success: true,
+            data,
+            meta: {
+                city: String(city || 'Istanbul'),
+                durationMs: Date.now() - startedAt,
+            },
+        });
+    } catch (err) {
+        const status = (err && err.statusCode) || 500;
+        res.status(status).json({ error: err.message, code: err.code });
+    }
+});
+
+router.post('/google/snapshot', scrapeRateLimit, async (req, res) => {
+    try {
+        const {
+            base = 'USD',
+            quote = 'TRY',
+            city = 'Istanbul',
+            hl,
+            gl,
+        } = req.body || {};
+
+        const startedAt = Date.now();
+        const [finance, weather] = await Promise.all([
+            service.googleFinanceRate(base, quote, { hl, gl }),
+            service.googleWeather(city, { hl, gl }),
+        ]);
+
+        res.json({
+            success: true,
+            data: { finance, weather },
+            meta: {
+                base: String(base || 'USD').toUpperCase(),
+                quote: String(quote || 'TRY').toUpperCase(),
+                city: String(city || 'Istanbul'),
+                durationMs: Date.now() - startedAt,
             },
         });
     } catch (err) {
