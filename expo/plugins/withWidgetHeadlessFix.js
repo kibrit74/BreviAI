@@ -19,6 +19,12 @@ function patchBefore(text, marker, insertText) {
 function patchWorkflowHeadlessService(text) {
   let out = text;
 
+  // Kotlin companion properties are exposed to Java via static getter/setter methods.
+  // Use setter calls instead of direct field access to avoid private-field compile errors.
+  out = out
+    .replace(/MainActivity\.sIsHeadlessLaunch = true;/g, 'MainActivity.setSIsHeadlessLaunch(true);')
+    .replace(/MainActivity\.sIsHeadlessLaunch = false;/g, 'MainActivity.setSIsHeadlessLaunch(false);');
+
   if (!out.includes('import android.os.Handler;')) {
     out = out.replace(
       'import android.os.Build;\n',
@@ -36,7 +42,7 @@ function patchWorkflowHeadlessService(text) {
         '    private final Runnable clearHeadlessLaunchFlagRunnable = new Runnable() {',
         '        @Override',
         '        public void run() {',
-        '            MainActivity.sIsHeadlessLaunch = false;',
+        '            MainActivity.setSIsHeadlessLaunch(false);',
         '            Log.d(TAG, "Cleared headless launch suppression flag (timeout)");',
         '        }',
         '    };',
@@ -47,6 +53,10 @@ function patchWorkflowHeadlessService(text) {
 
   out = out.replace(
     '            MainActivity.sIsHeadlessLaunch = true;',
+    '            markHeadlessLaunchSuppressed();'
+  );
+  out = out.replace(
+    '            MainActivity.setSIsHeadlessLaunch(true);',
     '            markHeadlessLaunchSuppressed();'
   );
 
@@ -63,7 +73,7 @@ function patchWorkflowHeadlessService(text) {
       '    /**\n     * Start as foreground service with notification.\n',
       [
         '    private void markHeadlessLaunchSuppressed() {',
-        '        MainActivity.sIsHeadlessLaunch = true;',
+        '        MainActivity.setSIsHeadlessLaunch(true);',
         '        mainHandler.removeCallbacks(clearHeadlessLaunchFlagRunnable);',
         '        mainHandler.postDelayed(clearHeadlessLaunchFlagRunnable, HEADLESS_LAUNCH_FLAG_TIMEOUT_MS);',
         '        Log.d(TAG, "Set headless launch suppression flag");',
@@ -71,7 +81,7 @@ function patchWorkflowHeadlessService(text) {
         '',
         '    private void clearHeadlessLaunchSuppressed() {',
         '        mainHandler.removeCallbacks(clearHeadlessLaunchFlagRunnable);',
-        '        MainActivity.sIsHeadlessLaunch = false;',
+        '        MainActivity.setSIsHeadlessLaunch(false);',
         '    }',
         '    ',
       ].join('\n')
@@ -91,12 +101,11 @@ function patchWorkflowHeadlessService(text) {
 function patchMainActivity(text) {
   let out = text;
 
-  if (out.includes('var sIsHeadlessLaunch = false') && !out.includes('@Volatile\n    @JvmStatic')) {
-    out = out.replace(
-      '    @JvmStatic\n    var sIsHeadlessLaunch = false',
-      '    @Volatile\n    @JvmStatic\n    var sIsHeadlessLaunch = false'
-    );
-  }
+  // Normalize the flag declaration so Java can always access static setter/getter.
+  out = out.replace(
+    /(?:\s*@Volatile\s*\n)?(?:\s*@JvmStatic\s*\n)?\s*(?:private\s+)?var sIsHeadlessLaunch = false/g,
+    '    @Volatile\n    @JvmStatic\n    var sIsHeadlessLaunch = false'
+  );
 
   if (!out.includes('var sIsHeadlessLaunch = false')) {
     out = patchAfter(

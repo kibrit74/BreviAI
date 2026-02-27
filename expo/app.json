@@ -5,7 +5,6 @@
     "version": "1.0.0",
     "scheme": "brevi-ai",
     "orientation": "portrait",
-    "newArchEnabled": true,
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -115,9 +114,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "eaa30bd3-b29c-4c3b-b471-6fd06e737902"
+        "projectId": "ff02f714-3770-4423-8834-750c0d005818"
       }
     },
-    "owner": "bordo23"
+    "owner": "bordo2323"
   }
 }
