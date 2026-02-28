@@ -2112,6 +2112,7 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                             placeholderTextColor="#666"
                             secureTextEntry
                         />
+                        <Text style={styles.fieldHint}>Bos birakirsaniz Ayarlar ekranindaki Slack API token kullanilir.</Text>
                     </View>
                     <View style={styles.field}>
                         <Text style={styles.fieldLabel}>Kanal ID veya Adi</Text>
@@ -2122,6 +2123,7 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                             placeholder="#general veya C012345"
                             placeholderTextColor="#666"
                         />
+                        <Text style={styles.fieldHint}>Bos birakirsaniz Ayarlar ekranindaki varsayilan kanal ID kullanilir.</Text>
                     </View>
                     {showAdvanced && (
                         <View style={styles.field}>

@@ -21,6 +21,7 @@ import { AgentMemoryService } from '../AgentMemoryService';
 import { VariableManager } from '../VariableManager';
 import { workflowEngine } from '../WorkflowEngine';
 import { secureStorage } from '../SecureStorage';
+import { userSettingsService } from '../UserSettingsService';
 
 // Fallback defaults (used when SecureStore has no saved values)
 const DEFAULT_FB_APP_ID = '1395089878474790';
@@ -336,14 +337,37 @@ export async function executeSlackSend(
     };
 
     try {
+        await userSettingsService.ensureLoaded();
+        const slackDefaults = userSettingsService.getSlackConfig();
+
         const webhookUrl = variableManager.resolveString(config.webhookUrl || '').trim();
         let message = variableManager.resolveString(config.message || '').trim();
-        const mode = (config.mode || (((config.apiToken || config.botToken) && config.channel) ? 'bot' : 'webhook')) as 'webhook' | 'bot';
-        const token = variableManager.resolveString(config.apiToken || config.botToken || '').trim();
-        const channel = variableManager.resolveString(config.channel || '').trim();
+        const nodeToken = variableManager.resolveString(config.apiToken || config.botToken || '').trim();
+        const nodeChannel = variableManager.resolveString(config.channel || '').trim();
+        const token = nodeToken || slackDefaults.apiToken;
+        const channel = nodeChannel || slackDefaults.channelId;
+        const modePreference = config.mode as 'webhook' | 'bot' | undefined;
+        let mode: 'webhook' | 'bot';
+        if (modePreference === 'bot') {
+            mode = 'bot';
+        } else if (modePreference === 'webhook') {
+            mode = (!webhookUrl && token && channel) ? 'bot' : 'webhook';
+        } else {
+            mode = (token && channel) ? 'bot' : 'webhook';
+        }
         const apiUrl = variableManager.resolveString(config.apiUrl || '').trim() || 'https://slack.com/api/chat.postMessage';
         const blocksStr = variableManager.resolveString(config.blocks || '').trim();
         const warnings: string[] = [];
+
+        if (!nodeToken && token) {
+            warnings.push('Slack API token Ayarlar sayfasindan kullanildi.');
+        }
+        if (!nodeChannel && channel) {
+            warnings.push('Slack kanal ID Ayarlar sayfasindan kullanildi.');
+        }
+        if (modePreference === 'webhook' && mode === 'bot') {
+            warnings.push('Webhook URL bos oldugu icin Slack API moduna otomatik gecildi.');
+        }
 
         let parsedBlocks: any[] | undefined;
         if (blocksStr) {

@@ -16,6 +16,8 @@ const STORAGE_KEYS = {
     claudeApiKey: '@user_claude_api_key',
     // Service API Keys
     openWeatherApiKey: '@user_openweather_api_key',
+    slackApiToken: '@user_slack_api_token',
+    slackChannelId: '@user_slack_channel_id',
     // Preferred AI Provider
     preferredProvider: '@user_preferred_provider',
     // Other settings
@@ -41,6 +43,8 @@ export interface UserSettings {
     claudeApiKey: string;
     // Service API Keys
     openWeatherApiKey: string;
+    slackApiToken: string;
+    slackChannelId: string;
     // Preferences
     preferredProvider: AIProvider;
     theme: 'dark' | 'light' | 'system';
@@ -69,6 +73,8 @@ class UserSettingsService {
         openaiApiKey: '',
         claudeApiKey: '',
         openWeatherApiKey: '',
+        slackApiToken: '',
+        slackChannelId: '',
         preferredProvider: 'gemini',
         theme: 'dark',
         language: 'tr',
@@ -114,13 +120,15 @@ class UserSettingsService {
         console.log('[UserSettings] loadSettings: START');
         try {
             const [
-                geminiKey, openaiKey, claudeKey, openWeatherKey, provider, theme, language,
+                geminiKey, openaiKey, claudeKey, openWeatherKey, slackApiToken, slackChannelId, provider, theme, language,
                 ttsLanguage, ttsRate, ttsPitch, customVars
             ] = await Promise.all([
                 AsyncStorage.getItem(STORAGE_KEYS.geminiApiKey),
                 AsyncStorage.getItem(STORAGE_KEYS.openaiApiKey),
                 AsyncStorage.getItem(STORAGE_KEYS.claudeApiKey),
                 AsyncStorage.getItem(STORAGE_KEYS.openWeatherApiKey),
+                AsyncStorage.getItem(STORAGE_KEYS.slackApiToken),
+                AsyncStorage.getItem(STORAGE_KEYS.slackChannelId),
                 AsyncStorage.getItem(STORAGE_KEYS.preferredProvider),
                 AsyncStorage.getItem(STORAGE_KEYS.theme),
                 AsyncStorage.getItem(STORAGE_KEYS.language),
@@ -157,6 +165,8 @@ class UserSettingsService {
                 openaiApiKey: openaiKey || '',
                 claudeApiKey: claudeKey || '',
                 openWeatherApiKey: openWeatherKey || '',
+                slackApiToken: slackApiToken || '',
+                slackChannelId: slackChannelId || '',
                 preferredProvider: (provider as AIProvider) || 'gemini',
                 theme: (theme as 'dark' | 'light' | 'system') || 'dark',
                 language: language || 'tr',
@@ -198,6 +208,16 @@ class UserSettingsService {
             if (updates.openWeatherApiKey !== undefined) {
                 this.settings.openWeatherApiKey = updates.openWeatherApiKey;
                 promises.push(AsyncStorage.setItem(STORAGE_KEYS.openWeatherApiKey, updates.openWeatherApiKey));
+            }
+
+            if (updates.slackApiToken !== undefined) {
+                this.settings.slackApiToken = updates.slackApiToken;
+                promises.push(AsyncStorage.setItem(STORAGE_KEYS.slackApiToken, updates.slackApiToken));
+            }
+
+            if (updates.slackChannelId !== undefined) {
+                this.settings.slackChannelId = updates.slackChannelId;
+                promises.push(AsyncStorage.setItem(STORAGE_KEYS.slackChannelId, updates.slackChannelId));
             }
 
             if (updates.preferredProvider !== undefined) {
@@ -377,6 +397,27 @@ class UserSettingsService {
         await this.saveSettings({ preferredProvider: provider });
     }
 
+    getSlackConfig(): { apiToken: string; channelId: string } {
+        return {
+            apiToken: this.settings.slackApiToken || '',
+            channelId: this.settings.slackChannelId || '',
+        };
+    }
+
+    async setSlackConfig(apiToken: string, channelId: string): Promise<void> {
+        await this.saveSettings({
+            slackApiToken: apiToken.trim(),
+            slackChannelId: channelId.trim(),
+        });
+    }
+
+    async clearSlackConfig(): Promise<void> {
+        await this.saveSettings({
+            slackApiToken: '',
+            slackChannelId: '',
+        });
+    }
+
     /**
      * Clear all API keys
      */
@@ -401,6 +442,8 @@ class UserSettingsService {
                 openaiApiKey: '',
                 claudeApiKey: '',
                 openWeatherApiKey: '',
+                slackApiToken: '',
+                slackChannelId: '',
                 preferredProvider: 'gemini',
                 theme: 'dark',
                 language: 'tr',

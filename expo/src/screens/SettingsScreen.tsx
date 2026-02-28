@@ -106,8 +106,14 @@ export default function SettingsScreen({ navigation }: any) {
     const [openaiKey, setOpenaiKey] = React.useState('');
     const [claudeKey, setClaudeKey] = React.useState('');
     const [openWeatherKey, setOpenWeatherKey] = React.useState('');
+    const [slackApiToken, setSlackApiToken] = React.useState('');
+    const [slackChannelId, setSlackChannelId] = React.useState('');
     const [weatherKeyModalVisible, setWeatherKeyModalVisible] = React.useState(false);
     const [weatherKeyInput, setWeatherKeyInput] = React.useState('');
+    const [slackSettingsModalVisible, setSlackSettingsModalVisible] = React.useState(false);
+    const [slackApiTokenInput, setSlackApiTokenInput] = React.useState('');
+    const [slackChannelIdInput, setSlackChannelIdInput] = React.useState('');
+    const [isSavingSlackSettings, setIsSavingSlackSettings] = React.useState(false);
     const [apiKeyModalVisible, setApiKeyModalVisible] = React.useState(false);
     const [currentApiProvider, setCurrentApiProvider] = React.useState<AIProvider>('gemini');
     const [currentApiKeyInput, setCurrentApiKeyInput] = React.useState('');
@@ -478,6 +484,8 @@ export default function SettingsScreen({ navigation }: any) {
         setOpenaiKey(settings.openaiApiKey);
         setClaudeKey(settings.claudeApiKey);
         setOpenWeatherKey(settings.openWeatherApiKey);
+        setSlackApiToken(settings.slackApiToken || '');
+        setSlackChannelId(settings.slackChannelId || '');
         setGoogleAuth(googleService.getAuthState());
     };
 
@@ -504,6 +512,51 @@ export default function SettingsScreen({ navigation }: any) {
         } finally {
             setIsSavingKey(false);
         }
+    };
+
+    const openSlackSettingsModal = () => {
+        setSlackApiTokenInput(slackApiToken);
+        setSlackChannelIdInput(slackChannelId);
+        setSlackSettingsModalVisible(true);
+    };
+
+    const saveSlackSettings = async () => {
+        setIsSavingSlackSettings(true);
+        try {
+            const token = slackApiTokenInput.trim();
+            const channelId = slackChannelIdInput.trim();
+            await userSettingsService.setSlackConfig(token, channelId);
+            setSlackApiToken(token);
+            setSlackChannelId(channelId);
+            setSlackSettingsModalVisible(false);
+            Alert.alert('Basarili', 'Slack ayarlari kaydedildi');
+        } catch (error) {
+            Alert.alert('Hata', 'Slack ayarlari kaydedilemedi');
+        } finally {
+            setIsSavingSlackSettings(false);
+        }
+    };
+
+    const clearSlackSettings = () => {
+        Alert.alert(
+            'Slack Ayarlari',
+            'Kayitli Slack API token ve kanal ID silinsin mi?',
+            [
+                { text: 'Iptal', style: 'cancel' },
+                {
+                    text: 'Sil',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await userSettingsService.clearSlackConfig();
+                        setSlackApiToken('');
+                        setSlackChannelId('');
+                        setSlackApiTokenInput('');
+                        setSlackChannelIdInput('');
+                        setSlackSettingsModalVisible(false);
+                    }
+                }
+            ]
+        );
     };
 
     // Custom Variables Logic
@@ -629,6 +682,12 @@ export default function SettingsScreen({ navigation }: any) {
     const getApiKeyStatus = (key: string) => {
         if (!key) return '⚪ Ayarlanmamış';
         return '🟢 Aktif';
+    };
+
+    const getSlackConfigStatus = () => {
+        if (slackApiToken && slackChannelId) return 'Aktif';
+        if (slackApiToken || slackChannelId) return 'Eksik';
+        return 'Ayarlanmamis';
     };
 
     const handleTestConnection = async () => {
@@ -1341,6 +1400,14 @@ export default function SettingsScreen({ navigation }: any) {
                                 </TouchableOpacity>
                             )}
                         </View>
+                        {/* Slack */}
+                        <View style={{ marginBottom: 12 }}>
+                            <Text style={[styles.sectionHeader, { marginBottom: 8, fontSize: 14 }]}>Slack Bot</Text>
+                            {renderPressableItem('logo-slack', 'Slack API + Kanal ID', getSlackConfigStatus(), openSlackSettingsModal)}
+                            <Text style={{ fontSize: 11, color: activeColors.textSecondary, marginTop: 4, marginLeft: 4 }}>
+                                Slack node token veya kanal bos ise buradaki ayarlar otomatik kullanilir.
+                            </Text>
+                        </View>
                         {/* Variables */}
                         <View>
                             <Text style={[styles.sectionHeader, { marginBottom: 8, fontSize: 14 }]}>Global Değişkenler</Text>
@@ -1633,6 +1700,70 @@ export default function SettingsScreen({ navigation }: any) {
                                 }}
                             >
                                 <Text style={styles.modalSaveText}>Kaydet</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Slack Settings Modal */}
+            <Modal
+                visible={slackSettingsModalVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setSlackSettingsModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Slack API ve Kanal</Text>
+                        <TextInput
+                            style={styles.apiInput}
+                            value={slackApiTokenInput}
+                            onChangeText={setSlackApiTokenInput}
+                            placeholder="xoxb-... bot token"
+                            placeholderTextColor="#666"
+                            secureTextEntry={true}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                        <TextInput
+                            style={styles.apiInput}
+                            value={slackChannelIdInput}
+                            onChangeText={setSlackChannelIdInput}
+                            placeholder="Kanal ID (orn: C01234567)"
+                            placeholderTextColor="#666"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
+                        <TouchableOpacity
+                            style={styles.apiLinkButton}
+                            onPress={() => Linking.openURL('https://api.slack.com/apps')}
+                        >
+                            <Text style={styles.apiLinkText}>Slack app ve token olustur</Text>
+                        </TouchableOpacity>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalCancelButton, { backgroundColor: '#FF444420' }]}
+                                onPress={clearSlackSettings}
+                            >
+                                <Text style={{ color: '#FF4444', fontSize: 16, fontWeight: '600' }}>Sil</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalCancelButton}
+                                onPress={() => setSlackSettingsModalVisible(false)}
+                            >
+                                <Text style={styles.modalCancelText}>Iptal</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalSaveButton}
+                                onPress={saveSlackSettings}
+                                disabled={isSavingSlackSettings}
+                            >
+                                {isSavingSlackSettings ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <Text style={styles.modalSaveText}>Kaydet</Text>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>

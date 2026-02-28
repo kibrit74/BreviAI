@@ -17,11 +17,15 @@ import { useApp } from '../context/AppContext';
 import { WidgetService } from '../services/WidgetService';
 import {
     WidgetButton,
+    WidgetAction,
     WidgetSize,
     WIDGET_LAYOUTS,
     DEFAULT_WIDGET_CONFIG,
     normalizeWidgetButtons,
     createDefaultButtonsForSize,
+    WidgetModeRoutinePresetId,
+    WIDGET_MODE_ROUTINE_PRESETS,
+    createButtonsFromModeRoutinePreset,
 } from '../types/widget';
 import { SavedShortcut } from '../services/ShortcutStorage';
 import { WorkflowStorage } from '../services/WorkflowStorage';
@@ -40,6 +44,36 @@ const SIZE_OPTIONS: Array<{ value: WidgetSize; title: string; subtitle: string }
     { value: '2x3', title: '2x3', subtitle: '6 tus' },
     { value: '4x2', title: '4x2', subtitle: '8 tus' },
 ];
+
+const MODE_PRESET_OPTIONS = Object.values(WIDGET_MODE_ROUTINE_PRESETS);
+
+function resolveWorkflowShortcutId(button: WidgetButton): string | undefined {
+    if (button.shortcutId) return button.shortcutId;
+    if (button.action?.type === 'workflow') {
+        const payloadShortcutId = button.action.payload?.shortcutId || button.action.payload?.workflowId;
+        if (typeof payloadShortcutId === 'string' && payloadShortcutId.trim()) {
+            return payloadShortcutId.trim();
+        }
+    }
+    return undefined;
+}
+
+function getAssignmentKind(button: WidgetButtonConfig): 'workflow' | 'system' | 'app' | 'custom' | 'none' {
+    if (button.assignedShortcut || button.action?.type === 'workflow') return 'workflow';
+    if (button.action?.type === 'system') return 'system';
+    if (button.action?.type === 'app') return 'app';
+    if (button.action?.type === 'custom') return 'custom';
+    return 'none';
+}
+
+function getAssignmentLabel(button: WidgetButtonConfig): string {
+    const kind = getAssignmentKind(button);
+    if (kind === 'workflow') return button.label || 'Workflow';
+    if (kind === 'system') return button.label || 'Sistem eylemi';
+    if (kind === 'app') return button.label || 'Uygulama ac';
+    if (kind === 'custom') return button.label || 'Ozel eylem';
+    return 'Atama yok';
+}
 
 function mapWorkflowToSavedShortcut(workflow: any): SavedShortcut {
     return {
@@ -96,11 +130,13 @@ export default function WidgetConfigScreen({ navigation }: any) {
 
             const normalizedButtons = normalizeWidgetButtons(config?.buttons, size);
             const hydratedButtons: WidgetButtonConfig[] = normalizedButtons.map((button) => {
-                const assignedWorkflow = button.shortcutId ? workflowsById.get(button.shortcutId) : null;
+                const resolvedShortcutId = resolveWorkflowShortcutId(button);
+                const assignedWorkflow = resolvedShortcutId ? workflowsById.get(resolvedShortcutId) : null;
                 const assignedShortcut = assignedWorkflow ? mapWorkflowToSavedShortcut(assignedWorkflow) : null;
 
                 return {
                     ...button,
+                    shortcutId: resolvedShortcutId,
                     assignedShortcut,
                 };
             });
@@ -145,6 +181,16 @@ export default function WidgetConfigScreen({ navigation }: any) {
         if (nextSize === widgetSize) return;
         setWidgetSize(nextSize);
         setButtons(resizeButtons(nextSize));
+        setHasChanges(true);
+    };
+
+    const applyModePreset = (presetId: WidgetModeRoutinePresetId) => {
+        const presetButtons = createButtonsFromModeRoutinePreset(presetId, widgetSize);
+        const hydrated: WidgetButtonConfig[] = presetButtons.map((button) => ({
+            ...button,
+            assignedShortcut: null,
+        }));
+        setButtons(hydrated);
         setHasChanges(true);
     };
 
@@ -199,10 +245,21 @@ export default function WidgetConfigScreen({ navigation }: any) {
             const normalizedButtons = normalizeWidgetButtons(
                 buttons.map(({ assignedShortcut, ...btn }) => ({
                     ...btn,
-                    shortcutId: assignedShortcut?.id || undefined,
-                    action: assignedShortcut
-                        ? { type: 'workflow' as const, payload: { shortcutId: assignedShortcut.id } }
-                        : undefined,
+                    shortcutId: assignedShortcut?.id || btn.shortcutId || undefined,
+                    action: (() => {
+                        if (assignedShortcut) {
+                            return { type: 'workflow' as const, payload: { shortcutId: assignedShortcut.id } };
+                        }
+                        if (btn.action?.type === 'workflow') {
+                            const existingShortcutId = btn.shortcutId || btn.action?.payload?.shortcutId;
+                            if (!existingShortcutId) return undefined;
+                            return {
+                                type: 'workflow' as const,
+                                payload: { shortcutId: existingShortcutId },
+                            };
+                        }
+                        return (btn.action as WidgetAction | undefined);
+                    })(),
                 })),
                 widgetSize
             );
@@ -238,11 +295,14 @@ export default function WidgetConfigScreen({ navigation }: any) {
     const getButtonIcon = (button: WidgetButtonConfig): string => {
         if (button.icon) return button.icon;
         if (button.assignedShortcut) return 'AI';
+        if (button.action?.type === 'system') return 'SYS';
+        if (button.action?.type === 'app') return 'APP';
+        if (button.action?.type === 'custom') return 'CST';
         return '+';
     };
 
     const renderButton = (button: WidgetButtonConfig, index: number) => {
-        const hasShortcut = !!button.assignedShortcut;
+        const hasAssignment = getAssignmentKind(button) !== 'none';
         const buttonColor = button.color || colors.primary;
 
         return (
@@ -251,19 +311,19 @@ export default function WidgetConfigScreen({ navigation }: any) {
                 style={[
                     styles.widgetButton,
                     {
-                        backgroundColor: hasShortcut ? `${buttonColor}1A` : '#101827',
-                        borderColor: hasShortcut ? buttonColor : '#243447',
+                        backgroundColor: hasAssignment ? `${buttonColor}1A` : '#101827',
+                        borderColor: hasAssignment ? buttonColor : '#243447',
                     },
                 ]}
                 onPress={() => handleButtonPress(index)}
-                onLongPress={() => hasShortcut && handleClearButton(index)}
+                onLongPress={() => hasAssignment && handleClearButton(index)}
                 activeOpacity={0.85}
             >
                 <Text style={styles.buttonIcon}>{getButtonIcon(button)}</Text>
                 <Text style={styles.buttonLabel} numberOfLines={2}>
                     {button.label}
                 </Text>
-                {hasShortcut && (
+                {hasAssignment && (
                     <View style={[styles.assignedBadge, { backgroundColor: buttonColor }]}>
                         <Ionicons name="checkmark" size={12} color="#fff" />
                     </View>
@@ -346,6 +406,25 @@ export default function WidgetConfigScreen({ navigation }: any) {
                     })}
                 </View>
 
+                <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>Mod Presetleri</Text>
+                    <Text style={styles.sectionSubtitle}>Tek tusla ata</Text>
+                </View>
+
+                <View style={styles.presetSelectorRow}>
+                    {MODE_PRESET_OPTIONS.map((preset) => (
+                        <TouchableOpacity
+                            key={preset.id}
+                            style={styles.presetChip}
+                            onPress={() => applyModePreset(preset.id)}
+                            activeOpacity={0.85}
+                        >
+                            <Text style={styles.presetChipTitle}>{preset.title}</Text>
+                            <Text style={styles.presetChipSubtitle}>{preset.subtitle}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
                 <View style={styles.previewCard}>
                     <View style={styles.previewHeader}>
                         <Text style={styles.previewTitle}>Canli Onizleme</Text>
@@ -359,7 +438,6 @@ export default function WidgetConfigScreen({ navigation }: any) {
                 <Text style={styles.sectionTitle}>Tus Atamalari</Text>
 
                 {buttons.map((button, index) => {
-                    const hasShortcut = !!button.assignedShortcut;
                     return (
                         <View key={`${button.id}-detail`} style={styles.buttonDetail}>
                             <View style={styles.detailIconWrap}>
@@ -368,7 +446,7 @@ export default function WidgetConfigScreen({ navigation }: any) {
                             <View style={styles.detailContent}>
                                 <Text style={styles.detailLabel}>Tus {index + 1}</Text>
                                 <Text style={styles.detailValue} numberOfLines={1}>
-                                    {hasShortcut ? button.label : 'Atama yok'}
+                                    {getAssignmentLabel(button)}
                                 </Text>
                             </View>
                             <TouchableOpacity style={styles.detailActionBtn} onPress={() => handleButtonPress(index)}>
@@ -505,6 +583,32 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 10,
         marginBottom: 16,
+    },
+    presetSelectorRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 16,
+    },
+    presetChip: {
+        minWidth: 90,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#2A3D57',
+        backgroundColor: '#111C2E',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        alignItems: 'flex-start',
+    },
+    presetChipTitle: {
+        color: '#EAF3FF',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    presetChipSubtitle: {
+        color: '#A8BEDB',
+        fontSize: 11,
+        marginTop: 2,
     },
     sizeChip: {
         flex: 1,
