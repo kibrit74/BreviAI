@@ -197,6 +197,7 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
                     'SMS_TRIGGER': 'sms',
                     'WHATSAPP_TRIGGER': 'whatsapp',
                     'TELEGRAM_TRIGGER': 'telegram',
+                    'SLACK_TRIGGER': 'slack_bot',
                     'EMAIL_TRIGGER': 'email',
                     'GEOFENCE_TRIGGER': 'geofence',
                     'GEOFENCE_ENTER_TRIGGER': 'geofence_enter',

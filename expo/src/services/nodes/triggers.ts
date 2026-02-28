@@ -3,8 +3,9 @@
  * Manual Trigger, Time Trigger
  */
 
-import { WorkflowNode, ManualTriggerConfig, TimeTriggerConfig, NotificationTriggerConfig, CallTriggerConfig, EmailTriggerConfig, TelegramTriggerConfig, DeepLinkTriggerConfig, SMSTriggerConfig, WhatsAppTriggerConfig, WebhookTriggerConfig } from '../../types/workflow-types';
+import { WorkflowNode, ManualTriggerConfig, TimeTriggerConfig, NotificationTriggerConfig, CallTriggerConfig, EmailTriggerConfig, TelegramTriggerConfig, SlackTriggerConfig, DeepLinkTriggerConfig, SMSTriggerConfig, WhatsAppTriggerConfig, WebhookTriggerConfig } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
+import { userSettingsService } from '../UserSettingsService';
 
 function extractPhoneFromTexts(...values: Array<any>): string {
     const text = values
@@ -27,6 +28,42 @@ function extractPhoneFromTexts(...values: Array<any>): string {
     return digits.length >= 10 ? digits : '';
 }
 
+function isSlackTsAfter(currentTs: string, referenceTs: string): boolean {
+    if (!currentTs) return false;
+    if (!referenceTs) return true;
+    const current = Number(currentTs);
+    const reference = Number(referenceTs);
+    if (!Number.isFinite(current) || !Number.isFinite(reference)) {
+        return currentTs > referenceTs;
+    }
+    return current > reference;
+}
+
+async function resolveSlackSenderName(token: string, userId: string): Promise<string> {
+    try {
+        const response = await fetch(`https://slack.com/api/users.info?user=${encodeURIComponent(userId)}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.ok) return userId;
+
+        const profile = data.user?.profile || {};
+        return (
+            String(profile.display_name || '').trim() ||
+            String(profile.real_name || '').trim() ||
+            String(data.user?.real_name || '').trim() ||
+            String(data.user?.name || '').trim() ||
+            userId
+        );
+    } catch {
+        return userId;
+    }
+}
+
 export async function executeTriggerNode(
     node: WorkflowNode,
     variableManager: VariableManager
@@ -44,6 +81,8 @@ export async function executeTriggerNode(
             return executeEmailTrigger(node.config as EmailTriggerConfig, variableManager);
         case 'TELEGRAM_TRIGGER':
             return executeTelegramTrigger(node.config as TelegramTriggerConfig, variableManager);
+        case 'SLACK_TRIGGER':
+            return executeSlackTrigger(node.config as SlackTriggerConfig, variableManager);
         case 'DEEP_LINK_TRIGGER':
             return executeDeepLinkTrigger(node.config as DeepLinkTriggerConfig, variableManager);
         case 'GESTURE_TRIGGER':
@@ -365,6 +404,175 @@ export async function executeWhatsAppTrigger(
 // Duplicate removed
 
 // Duplicate removed
+
+export async function executeSlackTrigger(
+    config: SlackTriggerConfig,
+    variableManager: VariableManager
+): Promise<any> {
+    const triggerType = variableManager.get('_triggerType');
+    const passedThroughMessage = variableManager.get('triggerMessage') || variableManager.get('_slackMessage');
+
+    if (triggerType === 'slack_bot' && passedThroughMessage) {
+        return {
+            triggered: true,
+            type: 'slack_bot',
+            timestamp: Date.now(),
+            data: {
+                text: passedThroughMessage,
+                channel: variableManager.get('slackChannel') || variableManager.get('_slackChannel'),
+                sender: variableManager.get('senderName') || variableManager.get('_slackSender')
+            }
+        };
+    }
+
+    await userSettingsService.ensureLoaded();
+    const slackDefaults = userSettingsService.getSlackConfig();
+    const token = variableManager.resolveString(String(config.botToken || slackDefaults.apiToken || '')).trim();
+    const channel = variableManager.resolveString(String(config.channel || slackDefaults.channelId || '')).trim();
+    const includeBotMessages = config.includeBotMessages === true;
+    const timeoutSeconds = Math.max(5, Math.min(300, Number(config.timeout || 30)));
+    const messageFilter = variableManager.resolveString(String(config.messageFilter || '')).trim();
+    const senderFilter = variableManager.resolveString(String(config.senderFilter || '')).trim().toLowerCase();
+
+    if (!token || !channel) {
+        return {
+            success: false,
+            triggered: false,
+            type: 'slack',
+            error: 'Slack Trigger icin bot token ve channel gerekli. Node alanlarini doldurun veya Ayarlar > Slack Bot alanini kullanin.'
+        };
+    }
+
+    const deadline = Date.now() + timeoutSeconds * 1000;
+    const channelStateKey = `_slack_last_ts_${channel}`;
+    let lastTs = String(variableManager.get(channelStateKey) || variableManager.get('_slack_last_ts') || '');
+
+    while (Date.now() < deadline) {
+        try {
+            const params = new URLSearchParams();
+            params.set('channel', channel);
+            params.set('limit', '20');
+            if (lastTs) params.set('oldest', lastTs);
+
+            const response = await fetch(`https://slack.com/api/conversations.history?${params.toString()}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+                return {
+                    success: false,
+                    triggered: false,
+                    type: 'slack',
+                    error: `Slack API Error: ${data?.error || `HTTP ${response.status}`}`
+                };
+            }
+
+            const messages: any[] = Array.isArray(data.messages) ? [...data.messages].reverse() : [];
+            let newestSeenTs = lastTs;
+
+            for (const msg of messages) {
+                const ts = String(msg?.ts || '').trim();
+                if (!ts || !isSlackTsAfter(ts, lastTs)) continue;
+                if (!newestSeenTs || isSlackTsAfter(ts, newestSeenTs)) newestSeenTs = ts;
+
+                const subtype = String(msg?.subtype || '').trim();
+                const isBotMessage = subtype === 'bot_message' || !!msg?.bot_id;
+                if (isBotMessage && !includeBotMessages) continue;
+
+                const text = String(msg?.text || '').trim();
+                if (!text) continue;
+
+                const userId = String(msg?.user || '').trim();
+                let senderName = String(msg?.username || '').trim() || userId || 'unknown';
+
+                if (senderFilter) {
+                    let senderMatched = false;
+
+                    if (userId && userId.toLowerCase().includes(senderFilter)) {
+                        senderMatched = true;
+                    }
+                    if (!senderMatched && senderName.toLowerCase().includes(senderFilter)) {
+                        senderMatched = true;
+                    }
+                    if (!senderMatched && userId) {
+                        senderName = await resolveSlackSenderName(token, userId);
+                        if (senderName.toLowerCase().includes(senderFilter)) {
+                            senderMatched = true;
+                        }
+                    }
+
+                    if (!senderMatched) continue;
+                }
+
+                if (messageFilter) {
+                    let msgMatched = false;
+                    try {
+                        msgMatched = new RegExp(messageFilter, 'i').test(text);
+                    } catch {
+                        msgMatched = text.toLowerCase().includes(messageFilter.toLowerCase());
+                    }
+                    if (!msgMatched) continue;
+                }
+
+                const now = new Date();
+                const slackInfo = {
+                    sender: senderName,
+                    senderUserId: userId,
+                    message: text,
+                    channel,
+                    ts,
+                };
+
+                variableManager.set('_triggerTime', now.toISOString());
+                variableManager.set('_triggerType', 'slack_bot');
+                variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
+                variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
+
+                variableManager.set('triggerMessage', text);
+                variableManager.set('senderName', senderName);
+                variableManager.set('slackMessage', text);
+                variableManager.set('slackChannel', channel);
+                variableManager.set('slackTs', ts);
+                variableManager.set('slackUserId', userId);
+                variableManager.set('_slack_last_ts', ts);
+                variableManager.set(channelStateKey, ts);
+
+                if (config.variableName) {
+                    variableManager.set(config.variableName, slackInfo);
+                }
+
+                return {
+                    triggered: true,
+                    type: 'slack_bot',
+                    timestamp: Date.now(),
+                    data: slackInfo
+                };
+            }
+
+            if (newestSeenTs && (!lastTs || isSlackTsAfter(newestSeenTs, lastTs))) {
+                lastTs = newestSeenTs;
+                variableManager.set('_slack_last_ts', newestSeenTs);
+                variableManager.set(channelStateKey, newestSeenTs);
+            }
+        } catch (error) {
+            console.warn('[SlackTrigger] Poll attempt failed:', error);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    return {
+        success: false,
+        triggered: false,
+        type: 'slack',
+        error: `Slack trigger timeout (${timeoutSeconds}s). Workflow aktifken arka plan polling ile otomatik tetiklenir.`
+    };
+}
 
 export async function executeTelegramTrigger(
     config: TelegramTriggerConfig,

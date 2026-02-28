@@ -265,6 +265,12 @@ export class WorkflowStorage {
                 whatsappPollingService.refreshPolling();
             } catch (e) { }
 
+            // Start/stop Slack polling for SLACK_TRIGGER
+            try {
+                const { slackPollingService } = require('./SlackPollingService');
+                slackPollingService.refreshPolling();
+            } catch (e) { }
+
             // Sync with Native Triggers (WhatsApp, Call, SMS, etc.)
             try {
                 const { triggerNativeService } = require('./TriggerNativeService');

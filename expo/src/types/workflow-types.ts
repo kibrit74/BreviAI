@@ -36,6 +36,7 @@ export type NodeType =
     | 'NOTIFICATION_TRIGGER'
     | 'EMAIL_TRIGGER'
     | 'TELEGRAM_TRIGGER'
+    | 'SLACK_TRIGGER'
     | 'GEOFENCE_TRIGGER'
     | 'GEOFENCE_ENTER_TRIGGER'
     | 'GEOFENCE_EXIT_TRIGGER'
@@ -228,6 +229,16 @@ export interface TelegramTriggerConfig {
     timeout?: number; // Polling timeout in seconds (default 30)
     variableName?: string; // Store message info
     triggerType?: string; // explicit trigger type (e.g. 'message')
+}
+
+export interface SlackTriggerConfig {
+    botToken?: string; // Optional, can use Settings fallback
+    channel?: string; // Channel ID (e.g. C01234567)
+    messageFilter?: string; // Regex or plain text
+    senderFilter?: string; // User ID or display name fragment
+    includeBotMessages?: boolean; // Default false
+    timeout?: number; // Polling timeout in seconds (manual run mode)
+    variableName?: string; // Store message info
 }
 
 // Call Trigger Setup
@@ -1070,6 +1081,7 @@ export type NodeConfig =
     | NotificationTriggerConfig
     | EmailTriggerConfig
     | TelegramTriggerConfig
+    | SlackTriggerConfig
     | CallTriggerConfig
     | SMSTriggerConfig
     | WhatsAppTriggerConfig
@@ -1389,6 +1401,16 @@ export const NODE_REGISTRY: Record<NodeType, NodeMetadata> = {
         description: 'Gelen mesajları yakalar',
         icon: 'paper-plane',
         color: '#229ED9',
+        hasInputPort: false,
+        outputPorts: ['default'],
+    },
+    SLACK_TRIGGER: {
+        type: 'SLACK_TRIGGER',
+        category: 'trigger',
+        name: 'Slack Tetikleyici',
+        description: 'Slack kanalÄ±ndan gelen mesajlarÄ± yakalar',
+        icon: 'logo-slack',
+        color: '#4A154B',
         hasInputPort: false,
         outputPorts: ['default'],
     },
@@ -2732,6 +2754,7 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'CALL_TRIGGER': return { states: ['Incoming'], variableName: 'callerInfo' };
         case 'SMS_TRIGGER': return { variableName: 'smsInfo' };
         case 'WHATSAPP_TRIGGER': return { variableName: 'whatsappInfo' };
+        case 'SLACK_TRIGGER': return { botToken: '', channel: '', messageFilter: '', senderFilter: '', includeBotMessages: false, timeout: 30, variableName: 'slackInfo' };
         case 'GOOGLE_TRANSLATE': return { text: '{{previous_output}}', targetLanguage: 'tr', variableName: 'translatedText' };
         case 'TELEGRAM_SEND': return { botToken: '', chatId: '', message: '{{previous_output}}' };
         case 'SLACK_SEND': return { mode: 'webhook', webhookUrl: '', apiToken: '', botToken: '', channel: '', apiUrl: 'https://slack.com/api/chat.postMessage', message: '{{previous_output}}', blocks: '' };

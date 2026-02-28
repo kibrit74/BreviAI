@@ -30,6 +30,14 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
         } catch (e) {
             console.warn('[BackgroundService] WhatsApp polling error:', e);
         }
+
+        // Trigger Slack polling check
+        try {
+            const { slackPollingService } = require('./SlackPollingService');
+            await slackPollingService.pollOnce();
+        } catch (e) {
+            console.warn('[BackgroundService] Slack polling error:', e);
+        }
     }
 });
 

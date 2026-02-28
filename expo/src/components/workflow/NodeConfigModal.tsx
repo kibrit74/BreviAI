@@ -702,6 +702,89 @@ const TelegramTriggerFields: React.FC<ConfigFieldsProps> = ({ config, updateConf
     </>
 );
 
+const SlackTriggerFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
+    <>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Slack Bot Token (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.botToken || ''}
+                onChangeText={(v) => updateConfig('botToken', v)}
+                placeholder="xoxb-..."
+                placeholderTextColor="#666"
+                secureTextEntry
+            />
+            <Text style={styles.fieldHint}>
+                Bos birakirsaniz Ayarlar ekranindaki Slack token kullanilir.
+            </Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Kanal ID (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.channel || ''}
+                onChangeText={(v) => updateConfig('channel', v)}
+                placeholder="C01234567"
+                placeholderTextColor="#666"
+                autoCapitalize="none"
+            />
+            <Text style={styles.fieldHint}>
+                Bos birakirsaniz Ayarlar ekranindaki kanal ID kullanilir.
+            </Text>
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Mesaj Filtresi (Regex)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.messageFilter || ''}
+                onChangeText={(v) => updateConfig('messageFilter', v)}
+                placeholder="ornek: ^/ai veya USD/TRY"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Gonderen Filtresi (Opsiyonel)</Text>
+            <TextInput
+                style={styles.input}
+                value={config.senderFilter || ''}
+                onChangeText={(v) => updateConfig('senderFilter', v)}
+                placeholder="U12345 veya kullanici adi parcasi"
+                placeholderTextColor="#666"
+            />
+        </View>
+        <View style={styles.rowField}>
+            <Text style={styles.fieldLabel}>Bot Mesajlarini Dahil Et</Text>
+            <Switch
+                value={!!config.includeBotMessages}
+                onValueChange={(v) => updateConfig('includeBotMessages', v)}
+                trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                thumbColor="#FFF"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Timeout (sn)</Text>
+            <TextInput
+                style={styles.input}
+                value={String(config.timeout || 30)}
+                onChangeText={(v) => updateConfig('timeout', v)}
+                placeholder="30"
+                placeholderTextColor="#666"
+                keyboardType="numeric"
+            />
+        </View>
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Sonuc Degiskeni</Text>
+            <TextInput
+                style={styles.input}
+                value={config.variableName || 'slackInfo'}
+                onChangeText={(v) => updateConfig('variableName', v)}
+                placeholder="slackInfo"
+                placeholderTextColor="#666"
+            />
+        </View>
+    </>
+);
+
 const CallTriggerFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => {
     const states = config.states || [];
 
@@ -6821,6 +6904,8 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
                 return <EmailTriggerFields config={config} updateConfig={updateConfig} />;
             case 'TELEGRAM_TRIGGER':
                 return <TelegramTriggerFields config={config} updateConfig={updateConfig} />;
+            case 'SLACK_TRIGGER':
+                return <SlackTriggerFields config={config} updateConfig={updateConfig} />;
             case 'CALL_TRIGGER':
                 return <CallTriggerFields config={config} updateConfig={updateConfig} />;
             case 'SMS_TRIGGER':

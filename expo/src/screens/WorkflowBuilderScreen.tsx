@@ -285,6 +285,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                             'whatsapp_send': 'WHATSAPP_SEND',
                             'telegram_send': 'TELEGRAM_SEND',
                             'slack_send': 'SLACK_SEND',
+                            'slack_trigger': 'SLACK_TRIGGER',
                             'email_send': 'EMAIL_SEND',
                             // Audio
                             'speak_text': 'SPEAK_TEXT',
@@ -1180,7 +1181,7 @@ export const WorkflowBuilderScreen: React.FC = () => {
                                 // Check trigger type for specific scheduling
                                 const hasTimeTrigger = workflow.nodes.some(n => n.type === 'TIME_TRIGGER');
                                 const hasNotificationTrigger = workflow.nodes.some(n =>
-                                    ['TELEGRAM_TRIGGER', 'SMS_TRIGGER', 'WHATSAPP_TRIGGER', 'EMAIL_TRIGGER', 'NOTIFICATION_TRIGGER', 'CALL_TRIGGER'].includes(n.type)
+                                    ['TELEGRAM_TRIGGER', 'SLACK_TRIGGER', 'SMS_TRIGGER', 'WHATSAPP_TRIGGER', 'EMAIL_TRIGGER', 'NOTIFICATION_TRIGGER', 'CALL_TRIGGER'].includes(n.type)
                                 );
 
                                 if (hasTimeTrigger) {

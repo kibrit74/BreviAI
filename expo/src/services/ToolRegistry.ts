@@ -1244,6 +1244,24 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         nodeType: 'TELEGRAM_TRIGGER'
     },
     {
+        name: 'trigger_slack',
+        description: 'Triggers the workflow when a Slack message is received in a channel.',
+        parameters: {
+            type: 'OBJECT',
+            properties: {
+                botToken: { type: 'STRING', description: 'Slack Bot token xoxb-... (optional, falls back to Settings)' },
+                channel: { type: 'STRING', description: 'Slack channel ID, e.g. C01234567 (optional, falls back to Settings)' },
+                messageFilter: { type: 'STRING', description: 'Regex/text filter for message content (optional)' },
+                senderFilter: { type: 'STRING', description: 'Sender user ID or name filter (optional)' },
+                includeBotMessages: { type: 'BOOLEAN', description: 'If true, bot messages are also matched' },
+                timeout: { type: 'INTEGER', description: 'Manual execution polling timeout in seconds (default: 30)' },
+                variableName: { type: 'STRING', description: 'Variable name to store Slack message info (default: slackInfo)' }
+            },
+            required: []
+        },
+        nodeType: 'SLACK_TRIGGER'
+    },
+    {
         name: 'trigger_geofence_enter',
         description: 'Triggers the workflow when the user enters a specific geographic area.',
         parameters: {

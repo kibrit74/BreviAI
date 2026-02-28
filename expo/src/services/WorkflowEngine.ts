@@ -759,6 +759,7 @@ export class WorkflowEngine {
                 case 'CALL_TRIGGER':
                 case 'NOTIFICATION_TRIGGER':
                 case 'TELEGRAM_TRIGGER':
+                case 'SLACK_TRIGGER':
                 case 'EMAIL_TRIGGER':
                 case 'GEOFENCE_TRIGGER':
                 case 'DEEP_LINK_TRIGGER':
