@@ -71,7 +71,7 @@ export async function searchWeb(query: string): Promise<SearchResult[]> {
     // 4. Döviz/Kripto Kontrolü
     if (isCurrencyQuery(lowerQuery)) {
         try {
-            const currencyResult = await getCurrencyInfo(query);
+            const currencyResult = await getCurrencyInfo();
             if (currencyResult) results.unshift(currencyResult); // En başa ekle
         } catch (e) {
             console.error('[SEARCH] Currency failed:', e);
@@ -153,14 +153,14 @@ async function getWeatherInfo(query: string): Promise<SearchResult | null> {
     try {
         const wttrResult = await scrapeWttrIn(location);
         if (wttrResult) return wttrResult;
-    } catch (e) {
+    } catch {
         console.warn('[WEATHER] wttr.in failed, trying OpenWeather');
     }
 
     // Yöntem 2: OpenWeatherMap (Daha detaylı)
     try {
         return await scrapeOpenWeather(location);
-    } catch (e) {
+    } catch {
         console.error('[WEATHER] All weather sources failed');
         return null;
     }
@@ -237,7 +237,7 @@ async function scrapeOpenWeather(location: string): Promise<SearchResult | null>
 
 // ============= CURRENCY API =============
 
-async function getCurrencyInfo(query: string): Promise<SearchResult | null> {
+async function getCurrencyInfo(): Promise<SearchResult | null> {
     try {
         // exchangerate.host - Ücretsiz API
         const response = await fetch('https://api.exchangerate.host/latest?base=USD&symbols=TRY,EUR,GBP');

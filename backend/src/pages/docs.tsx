@@ -3,7 +3,6 @@ import Head from 'next/head';
 import styles from './docs.module.css';
 import { NODES, CATS } from '../data/docsData';
 import DocsChat from '../components/DocsChat';
-import { ReactNode } from 'react';
 
 // --- Types ---
 type TabId = 'overview' | 'params' | 'output' | 'examples' | 'usecases';

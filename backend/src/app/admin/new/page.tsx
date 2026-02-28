@@ -141,7 +141,7 @@ export default function NewTemplatePage() {
             } else {
                 setError(data.error || 'Failed to create template');
             }
-        } catch (err) {
+        } catch {
             setError('An unexpected error occurred');
         } finally {
             setLoading(false);

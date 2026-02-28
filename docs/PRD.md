@@ -1,6 +1,97 @@
-🚀 PRD: Uygulama Adı : BreviAI Kestirme + AI Motoru (Hybrid Architecture)Versiyon: 2.0 (Backend Entegreli)Tarih: 24.05.2024Mimari: Android (Client) + Next.js (Server/AI Gateway)1. Yönetici ÖzetiBu proje, Android kullanıcılarının doğal dil kullanarak karmaşık otomasyon senaryoları (kestirmeler) oluşturmasını sağlayan hibrit bir sistemdir.Uygulama, Android tarafında donanım erişimini (Mikrofon, Bluetooth, Wi-Fi) yönetirken, Next.js Backend tarafında Gemini 2.5/3.0 modellerini kullanarak kullanıcının niyetini çalıştırılabilir bir JSON şablonuna dönüştürür. Amaç, teknik bilgisi olmayan kullanıcılara "No-Code" otomasyon sunmaktır.2. Sistem Mimarisi ve SorumluluklarSistem iki ana bloktan oluşur: Android Client ve Next.js Server.2.1. Android Client (The Executer)Görevi: Kullanıcı arayüzünü sunmak, ses/girdi toplamak ve gelen JSON emrini uygulamak.Teknoloji: Kotlin, Jetpack Compose, WorkManager.Yetenekler:Donanım kontrolü (BT, Wi-Fi).Android Intent yönetimi (Mail, Not, SMS).Speech-to-Text (Offline/Online).2.2. Next.js Backend (The Brain)Görevi: Android'den gelen doğal dil isteğini işlemek, uygun AI modelini seçmek ve JSON üretmek.Teknoloji: Next.js (API Routes), Vercel/Node.js, Google Gemini API.Yetenekler:Prompt Router: İsteğin karmaşıklığına göre Gemini 2.5 Flash veya 3.0 Flash seçimi.JSON Validation: AI'ın ürettiği JSON'un bozuk olup olmadığını kontrol etme.Template Library: Hazır şablonları sunma.3. Kullanıcı Akışı ve API EntegrasyonuSenaryo: Kullanıcı "Toplantıdayım, not al ve yöneticime mail at" der.Input (Android): Kullanıcı butona basar ve konuşur. Android STT (Speech-to-Text) bunu metne çevirir.Request (Android -> Next.js): Uygulama, metni API'ye gönderir.POST /api/generate-shortcutBody: { "prompt": "Toplantıdayım, not al ve...", "user_context": "..." }Processing (Next.js):Backend isteği analiz eder (Uzun/Zincirleme emir mi?).Karar: Karmaşık emir -> Gemini 3.0 Flash kullanılır.AI, sistem promptuna göre bir JSON üretir.Response (Next.js -> Android):Backend, 200 OK ile JSON şablonunu döner.Execution (Android):Android motoru JSON'u parse eder.Sırasıyla: Ses kaydı başlat -> Metni al -> Mail Intent'ini hazırla -> Kullanıcıya onaylat/gönder.4. Teknik Gereksinimler & API Kontratı4.1. JSON Şablon Yapısı (Ortak Dil)Android ve Backend'in anlaşacağı standart veri yapısıdır.JSON{
+# BreviAI PRD (Ürün Gereksinimleri Dokümanı)
+
+- Sürüm: `3.0`
+- Tarih: `28.02.2026`
+- Mimari: `Expo React Native (mobil) + Next.js (backend/API gateway)`
+
+## 1) Yönetici Özeti
+
+BreviAI, kullanıcının doğal dille otomasyon iş akışları oluşturmasını ve bunları mobilde güvenli şekilde çalıştırmasını hedefleyen bir üründür.
+
+Sistem iki ana parçadan oluşur:
+- Mobil uygulama: UI, workflow builder, trigger/aksiyon yürütme.
+- Backend: AI üretim endpointleri, şablon servisleri, kimlik doğrulama ve güvenlik katmanı.
+
+Ana hedef kitle:
+- Bireysel kullanıcılar
+- Freelancer/profesyoneller
+- Mobilde hızlı otomasyon isteyen teknik olmayan kullanıcılar
+
+## 2) Ürün Amaçları
+
+1. Doğal dil ile anlamlı workflow üretimini güvenilir hale getirmek.
+2. Üretilen workflow’ların mobilde deterministik şekilde çalışmasını sağlamak.
+3. Güvenlikte fail-closed yaklaşımı sürdürmek (secret/admin key eksikse endpoint açmama).
+4. Üretim ortamında test/mock verinin kullanıcı akışına karışmasını engellemek.
+
+## 3) Kapsam
+
+Kapsam dahil:
+- Workflow üretimi (`/api/generate`)
+- Template katalogu (`/api/templates`)
+- Workflow yürütme ve geçmiş
+- Widget tetikleme ve resize adaptasyonu
+- MCP tabanlı tool çağrıları
+
+Kapsam dışı:
+- Tam teşekküllü masaüstü uygulama
+- Çok kiracılı enterprise yönetim paneli
+- Tam offline LLM inference (araştırma konusudur)
+
+## 4) Sistem Mimarisi
+
+### 4.1 Mobil (Expo React Native)
+
+Sorumluluklar:
+- Kullanıcıdan prompt alma
+- Workflow görsel düzenleme
+- Node bazlı execution
+- Trigger yönetimi (manuel, zaman, sensör, widget)
+- Native köprüler (izinler, widget, bildirim dinleyici vb.)
+
+### 4.2 Backend (Next.js)
+
+Sorumluluklar:
+- AI model yönlendirme ve üretim
+- Template servisleri
+- Güvenlik doğrulama (`x-app-secret`, admin key)
+- Reliability, preflight, execution, outbox gibi workflow API’leri
+
+## 5) Temel Kullanıcı Akışı
+
+1. Kullanıcı doğal dilde komut verir.
+2. Mobil uygulama promptu backend’e gönderir.
+3. Backend promptu analiz eder, uygun modelle JSON workflow üretir.
+4. Mobil uygulama workflow’u parse eder ve kullanıcıya düzenleme/çalıştırma imkanı verir.
+5. Çalıştırma sonrası sonuç ve loglar kayıt altına alınır.
+
+## 6) API Sözleşmesi (Özet)
+
+### 6.1 Üretim Endpointleri
+
+- `POST /api/generate`
+- `GET /api/templates`
+- `POST /api/feedback` (opsiyonel)
+
+### 6.2 Workflow Operasyonları
+
+- `GET/POST /api/workflows/*`
+- `GET/POST /api/workflows/executions`
+- `GET/POST /api/workflows/preflight`
+- `GET/POST /api/workflows/reliability`
+
+### 6.3 Güvenlik İlkeleri
+
+- Uygulama sırları eksikse endpoint fail-closed davranır.
+- Route seviyesinde wildcard CORS kullanılmaz; merkezi politika uygulanır.
+- Giriş/çıkış payloadlarında doğrulama ve hata standardizasyonu zorunludur.
+
+## 7) Workflow JSON Kontratı (Örnek)
+
+```json
+{
   "shortcut_name": "Toplantı Modu",
-  "ai_model_used": "gemini-3.0-flash",
+  "ai_model_used": "gemini-flash",
   "steps": [
     {
       "step_id": 1,
@@ -10,33 +101,37 @@
     },
     {
       "step_id": 2,
-      "type": "APP_ACTION",
-      "action": "RECORD_AUDIO",
-      "params": { "duration": "auto_stop_silence" },
-      "output_key": "audio_transcript"
-    },
-    {
-      "step_id": 3,
       "type": "INTENT_ACTION",
       "action": "SEND_EMAIL",
       "params": {
         "subject": "Toplantı Notları",
-        "body": "{audio_transcript}",
-        "recipient": "auto"
+        "body": "{{note_text}}"
       }
     }
   ]
 }
-4.2. Backend API EndpointleriMethodEndpointAçıklamaGET/api/templatesAnasayfada gösterilecek hazır (curated) şablonları listeler.POST/api/generateKullanıcı promptunu alır, AI ile işler ve çalıştırılabilir JSON döner.POST/api/feedback(Opsiyonel) Başarısız/Hatalı şablonları raporlar.4.3. AI Model Stratejisi (Backend Logic)Backend içindeki PromptRouter servisi şu mantıkla çalışır:Logic: if (prompt.length < 50 && keywords.include(['aç', 'kapat', 'ayarla'])) -> Gemini 2.5 Flash (Hızlı, Ucuz).Logic: else (Çok adımlı, özetleme gerektiren, içerik üretimi) -> Gemini 3.0 Flash (Yetenekli).5. Android Uygulama Özellikleri (Frontend)5.1. Kestirme Motoru (Execution Engine)Motor, backend'den gelen JSON'daki action tiplerini şu native fonksiyonlarla eşleştirir:TOGGLE_SETTING:Wi-Fi (Android sürümüne göre panel açma veya direkt işlem).Bluetooth (BluetoothAdapter kullanımı).SEND_INTENT:Mail (Intent.ACTION_SENDTO).Not (Intent.ACTION_CREATE_DOCUMENT veya Keep entegrasyonu).MEDIA_ACTION:Ses Kaydı (MediaRecorder).NOTIFICATION_ACTION:Bildirim okuma (NotificationListenerService).5.2. UI TasarımıAna Sayfa:Hazır Şablonlar (Grid yapıda, Next.js'den fetch edilir)."Sihirli Buton": Mikrofon ikonu ile AI input ekranını açar.İşlem Ekranı (Loading State):Next.js yanıt verirken "Kestirme hazırlanıyor..." animasyonu.Manuel Düzenleme:Gelen JSON parametrelerini (örneğin mail adresi yanlışsa) kullanıcı UI üzerinden düzeltebilmeli.6. Güvenlik ve İzinler6.1. Android İzinleri (Manifest)INTERNET: Backend ile iletişim.RECORD_AUDIO: Sesli komut ve kayıt aksiyonları.BLUETOOTH_CONNECT / ADMIN: Sistem ayarları.QUERY_ALL_PACKAGES: Yüklü mail/not uygulamalarını bulmak için (Play Store'da gerekçelendirilmelidir).6.2. Backend GüvenliğiAPI Key / Auth: Uygulamanın API'yi sömürmemesi için basit bir x-app-secret başlığı veya Firebase App Check entegrasyonu.Rate Limiting: IP başına istek sınırlaması (Next.js Middleware ile).7. MVP (Minimum Viable Product) Özellik SetiFaz 1 (İlk Sürüm - Hedef):Frontend: Android Native (Kotlin).Backend: Next.js (Vercel).Aksiyonlar:Ses -> Metin (STT).Metni Mail uygulamasına aktar (Taslak olarak aç).Metni Panoya kopyala / Paylaş menüsü.Temel Bluetooth/Wi-Fi paneli açma.AI: Sadece Gemini 2.5 Flash (Maliyet ve hız optimizasyonu için başlangıçta tek model).Faz 2 (Sonraki Sürüm):AI: Gemini 3.0 Flash entegrasyonu ve otomatik model seçimi.Otomasyon: Maili kullanıcı onayı olmadan arka planda gönderme (Gmail API).Kütüphane: Kullanıcıların oluşturduğu şablonları "Topluluk" sekmesinde paylaşabilmesi.Geliştirici İçin Önerilen Klasör Yapısı (Next.js)Bash/my-ai-shortcuts-backend
-  /src
-    /app
-      /api
-        /generate
-          route.ts       # AI Şablon Üretim Endpoint'i
-        /templates
-          route.ts       # Hazır Şablon Listesi
-    /lib
-      gemini.ts          # Google AI SDK Kurulumu
-      prompt-templates.ts # Sistem Promtları (System Instructions)
-      json-validator.ts  # AI çıktısını kontrol eden fonksiyon
-Bu doküman, hem Android geliştiricisi hem de Backend geliştiricisi (veya Full-stack geliştirici) için projenin sınırlarını net bir şekilde çizer. Başlamak için onayını bekliyor! 🚀
+```
+
+## 8) Başarı Ölçütleri
+
+1. Workflow üretim başarı oranı
+2. Çalıştırma başarı oranı
+3. Ortalama yürütme süresi
+4. Kullanıcı memnuniyeti (geri bildirim)
+5. Kritik güvenlik bulgusu sayısı (hedef: 0)
+
+## 9) Riskler ve Önlemler
+
+- Risk: Üretimde test/mock verinin görünmesi
+  Önlem: `__DEV__` veya açık env flag guardları
+
+- Risk: Yanlış yapılandırma ile endpointlerin açık kalması
+  Önlem: Fail-closed auth ve startup validation
+
+- Risk: Mobil-native widget davranış farklılıkları
+  Önlem: Resize options tabanlı adaptasyon + test matrisi
+
+## 10) Notlar
+
+Bu PRD, mevcut codebase ile uyumlu olacak şekilde güncellenmiştir. Önceki Kotlin/Jetpack odaklı tek katmanlı anlatım yerine güncel hibrit (Expo + Next.js) gerçekliği esas alınmıştır.
+

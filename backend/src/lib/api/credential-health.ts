@@ -18,6 +18,7 @@ export interface CredentialHealthSnapshot {
 }
 
 declare global {
+    // eslint-disable-next-line no-var
     var __breviaiCredentialHealthHistory: CredentialHealthSnapshot[] | undefined;
 }
 

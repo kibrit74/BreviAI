@@ -5,16 +5,12 @@ import { ValidationException, parseQueryParams } from '@/lib/api/validation';
 import { buildRateLimitHeaders, checkRateLimit, getClientIp } from '@/lib/api/rate-limit';
 import { getCredentialHealthHistory, runCredentialHealthCheck } from '@/lib/api/credential-health';
 import { recordExecution } from '@/lib/api/execution-history';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 const querySchema = z.object({
     probe: z.enum(['true', 'false']).optional(),
     historyLimit: z.string().optional(),
 });
-
-function hasAdminAccess(request: NextRequest) {
-    if (!process.env.ADMIN_KEY) return true;
-    return request.headers.get('x-admin-key') === process.env.ADMIN_KEY;
-}
 
 export async function GET(request: NextRequest) {
     const requestId = createRequestId('cred');
@@ -36,10 +32,11 @@ export async function GET(request: NextRequest) {
         });
     }
 
-    if (!hasAdminAccess(request)) {
-        return apiError('Unauthorized', {
-            status: 401,
-            code: 'UNAUTHORIZED',
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return apiError(adminAuth.message || 'Unauthorized', {
+            status: adminAuth.status || 401,
+            code: adminAuth.code || 'UNAUTHORIZED',
             requestId,
             headers: rateHeaders,
         });

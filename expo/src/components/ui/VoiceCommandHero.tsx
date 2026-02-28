@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated as RNAnimated, Easing as RNEasing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -24,7 +24,23 @@ export const VoiceCommandHero: React.FC<VoiceCommandHeroProps> = ({
     onPress,
     isRecording = false
 }) => {
-    const { t } = useApp();
+    const { t, language } = useApp();
+    const commandOpacity = useRef(new RNAnimated.Value(1)).current;
+    const [commandIndex, setCommandIndex] = useState(0);
+    const voiceCommandExamples = useMemo(
+        () => [
+            t('voiceCmdSummarizeNotes'),
+            t('voiceCmdSummarizeEmails'),
+            t('voiceCmdReadCalendar'),
+            t('voiceCmdListEvents'),
+            t('voiceCmdPlanDay'),
+            t('voiceCmdCreateReminder'),
+            t('voiceCmdSendDailyReport'),
+            t('voiceCmdCheckWeather'),
+            t('voiceCmdShowTodayTasks'),
+        ],
+        [language]
+    );
 
     const pulse = useSharedValue(0);
     const wave = useSharedValue(0);
@@ -48,6 +64,37 @@ export const VoiceCommandHero: React.FC<VoiceCommandHeroProps> = ({
             wave.value = 0;
         }
     }, [isRecording]);
+
+    useEffect(() => {
+        setCommandIndex(0);
+        commandOpacity.setValue(1);
+    }, [voiceCommandExamples, commandOpacity]);
+
+    useEffect(() => {
+        if (voiceCommandExamples.length <= 1) return;
+
+        const intervalId = setInterval(() => {
+            RNAnimated.timing(commandOpacity, {
+                toValue: 0,
+                duration: 220,
+                easing: RNEasing.out(RNEasing.quad),
+                useNativeDriver: true,
+            }).start(({ finished }) => {
+                if (!finished) return;
+
+                setCommandIndex((prev) => (prev + 1) % voiceCommandExamples.length);
+
+                RNAnimated.timing(commandOpacity, {
+                    toValue: 1,
+                    duration: 260,
+                    easing: RNEasing.in(RNEasing.quad),
+                    useNativeDriver: true,
+                }).start();
+            });
+        }, 2400);
+
+        return () => clearInterval(intervalId);
+    }, [voiceCommandExamples, commandOpacity]);
 
     // 7 Glow Rings
     const ring1Style = useAnimatedStyle(() => ({
@@ -163,7 +210,13 @@ export const VoiceCommandHero: React.FC<VoiceCommandHeroProps> = ({
 
             <View style={styles.textContainer}>
                 <Text style={styles.tapText}>{t('tapToSpeak')}</Text>
-                <Text style={styles.exampleText}>{t('voiceExample')}</Text>
+                <View style={styles.exampleRow}>
+                    <Text style={styles.exampleText}>{`"Hey BreviAI, `}</Text>
+                    <RNAnimated.Text style={[styles.exampleText, { opacity: commandOpacity }]}>
+                        {voiceCommandExamples[commandIndex]}
+                    </RNAnimated.Text>
+                    <Text style={styles.exampleText}>{`"`}</Text>
+                </View>
             </View>
         </View>
     );
@@ -292,5 +345,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: 'rgba(255, 255, 255, 0.7)',
         fontWeight: '400',
+    },
+    exampleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
     },
 });

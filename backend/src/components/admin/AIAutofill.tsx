@@ -2,7 +2,6 @@
 'use client';
 
 import { useState } from 'react';
-import styles from '../admin.module.css'; // Adjust path as needed, assuming we are in src/components/admin
 import { withAdminAuthHeaders } from '@/lib/admin-client-auth';
 
 interface AIAutofillProps {
@@ -36,7 +35,7 @@ export default function AIAutofill({ onGenerated }: AIAutofillProps) {
             } else {
                 setError(data.error || 'Failed to generate template');
             }
-        } catch (err) {
+        } catch {
             setError('Connection failed');
         } finally {
             setLoading(false);
@@ -57,7 +56,7 @@ export default function AIAutofill({ onGenerated }: AIAutofillProps) {
             </div>
 
             <p style={{ color: '#d8b4fe', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                Describe the shortcut you want to create (e.g., "Whatsapp message to Mom when I leave work").
+                Describe the shortcut you want to create (e.g., &quot;Whatsapp message to Mom when I leave work&quot;).
                 The AI will search the web for intent details and autofill the form.
             </p>
 

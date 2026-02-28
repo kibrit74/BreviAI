@@ -9,7 +9,6 @@ import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, idempotency-key',
 };

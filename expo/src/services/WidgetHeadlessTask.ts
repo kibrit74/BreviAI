@@ -19,6 +19,10 @@ interface HeadlessTaskData {
     [key: string]: any; // Allow additional native extras
 }
 
+const headlessInFlight = new Set<string>();
+const headlessLastStartAt = new Map<string, number>();
+const HEADLESS_DEBOUNCE_MS = 12000;
+
 async function loadWorkflowsForHeadless(): Promise<Workflow[] | null> {
     const candidateKeys = ['brevi_workflows', 'workflows'];
 
@@ -48,6 +52,21 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
         console.warn('[WidgetHeadlessTask] No workflowId provided, aborting');
         return;
     }
+
+    const now = Date.now();
+    const lastStart = headlessLastStartAt.get(workflowId) || 0;
+    if (headlessInFlight.has(workflowId)) {
+        console.warn(`[WidgetHeadlessTask] Workflow ${workflowId} already in-flight, skipping duplicate trigger`);
+        return;
+    }
+    if (now - lastStart < HEADLESS_DEBOUNCE_MS) {
+        console.warn(
+            `[WidgetHeadlessTask] Workflow ${workflowId} triggered too soon (${now - lastStart}ms), skipping duplicate`
+        );
+        return;
+    }
+    headlessLastStartAt.set(workflowId, now);
+    headlessInFlight.add(workflowId);
 
     try {
         // 1. Load workflow from storage (since we don't have hydrated store)
@@ -88,6 +107,13 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
         if (data._gestureType) {
             initialVariables._gestureType = data._gestureType;
             console.log(`[WidgetHeadlessTask] Using native _gestureType from data: ${data._gestureType}`);
+        }
+
+        // Pass through any additional native extras (e.g. _callerNumber, _smsMessage)
+        // so trigger nodes can run without relying only on SharedPreferences reads.
+        if (data && typeof data === 'object') {
+            const { workflowId: _ignoredWorkflowId, ...nativeExtras } = data as Record<string, any>;
+            initialVariables = { ...nativeExtras, ...initialVariables };
         }
 
         // PRIORITY 2: Fetch trigger variables from SharedPreferences (e.g. WhatsApp message content)
@@ -167,6 +193,9 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
     } catch (error: any) {
         console.error('[WidgetHeadlessTask] Error executing workflow:', error);
         await showNotification('Hata', error.message || 'Otomasyon çalıştırılamadı');
+    }
+    finally {
+        headlessInFlight.delete(workflowId);
     }
 };
 

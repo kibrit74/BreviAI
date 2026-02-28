@@ -5,7 +5,6 @@ import { verifyAdminAccess } from '@/lib/api/admin-auth';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };

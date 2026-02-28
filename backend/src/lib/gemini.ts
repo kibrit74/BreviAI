@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerativeModel, SchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 
 // Initialize the Google AI client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');

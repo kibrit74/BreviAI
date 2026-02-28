@@ -10,7 +10,6 @@ import { validateShortcut } from '@/lib/json-validator';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-app-secret',
 };
@@ -160,7 +159,7 @@ function checkRateLimit(ip: string): boolean {
     return true;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
     return NextResponse.json({
         status: 'online',
         version: '2.4',
@@ -237,7 +236,6 @@ export async function POST(request: NextRequest) {
             });
             return NextResponse.json(
                 { success: false, error: 'Prompt gerekli' },
-                // @ts-ignore
                 { status: 400, headers: corsHeaders }
             );
         }
@@ -576,7 +574,7 @@ CURRENT DATE: ${new Date().toLocaleDateString('tr-TR')}
 
         // Determine error type and return appropriate message
         let errorMessage = 'Sunucu hatasÄ±';
-        let details = error instanceof Error ? error.message : 'Bilinmeyen hata';
+        const details = error instanceof Error ? error.message : 'Bilinmeyen hata';
         let statusCode = 500;
 
         if (details.includes('API key') || details.includes('401') || details.includes('403')) {

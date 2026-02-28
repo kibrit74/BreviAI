@@ -1,7 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
-import { SEED_TEMPLATES } from '@/data/seed_templates';
 import { z } from 'zod';
 import { apiError, apiSuccess, createRequestId } from '@/lib/api/response';
 import { ValidationException, parseJsonBody } from '@/lib/api/validation';
@@ -11,7 +10,6 @@ import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, idempotency-key',
 };
@@ -19,45 +17,6 @@ const corsHeaders = {
 const templateIdSchema = z.object({
     template_id: z.string().trim().min(1, 'template_id required'),
 });
-
-async function seedTemplatesIfNeeded() {
-    try {
-        const { count, error } = await supabase
-            .from('templates')
-            .select('*', { count: 'exact', head: true });
-
-        if (error) {
-            console.error('Error checking templates count:', error);
-            return;
-        }
-
-        if (count === 0) {
-            console.log('Seeding templates...');
-            const { error: insertError } = await supabase
-                .from('templates')
-                .insert(SEED_TEMPLATES.map(t => ({
-                    id: t.id,
-                    title: t.title,
-                    title_en: t.title_en,
-                    description: t.description,
-                    description_en: t.description_en,
-                    category: t.category,
-                    author: t.author,
-                    downloads: t.downloads,
-                    tags: t.tags,
-                    template_json: t.template_json || {},
-                })));
-
-            if (insertError) {
-                console.error('Error seeding templates:', insertError);
-            } else {
-                console.log('Templates seeded successfully');
-            }
-        }
-    } catch (e) {
-        console.error('Unexpected error during seeding:', e);
-    }
-}
 
 /**
  * GET /api/templates

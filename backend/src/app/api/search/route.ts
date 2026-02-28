@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { searchWeb } from '@/lib/search';
 import { z } from 'zod';
 import { apiError, apiSuccess, createRequestId } from '@/lib/api/response';

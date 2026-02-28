@@ -23,6 +23,7 @@ export interface IdempotencyRunResult {
 }
 
 declare global {
+    // eslint-disable-next-line no-var
     var __breviaiIdempotencyStore: Map<string, IdempotencyEntry> | undefined;
 }
 

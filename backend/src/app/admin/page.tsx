@@ -34,7 +34,7 @@ export default function AdminDashboard() {
             } else {
                 setError(data.error || 'Failed to load templates');
             }
-        } catch (err) {
+        } catch {
             setError('Failed to connect to server');
         } finally {
             setLoading(false);
@@ -56,7 +56,7 @@ export default function AdminDashboard() {
             } else {
                 alert('Failed to delete: ' + data.error);
             }
-        } catch (err) {
+        } catch {
             alert('Error deleting template');
         }
     };

@@ -4,6 +4,7 @@ import { apiError, apiSuccess, createRequestId } from '@/lib/api/response';
 import { ValidationException, parseQueryParams } from '@/lib/api/validation';
 import { buildRateLimitHeaders, checkRateLimit, getClientIp } from '@/lib/api/rate-limit';
 import { getOutboxItem, listOutboxItems } from '@/lib/api/outbox';
+import { verifyAdminKey } from '@/lib/api/auth';
 
 const outboxQuerySchema = z.object({
     id: z.string().optional(),
@@ -11,11 +12,6 @@ const outboxQuerySchema = z.object({
     status: z.enum(['pending', 'processing', 'sent', 'failed']).optional(),
     limit: z.string().optional(),
 });
-
-function hasAdminAccess(request: NextRequest) {
-    if (!process.env.ADMIN_KEY) return true;
-    return request.headers.get('x-admin-key') === process.env.ADMIN_KEY;
-}
 
 export async function GET(request: NextRequest) {
     const requestId = createRequestId('outbox');
@@ -36,10 +32,11 @@ export async function GET(request: NextRequest) {
         });
     }
 
-    if (!hasAdminAccess(request)) {
-        return apiError('Unauthorized', {
-            status: 401,
-            code: 'UNAUTHORIZED',
+    const adminAuth = verifyAdminKey(request);
+    if (!adminAuth.ok) {
+        return apiError(adminAuth.message || 'Unauthorized', {
+            status: adminAuth.status || 401,
+            code: adminAuth.code || 'UNAUTHORIZED',
             requestId,
             headers: rateHeaders,
         });

@@ -30,6 +30,7 @@ type RootStackParamList = {
 };
 
 type WorkflowListNavigationProp = NativeStackNavigationProp<RootStackParamList, 'WorkflowList'>;
+const ENABLE_DEV_WORKFLOW_SEEDS = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_SEEDS === 'true';
 
 export const WorkflowListScreen: React.FC = () => {
     const navigation = useNavigation<WorkflowListNavigationProp>();
@@ -41,8 +42,9 @@ export const WorkflowListScreen: React.FC = () => {
     const [runningWorkflowId, setRunningWorkflowId] = useState<string | null>(null);
 
     const loadWorkflows = useCallback(async () => {
-        // Seed test workflows if none exist
-        await WorkflowStorage.seedTestWorkflows();
+        if (ENABLE_DEV_WORKFLOW_SEEDS) {
+            await WorkflowStorage.seedTestWorkflows();
+        }
         const data = await WorkflowStorage.getAll();
         setWorkflows(data);
     }, []);

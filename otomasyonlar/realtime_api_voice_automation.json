@@ -1,0 +1,82 @@
+{
+  "id": "realtime-api-voice-automation-001",
+  "name": "Realtime API Voice Automation",
+  "description": "Incoming call triggers Gemini Live realtime voice assistant, then saves transcript and shows completion notification.",
+  "icon": "mic",
+  "color": "#06B6D4",
+  "tags": ["realtime", "voice", "gemini-live", "call"],
+  "nodes": [
+    {
+      "id": "start",
+      "type": "CALL_TRIGGER",
+      "label": "Incoming Call Trigger",
+      "config": {
+        "states": ["Incoming"],
+        "variableName": "callerInfo"
+      },
+      "position": { "x": 120, "y": 80 }
+    },
+    {
+      "id": "realtime",
+      "type": "REALTIME_AI",
+      "label": "Realtime AI Session",
+      "config": {
+        "systemPrompt": "You are a concise Turkish phone assistant. Keep replies short and clear. Caller number: {{callerInfo.number}}. Call state: {{callerInfo.state}}.",
+        "voice": "Kore",
+        "model": "gemini-2.5-flash-native-audio-preview-12-2025",
+        "tools": true,
+        "retryWithoutTools": true,
+        "speakerMode": true,
+        "maxDuration": 180,
+        "maxTurns": 0,
+        "includeTimestamps": false,
+        "clearPlaybackOnInterrupt": true,
+        "variableName": "realtimeTranscript",
+        "transcriptJsonVariable": "realtimeTranscriptRaw"
+      },
+      "position": { "x": 120, "y": 250 }
+    },
+    {
+      "id": "save-transcript",
+      "type": "FILE_WRITE",
+      "label": "Save Transcript",
+      "config": {
+        "filename": "realtime_call_{{_callTimestamp}}.txt",
+        "content": "Realtime Voice Session\nCaller: {{callerInfo.number}}\nState: {{callerInfo.state}}\nDate: {{_currentDate}} {{_currentTime}}\n\n{{realtimeTranscript}}"
+      },
+      "position": { "x": 120, "y": 430 }
+    },
+    {
+      "id": "notify",
+      "type": "NOTIFICATION",
+      "label": "Notify Complete",
+      "config": {
+        "type": "notification",
+        "title": "Realtime Session Complete",
+        "message": "Call with {{callerInfo.number}} ended. Transcript saved."
+      },
+      "position": { "x": 120, "y": 610 }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "sourceNodeId": "start",
+      "targetNodeId": "realtime",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e2",
+      "sourceNodeId": "realtime",
+      "targetNodeId": "save-transcript",
+      "sourcePort": "default"
+    },
+    {
+      "id": "e3",
+      "sourceNodeId": "save-transcript",
+      "targetNodeId": "notify",
+      "sourcePort": "default"
+    }
+  ]
+}
+

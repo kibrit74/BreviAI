@@ -74,7 +74,7 @@ export async function POST(request: Request) {
                         date: date,
                         _source: 'gmail_api_oauth'
                     };
-                } catch (e) {
+                } catch {
                     console.error('Failed to fetch msg details', msg.id);
                     return null;
                 }
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         if (connection) {
-            try { connection.end(); } catch (e) { }
+            try { connection.end(); } catch { }
         }
         console.warn('[Email Read Route] IMAP Failed:', error.message);
         imapError = error.message;

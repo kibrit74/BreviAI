@@ -194,26 +194,41 @@ export async function executeCallTrigger(
         return { triggered: false };
     }
 
-    const injectedNumber = variableManager.get('_callerNumber');
-    // ...
-    if (injectedNumber) {
-        // ... set variables ...
-        const now = new Date();
-        variableManager.set('_triggerTime', now.toISOString());
-        variableManager.set('_triggerType', 'call');
-        variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
-        variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
-        variableManager.set('triggerMessage', injectedNumber);
-        variableManager.set('callerInfo', injectedNumber); // Added for compatibility with workflow templates
+    const rawNumber = variableManager.get('_callerNumber');
+    const rawState = variableManager.get('_callState');
+    const injectedNumber = rawNumber == null ? '' : String(rawNumber).trim();
+    const injectedState = rawState == null ? '' : String(rawState).trim().toLowerCase();
 
-        console.log('[CALL_TRIGGER] Triggered by call from:', injectedNumber);
-        return {
-            triggered: true,
-            type: 'call',
-            timestamp: Date.now()
-        };
+    // If we have neither number nor state, this is likely a manual run with no call context.
+    if (!injectedNumber && !injectedState) {
+        return { success: false, triggered: false, error: 'Manual execution...' };
     }
-    return { success: false, triggered: false, error: 'Manual execution...' };
+
+    const now = new Date();
+    const callerInfo = {
+        number: injectedNumber || 'Unknown',
+        state: injectedState || 'incoming',
+        timestamp: now.toISOString(),
+    };
+
+    variableManager.set('_triggerTime', now.toISOString());
+    variableManager.set('_triggerType', 'call');
+    variableManager.set('_currentDate', now.toLocaleDateString('tr-TR'));
+    variableManager.set('_currentTime', now.toLocaleTimeString('tr-TR'));
+    variableManager.set('_callerInfo', callerInfo);
+    variableManager.set('callerInfo', callerInfo);
+    if (config.variableName) {
+        variableManager.set(config.variableName, callerInfo);
+    }
+    variableManager.set('triggerMessage', injectedNumber || `call:${callerInfo.state}`);
+
+    console.log('[CALL_TRIGGER] Triggered by call:', callerInfo);
+    return {
+        triggered: true,
+        type: 'call',
+        timestamp: Date.now(),
+        data: callerInfo,
+    };
 }
 
 export async function executeEmailTrigger(

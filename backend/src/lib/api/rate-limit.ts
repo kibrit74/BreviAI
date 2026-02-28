@@ -12,6 +12,7 @@ interface RateLimitRecord {
 }
 
 declare global {
+    // eslint-disable-next-line no-var
     var __breviaiRateLimitStore: Map<string, RateLimitRecord> | undefined;
 }
 

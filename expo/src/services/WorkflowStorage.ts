@@ -51,11 +51,87 @@ export class WorkflowStorage {
     static async getAll(): Promise<Workflow[]> {
         try {
             const data = await AsyncStorage.getItem(WORKFLOWS_KEY);
-            return data ? JSON.parse(data) : [];
+            const workflows: Workflow[] = data ? JSON.parse(data) : [];
+            const { workflows: migratedWorkflows, changed } = this.migrateRealtimeCallWorkflows(workflows);
+
+            // Persist one-time migrations so runtime uses corrected trigger/config.
+            if (changed) {
+                await AsyncStorage.setItem(WORKFLOWS_KEY, JSON.stringify(migratedWorkflows));
+                console.log('[WorkflowStorage] Migrated realtime call workflows (CALL_TRIGGER + speakerMode)');
+            }
+
+            return migratedWorkflows;
         } catch (error) {
             console.error('Error reading workflows:', error);
             return [];
         }
+    }
+
+    private static migrateRealtimeCallWorkflows(workflows: Workflow[]): { workflows: Workflow[]; changed: boolean } {
+        let changed = false;
+
+        const migrated = workflows.map((workflow) => {
+            const hasRealtime = workflow.nodes?.some((n: any) => n.type === 'REALTIME_AI');
+            if (!hasRealtime) return workflow;
+
+            const name = String(workflow.name || '').toLowerCase();
+            const isRealtimeSeed =
+                workflow.id === 'realtime-api-voice-automation-001' ||
+                name.includes('realtime api voice automation');
+            const isVoiceSecretary = name.includes('sesli ai sekreter');
+
+            const manualStartIndex = workflow.nodes.findIndex((n: any) =>
+                n.type === 'MANUAL_TRIGGER' &&
+                (n.id === 'start' || String(n.label || '').toLowerCase().includes('start realtime'))
+            );
+            const hasCallTrigger = workflow.nodes.some((n: any) => n.type === 'CALL_TRIGGER');
+            const shouldForceCallTrigger = (isRealtimeSeed || isVoiceSecretary) && manualStartIndex >= 0 && !hasCallTrigger;
+
+            let nodeChanged = false;
+            const nextNodes = workflow.nodes.map((node: any, idx: number) => {
+                if (shouldForceCallTrigger && idx === manualStartIndex) {
+                    nodeChanged = true;
+                    return {
+                        ...node,
+                        type: 'CALL_TRIGGER',
+                        label: 'Incoming Call Trigger',
+                        config: {
+                            states: ['Incoming'],
+                            variableName: 'callerInfo',
+                        },
+                    };
+                }
+
+                if (
+                    node.type === 'REALTIME_AI' &&
+                    (isRealtimeSeed || isVoiceSecretary || hasCallTrigger)
+                ) {
+                    const currentSpeakerMode = (node.config as any)?.speakerMode;
+                    if (currentSpeakerMode !== true) {
+                        nodeChanged = true;
+                        return {
+                            ...node,
+                            config: {
+                                ...(node.config || {}),
+                                speakerMode: true,
+                            },
+                        };
+                    }
+                }
+
+                return node;
+            });
+
+            if (!nodeChanged) return workflow;
+            changed = true;
+            return {
+                ...workflow,
+                nodes: nextNodes,
+                updatedAt: new Date().toISOString(),
+            };
+        });
+
+        return { workflows: migrated, changed };
     }
 
     /**

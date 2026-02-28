@@ -9,6 +9,11 @@ import {
     recordWorkflowRun,
 } from '@/lib/workflows/reliability';
 import { recordExecution } from '@/lib/api/execution-history';
+import {
+    verifyAppSecret as verifyAppSecretAuth,
+    verifyAdminKey,
+    type AuthValidationResult,
+} from '@/lib/api/auth';
 
 const workflowExecutionSchema = z.object({
     workflowId: z.string().trim().min(1).max(120),
@@ -25,16 +30,32 @@ const querySchema = z.object({
     limit: z.string().optional(),
 });
 
-function verifyAppSecret(request: NextRequest): boolean {
-    const secret = request.headers.get('x-app-secret');
-    if (!process.env.APP_SECRET || process.env.NODE_ENV === 'development') return true;
-    return secret === process.env.APP_SECRET;
-}
+function verifyReadAccess(request: NextRequest): AuthValidationResult {
+    const appSecretAuth = verifyAppSecretAuth(request);
+    if (appSecretAuth.ok) return { ok: true };
 
-function hasReadAccess(request: NextRequest) {
-    if (verifyAppSecret(request)) return true;
-    if (!process.env.ADMIN_KEY) return true;
-    return request.headers.get('x-admin-key') === process.env.ADMIN_KEY;
+    const adminAuth = verifyAdminKey(request);
+    if (adminAuth.ok) return { ok: true };
+
+    const bothNotConfigured =
+        appSecretAuth.code === 'APP_SECRET_NOT_CONFIGURED' &&
+        adminAuth.code === 'ADMIN_KEY_NOT_CONFIGURED';
+
+    if (bothNotConfigured) {
+        return {
+            ok: false,
+            status: Math.max(appSecretAuth.status || 401, adminAuth.status || 401),
+            code: 'AUTH_NOT_CONFIGURED',
+            message: 'Neither APP_SECRET nor ADMIN_KEY is configured.',
+        };
+    }
+
+    return {
+        ok: false,
+        status: 401,
+        code: 'UNAUTHORIZED',
+        message: 'Provide valid x-app-secret or x-admin-key.',
+    };
 }
 
 export async function POST(request: NextRequest) {
@@ -57,10 +78,11 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    if (!verifyAppSecret(request)) {
-        return apiError('Unauthorized', {
-            status: 401,
-            code: 'UNAUTHORIZED',
+    const auth = verifyAppSecretAuth(request);
+    if (!auth.ok) {
+        return apiError(auth.message || 'Unauthorized', {
+            status: auth.status || 401,
+            code: auth.code || 'UNAUTHORIZED',
             requestId,
             headers: rateHeaders,
         });
@@ -154,10 +176,11 @@ export async function GET(request: NextRequest) {
         });
     }
 
-    if (!hasReadAccess(request)) {
-        return apiError('Unauthorized', {
-            status: 401,
-            code: 'UNAUTHORIZED',
+    const access = verifyReadAccess(request);
+    if (!access.ok) {
+        return apiError(access.message || 'Unauthorized', {
+            status: access.status || 401,
+            code: access.code || 'UNAUTHORIZED',
             requestId,
             headers: rateHeaders,
         });

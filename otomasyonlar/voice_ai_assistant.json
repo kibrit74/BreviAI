@@ -25,6 +25,7 @@
             "config": {
                 "systemPrompt": "Sen bir AI telefon sekretersin. Arayan kişiyle Türkçe konuşuyorsun.\n\nKurallar:\n- Kısa ve profesyonel cevaplar ver (1-2 cümle)\n- Aramayı karşıla: 'Merhaba, BreviAI asistanı, size nasıl yardımcı olabilirim?'\n- Arayan kişinin ismini ve mesajını not al\n- Gerektiğinde bilgi sor\n- Arayan: {{_callerNumber}}",
                 "voice": "Kore",
+                "model": "gemini-2.5-flash-native-audio-preview-12-2025",
                 "tools": true,
                 "speakerMode": true,
                 "maxDuration": 120,

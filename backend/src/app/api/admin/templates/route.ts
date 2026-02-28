@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };

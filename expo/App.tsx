@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, LogBox, Alert } from 'react-native';
+import { View, Text, LogBox } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppProvider } from './src/context/AppContext';
@@ -90,7 +90,6 @@ export default function App() {
 
         async function prepare() {
             console.log("App: Beginning boot process...");
-            let bootText = BOOT_TEXT.tr;
             try {
                 // Load fonts first - critical for UI
                 console.log("App: Loading fonts...");
@@ -107,7 +106,6 @@ export default function App() {
                     ]);
 
                     const resolvedLanguage: AppLanguage = language === 'en' ? 'en' : 'tr';
-                    bootText = BOOT_TEXT[resolvedLanguage];
 
                     if (isMounted) {
                         setInitialState({
@@ -154,20 +152,7 @@ export default function App() {
                     const hasNotifPerm = BreviSettingsManager?.hasNotificationListenerAccess?.();
 
                     if (hasNotifPerm === false) { // Explicit check since it might be undefined/null on iOS or error
-                        console.log("App: Notification Permission missing. Prompting user...");
-                        Alert.alert(
-                            bootText.notificationPermissionTitle,
-                            bootText.notificationPermissionMessage,
-                            [
-                                { text: bootText.laterButton, style: 'cancel' },
-                                {
-                                    text: bootText.openSettingsButton,
-                                    onPress: async () => {
-                                        BreviSettingsManager?.requestNotificationListenerAccess();
-                                    }
-                                }
-                            ]
-                        );
+                        console.log("App: Notification Permission missing.");
                     } else {
                         console.log("App: Notification Permission granted (or module missing).");
                     }
@@ -181,14 +166,11 @@ export default function App() {
                     const conn = await apiService.testConnection();
                     if (conn.success) {
                         console.log(`App: Backend Connection SUCCESS (Latency: ${conn.latency}ms)`);
-                        Alert.alert(bootText.connectionSuccessTitle, bootText.connectionSuccessMessage(conn.latency));
                     } else {
                         console.warn("App: Connection Error:", conn.error);
-                        Alert.alert(bootText.connectionErrorTitle, bootText.connectionErrorMessage(conn.error || 'unknown'));
                     }
                 } catch (e) {
                     console.error("App: Connection Test Exception:", e);
-                    Alert.alert(bootText.criticalErrorTitle, bootText.criticalErrorMessage(String(e)));
                 }
 
             } catch (e) {
@@ -264,7 +246,7 @@ export default function App() {
                             <StatusBar style={initialState.theme === 'dark' ? 'light' : 'dark'} />
                             <AppNavigator />
                             <InteractionModal />
-                            <DebugConsole />
+                            {(__DEV__ || initialState.debug) ? <DebugConsole /> : null}
                             <DeepLinkHandler />
                         </GlobalGestureHandler>
                     </AppProvider>

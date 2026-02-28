@@ -11,6 +11,7 @@ import { TemplateCard } from '../components/TemplateCard';
 import { apiService } from '../services/ApiService';
 
 const CATEGORIES = ['All', 'System', 'Social', 'Productivity', 'Lifestyle', 'Health', 'Web'];
+const ENABLE_DEV_TEMPLATES = __DEV__ || process.env.EXPO_PUBLIC_ENABLE_DEV_TEMPLATES === 'true';
 
 const WEB_AUTO_TEST_TEMPLATE: ShortcutTemplate = {
     id: 'web-auto-test-v1',
@@ -109,6 +110,15 @@ export default function TemplateLibraryScreen({ navigation }: any) {
     // API Data Loading
     const [loading, setLoading] = useState(true);
     const [templates, setTemplates] = useState<ShortcutTemplate[]>([]);
+    const getTemplatesForRuntime = (baseTemplates: ShortcutTemplate[]) => {
+        if (!ENABLE_DEV_TEMPLATES) return baseTemplates;
+
+        const existingIds = new Set(baseTemplates.map((tpl) => tpl.id));
+        const devTemplates = [WEB_AUTO_TEST_TEMPLATE, SMART_WEB_TEST_TEMPLATE].filter(
+            (tpl) => !existingIds.has(tpl.id)
+        );
+        return [...baseTemplates, ...devTemplates];
+    };
 
     useEffect(() => {
         loadTemplates();
@@ -139,15 +149,13 @@ export default function TemplateLibraryScreen({ navigation }: any) {
             });
 
             if (enrichedTemplates.length > 0) {
-                // Also explicitly add the local-only test templates
-                setTemplates([...enrichedTemplates, WEB_AUTO_TEST_TEMPLATE, SMART_WEB_TEST_TEMPLATE]);
+                setTemplates(getTemplatesForRuntime(enrichedTemplates));
             } else {
-                // Fallback to local if API returns empty
-                setTemplates([...(SEED_TEMPLATES || []), WEB_AUTO_TEST_TEMPLATE, SMART_WEB_TEST_TEMPLATE]);
+                setTemplates(getTemplatesForRuntime([...(SEED_TEMPLATES || [])]));
             }
         } catch (error) {
             console.error('Failed to load templates from API, using local:', error);
-            setTemplates(SEED_TEMPLATES || []);
+            setTemplates(getTemplatesForRuntime(SEED_TEMPLATES || []));
         } finally {
             setLoading(false);
         }

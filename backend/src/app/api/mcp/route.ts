@@ -8,7 +8,6 @@ import { ValidationException, parseJsonBody } from '@/lib/api/validation';
 import { executeMcpTool, listMcpTools } from '@/lib/mcp/registry';
 
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, x-app-secret, idempotency-key',
 };

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import styles from '../../admin.module.css';
@@ -31,11 +31,7 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
         template_json: '{}'
     });
 
-    useEffect(() => {
-        fetchTemplate();
-    }, [id]);
-
-    const fetchTemplate = async () => {
+    const fetchTemplate = useCallback(async () => {
         try {
             const headers = await withAdminAuthHeaders();
             const res = await fetch(`/api/admin/templates/${id}`, { headers });
@@ -57,23 +53,38 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
             } else {
                 setError('Template not found');
             }
-        } catch (err) {
+        } catch {
             setError('Failed to fetch template details');
         } finally {
             setLoading(false);
         }
-    };
+    }, [id]);
 
-    const handleAutofill = (data: any) => {
+    useEffect(() => {
+        fetchTemplate();
+    }, [fetchTemplate]);
+
+    const handleAutofill = (data: Record<string, unknown>) => {
+        const safeTags = Array.isArray(data.tags)
+            ? data.tags.filter((tag): tag is string => typeof tag === 'string').join(', ')
+            : typeof data.tags === 'string'
+                ? data.tags
+                : undefined;
+
+        const safeTemplateJson =
+            data.template_json && typeof data.template_json === 'object'
+                ? data.template_json
+                : {};
+
         setFormData(prev => ({
             ...prev,
-            title: data.title || prev.title,
-            title_en: data.title_en || prev.title_en,
-            description: data.description || prev.description,
-            description_en: data.description_en || prev.description_en,
-            category: data.category || prev.category,
-            tags: Array.isArray(data.tags) ? data.tags.join(', ') : (data.tags || prev.tags),
-            template_json: JSON.stringify(data.template_json || {}, null, 2)
+            title: typeof data.title === 'string' ? data.title : prev.title,
+            title_en: typeof data.title_en === 'string' ? data.title_en : prev.title_en,
+            description: typeof data.description === 'string' ? data.description : prev.description,
+            description_en: typeof data.description_en === 'string' ? data.description_en : prev.description_en,
+            category: typeof data.category === 'string' ? data.category : prev.category,
+            tags: safeTags || prev.tags,
+            template_json: JSON.stringify(safeTemplateJson, null, 2)
         }));
     };
 
@@ -94,7 +105,7 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
             let parsedJson = {};
             try {
                 parsedJson = JSON.parse(formData.template_json);
-            } catch (err) {
+            } catch {
                 setError('Invalid JSON format in Template Data');
                 setSaving(false);
                 return;
@@ -120,7 +131,7 @@ export default function EditTemplatePage({ params }: { params: { id: string } })
             } else {
                 setError(data.error || 'Failed to update template');
             }
-        } catch (err) {
+        } catch {
             setError('An unexpected error occurred');
         } finally {
             setSaving(false);

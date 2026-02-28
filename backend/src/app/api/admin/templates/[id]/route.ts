@@ -7,7 +7,6 @@ export const dynamic = 'force-dynamic';
 
 // CORS headers
 const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-app-secret, x-admin-key',
 };
@@ -62,8 +61,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         const id = params.id;
         const body = await request.json();
 
-        // Remove id from body to prevent changing primary key (unless we want to allow that? usually bad idea)
-        const { id: _, ...updateData } = body;
+        // Remove id from body to prevent changing primary key.
+        const updateData = { ...body };
+        delete updateData.id;
 
         const { data, error } = await supabaseAdmin
             .from('templates')
@@ -85,7 +85,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             template: data
         }, { headers: corsHeaders });
 
-    } catch (error) {
+    } catch {
         return NextResponse.json(
             { success: false, error: 'Invalid request' },
             { status: 400, headers: corsHeaders }

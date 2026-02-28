@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Platform, Image } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Platform, Image, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,16 +12,32 @@ import { NeoOrb } from '../components/ui/NeoOrb';
 
 
 export default function HomeScreenNeo({ navigation }: any) {
-    const { t, theme, colors } = useApp();
+    const { t, theme, colors, language } = useApp();
     const isDark = theme === 'dark';
     const insets = useSafeAreaInsets();
     const [refreshing, setRefreshing] = useState(false);
+    const commandOpacity = useRef(new Animated.Value(1)).current;
+    const [commandIndex, setCommandIndex] = useState(0);
+    const voiceCommandExamples = useMemo(
+        () => [
+            t('voiceCmdSummarizeNotes'),
+            t('voiceCmdSummarizeEmails'),
+            t('voiceCmdReadCalendar'),
+            t('voiceCmdListEvents'),
+            t('voiceCmdPlanDay'),
+            t('voiceCmdCreateReminder'),
+            t('voiceCmdSendDailyReport'),
+            t('voiceCmdCheckWeather'),
+            t('voiceCmdShowTodayTasks'),
+        ],
+        [language]
+    );
 
     // State
     const [shortcuts, setShortcuts] = useState<any[]>([]);
     const [stats, setStats] = useState({
-        automationsRun: 8, // Default from mock
-        timeSaved: 16,     // Default
+        automationsRun: 0,
+        timeSaved: 0,
     });
 
     const loadData = useCallback(async () => {
@@ -30,14 +46,10 @@ export default function HomeScreenNeo({ navigation }: any) {
             const activeWf = await WorkflowStorage.getActive();
 
             const totalRuns = workflows.reduce((acc, curr) => acc + (curr.runCount || 0), 0);
-
-            // If user has data, obey it. If 0, keep the mocks for "demo" visual as requested.
-            if (totalRuns > 0) {
-                setStats({
-                    automationsRun: totalRuns,
-                    timeSaved: Math.round(totalRuns * 2), // Mock calc
-                });
-            }
+            setStats({
+                automationsRun: totalRuns,
+                timeSaved: Math.round(totalRuns * 2),
+            });
 
             if (activeWf.length > 0) {
                 setShortcuts(activeWf.map(w => ({
@@ -47,11 +59,7 @@ export default function HomeScreenNeo({ navigation }: any) {
                     icon: w.icon || 'flash',
                 })));
             } else {
-                // Mock items for the "try" request if empty
-                setShortcuts([
-                    { id: '1', title: t('homeMockDailyReport'), description: t('homeMockDailyTime'), icon: 'mail' },
-                    { id: '2', title: t('homeMockMeetingPrep'), description: t('homeMockBeforeEvent'), icon: 'calendar' }
-                ]);
+                setShortcuts([]);
             }
 
         } catch (e) {
@@ -70,6 +78,37 @@ export default function HomeScreenNeo({ navigation }: any) {
         await loadData();
         setRefreshing(false);
     };
+
+    useEffect(() => {
+        setCommandIndex(0);
+        commandOpacity.setValue(1);
+    }, [voiceCommandExamples, commandOpacity]);
+
+    useEffect(() => {
+        if (voiceCommandExamples.length <= 1) return;
+
+        const intervalId = setInterval(() => {
+            Animated.timing(commandOpacity, {
+                toValue: 0,
+                duration: 220,
+                easing: Easing.out(Easing.quad),
+                useNativeDriver: true,
+            }).start(({ finished }) => {
+                if (!finished) return;
+
+                setCommandIndex((prev) => (prev + 1) % voiceCommandExamples.length);
+
+                Animated.timing(commandOpacity, {
+                    toValue: 1,
+                    duration: 260,
+                    easing: Easing.in(Easing.quad),
+                    useNativeDriver: true,
+                }).start();
+            });
+        }, 2400);
+
+        return () => clearInterval(intervalId);
+    }, [voiceCommandExamples, commandOpacity]);
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
@@ -104,7 +143,17 @@ export default function HomeScreenNeo({ navigation }: any) {
                     <NeoOrb onPress={() => navigation.navigate('WorkflowBuilder', { autoOpenAI: true })} />
                     <View style={styles.heroTextContainer}>
                         <Text style={[styles.heroTitle, { color: colors.text }]}>{t('tapToSpeak')}</Text>
-                        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>{t('voiceExample')}</Text>
+                        <View style={styles.heroSubtitleRow}>
+                            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                                {`"Hey BreviAI, `}
+                            </Text>
+                            <Animated.Text style={[styles.heroSubtitle, { color: colors.textSecondary, opacity: commandOpacity }]}>
+                                {voiceCommandExamples[commandIndex]}
+                            </Animated.Text>
+                            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+                                {`"`}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
@@ -144,19 +193,28 @@ export default function HomeScreenNeo({ navigation }: any) {
                 </View>
 
                 <View style={styles.listContainer}>
-                    {shortcuts.map((item, index) => (
-                        <GlassPanel key={item.id} style={styles.listItem} onPress={() => { }} theme={theme} colors={colors}>
-                            <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                                <Ionicons name={item.icon.includes('-') ? item.icon : 'flash'} size={20} color={colors.textSecondary} />
-                            </View>
-                            <View style={styles.listItemContent}>
-                                <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
-                                <Text style={[styles.listItemSub, { color: colors.textSecondary }]}>{item.description}</Text>
-                            </View>
-                            {/* Cyan Dot Indicator */}
-                            <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+                    {shortcuts.length > 0 ? (
+                        shortcuts.map((item) => (
+                            <GlassPanel key={item.id} style={styles.listItem} onPress={() => { }} theme={theme} colors={colors}>
+                                <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0,0,0,0.05)' }]}>
+                                    <Ionicons name={item.icon.includes('-') ? item.icon : 'flash'} size={20} color={colors.textSecondary} />
+                                </View>
+                                <View style={styles.listItemContent}>
+                                    <Text style={[styles.listItemTitle, { color: colors.text }]} numberOfLines={1}>{item.title}</Text>
+                                    <Text style={[styles.listItemSub, { color: colors.textSecondary }]}>{item.description}</Text>
+                                </View>
+                                {/* Cyan Dot Indicator */}
+                                <View style={[styles.activeDot, { backgroundColor: colors.primary }]} />
+                            </GlassPanel>
+                        ))
+                    ) : (
+                        <GlassPanel style={styles.emptyShortcutState} onPress={() => navigation.navigate('Workflows')} theme={theme} colors={colors}>
+                            <Text style={[styles.emptyShortcutTitle, { color: colors.text }]}>{t('noShortcutsYet')}</Text>
+                            <Text style={[styles.emptyShortcutText, { color: colors.textSecondary }]}>
+                                {t('activeAutomationFallback')}
+                            </Text>
                         </GlassPanel>
-                    ))}
+                    )}
                 </View>
 
                 <View style={{ height: 120 }} />
@@ -256,6 +314,12 @@ const styles = StyleSheet.create({
         fontWeight: '400',
         letterSpacing: 0.5,
     },
+    heroSubtitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+    },
     statsRow: {
         flexDirection: 'row',
         paddingHorizontal: 24,
@@ -342,6 +406,18 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     listItemSub: {
+        fontSize: 12,
+    },
+    emptyShortcutState: {
+        height: 'auto',
+        padding: 16,
+        gap: 6,
+    },
+    emptyShortcutTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    emptyShortcutText: {
         fontSize: 12,
     },
     activeDot: {

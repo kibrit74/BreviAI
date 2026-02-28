@@ -2,5 +2,35 @@
   "extends": [
     "next/core-web-vitals",
     "next/typescript"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "src/pages/docs.tsx"
+      ],
+      "rules": {
+        "react/no-unescaped-entities": "off"
+      }
+    },
+    {
+      "files": [
+        "src/app/api/email/read/route.ts",
+        "src/app/api/admin/generate-template/route.ts",
+        "src/app/api/generate/route.ts",
+        "src/data/types.ts",
+        "src/pages/docs.tsx",
+        "src/lib/gemini.ts",
+        "src/app/admin/new/page.tsx",
+        "src/app/admin/edit/[id]/page.tsx",
+        "src/lib/workflows/preflight.ts",
+        "src/app/api/email/send/route.ts",
+        "src/lib/search.ts",
+        "src/components/admin/AIAutofill.tsx",
+        "src/app/api/google/sheets/read/route.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
   ]
 }

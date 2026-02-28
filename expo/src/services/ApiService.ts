@@ -1,12 +1,18 @@
 // Force update 3: Switched to verified model gemini-embedding-001
-import Constants from 'expo-constants';
-import { Platform, NativeModules } from 'react-native';
+import { Platform } from 'react-native';
 import { debugLog } from './DebugLogger';
 import * as FileSystem from 'expo-file-system/legacy';
 
-// Always use production Vercel backend as default
-let API_BASE_URL = 'https://breviai.vercel.app';
-console.log('[ApiService] Initialized with dynamic base URL resolution');
+const DEFAULT_API_BASE_URL = 'https://breviai.vercel.app';
+const configuredApiBaseUrl =
+    process.env.EXPO_PUBLIC_API_URL?.trim() ||
+    process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
+    '';
+
+let API_BASE_URL = configuredApiBaseUrl
+    ? configuredApiBaseUrl.replace(/\/$/, '')
+    : DEFAULT_API_BASE_URL;
+console.log('[ApiService] Initialized with API base URL:', API_BASE_URL);
 const APP_SECRET = process.env.EXPO_PUBLIC_APP_SECRET || '';
 if (!APP_SECRET) {
     console.warn('[ApiService] EXPO_PUBLIC_APP_SECRET is not set. Authenticated API requests may fail.');
@@ -72,17 +78,6 @@ export interface ShortcutStep {
 import { ShortcutTemplate } from '../types';
 
 class ApiService {
-    private async getGoogleCloudUrl(): Promise<string> {
-        try {
-            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-            const url = await AsyncStorage.getItem('whatsapp_backend_url');
-            if (url) return url.trim().replace(/\/$/, '');
-        } catch (e) {
-            console.warn('[ApiService] Failed to get url:', e);
-        }
-        return 'http://136.109.124.154:3001';
-    }
-
     private headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

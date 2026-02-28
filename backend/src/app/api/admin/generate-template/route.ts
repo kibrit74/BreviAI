@@ -41,14 +41,14 @@ export async function POST(request: Request) {
     // Strategy 1: Attempt to parse directly (best case)
     try {
       data = JSON.parse(jsonStr);
-    } catch (e1) {
+    } catch {
       // Strategy 2: Extract from markdown code blocks
       const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (codeBlockMatch) {
         jsonStr = codeBlockMatch[1].trim();
         try {
           data = JSON.parse(jsonStr);
-        } catch (e2) {
+        } catch {
           // proceed to strategy 3
         }
       }
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     if (!data) {
       try {
         data = JSON.parse(jsonStr);
-      } catch (parseError) {
+      } catch {
         console.error('[Admin Generate] JSON Parse Error. Raw text:', text);
         console.error('[Admin Generate] Extracted string:', jsonStr);
         throw new Error('AI response was not valid JSON.');

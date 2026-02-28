@@ -17,7 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function clear() {
     console.log('🗑️ Clearing templates table...');
-    const { error, count } = await supabase
+    const { error } = await supabase
         .from('templates')
         .delete()
         .neq('id', 'nomatch'); // Delete all

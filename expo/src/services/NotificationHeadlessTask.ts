@@ -1,7 +1,59 @@
 import { WorkflowEngine } from './WorkflowEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Workflow, NotificationTriggerConfig } from '../types/workflow-types';
-import * as Notifications from 'expo-notifications';
+
+const SELF_PACKAGES = new Set(['com.breviai.app', 'com.breviai.expo', 'host.exp.exponent']);
+const NOTIFICATION_DEBOUNCE_MS = 2500;
+const recentNotificationKeys = new Map<string, number>();
+
+function normalizeNotificationPayload(raw: any): { packageName: string; title: string; text: string } | null {
+    if (!raw) return null;
+
+    let payload: any = raw;
+    if (typeof raw.notification === 'string') {
+        try {
+            payload = JSON.parse(raw.notification);
+        } catch {
+            payload = raw;
+        }
+    } else if (raw.notification && typeof raw.notification === 'object') {
+        payload = raw.notification;
+    }
+
+    const packageName = String(
+        payload?.app ??
+        payload?.packageName ??
+        payload?.package ??
+        raw?.app ??
+        raw?.packageName ??
+        raw?.package ??
+        ''
+    ).trim();
+
+    const title = String(payload?.title ?? raw?.title ?? '').trim();
+    const text = String(payload?.text ?? payload?.bigText ?? raw?.text ?? raw?.bigText ?? '').trim();
+
+    return { packageName, title, text };
+}
+
+function shouldProcessNotificationKey(key: string): boolean {
+    const now = Date.now();
+    const last = recentNotificationKeys.get(key) || 0;
+    if (now - last < NOTIFICATION_DEBOUNCE_MS) {
+        return false;
+    }
+    recentNotificationKeys.set(key, now);
+
+    // Keep memory bounded
+    if (recentNotificationKeys.size > 200) {
+        for (const [k, t] of recentNotificationKeys) {
+            if (now - t > 30000) {
+                recentNotificationKeys.delete(k);
+            }
+        }
+    }
+    return true;
+}
 
 /**
  * Headless JS Task for handling incoming notifications from Android Notification Listener.
@@ -12,13 +64,19 @@ const NotificationHeadlessTask = async (notification: any) => {
 
     if (!notification) return;
 
-    // Normalizing notification data structure (library versions vary)
-    const packageName = notification.app || notification.packageName || notification.package;
-    const title = notification.title;
-    const text = notification.text || notification.bigText;
+    const normalized = normalizeNotificationPayload(notification);
+    if (!normalized) return;
+    const { packageName, title, text } = normalized;
+    if (!packageName) return;
 
     // Ignore internal notifications to prevent loops
-    if (packageName === 'com.breviai.expo' || packageName === 'host.exp.exponent') {
+    if (SELF_PACKAGES.has(packageName)) {
+        return;
+    }
+
+    // Ignore duplicates in a very short window
+    const dedupeKey = `${packageName}|${title}|${text}`;
+    if (!shouldProcessNotificationKey(dedupeKey)) {
         return;
     }
 
@@ -34,8 +92,7 @@ const NotificationHeadlessTask = async (notification: any) => {
 
         // 2. Filter workflows with ACTIVE Notification Trigger
         const matchedWorkflows = workflows.filter(workflow => {
-            // Must be active (?) - Assuming we trigger active workflows. 
-            // If there's an 'enabled/active' flag on workflow, check it. (Workflow type doesn't have 'active' prop explicitly shown in types, assuming all in storage are valid candidates or we check trigger node)
+            if (!workflow.isActive) return false;
 
             const triggerNode = workflow.nodes.find(n => n.type === 'NOTIFICATION_TRIGGER');
             if (!triggerNode) return false;

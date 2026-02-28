@@ -6,6 +6,7 @@ import { buildRateLimitHeaders, checkRateLimit, getClientIp } from '@/lib/api/ra
 import { runWorkflowPreflight } from '@/lib/workflows/preflight';
 import { recordExecution } from '@/lib/api/execution-history';
 import { getWorkflowReliability } from '@/lib/workflows/reliability';
+import { verifyAppSecret as verifyAppSecretAuth } from '@/lib/api/auth';
 
 const preflightSchema = z.object({
     workflow: z.object({
@@ -36,11 +37,6 @@ const preflightSchema = z.object({
         .optional(),
 });
 
-function verifyAppSecret(request: NextRequest): boolean {
-    if (!process.env.APP_SECRET || process.env.NODE_ENV === 'development') return true;
-    return request.headers.get('x-app-secret') === process.env.APP_SECRET;
-}
-
 export async function POST(request: NextRequest) {
     const requestId = createRequestId('preflight');
     const startedAt = Date.now();
@@ -61,10 +57,11 @@ export async function POST(request: NextRequest) {
         });
     }
 
-    if (!verifyAppSecret(request)) {
-        return apiError('Unauthorized', {
-            status: 401,
-            code: 'UNAUTHORIZED',
+    const auth = verifyAppSecretAuth(request);
+    if (!auth.ok) {
+        return apiError(auth.message || 'Unauthorized', {
+            status: auth.status || 401,
+            code: auth.code || 'UNAUTHORIZED',
             requestId,
             headers: rateHeaders,
         });
