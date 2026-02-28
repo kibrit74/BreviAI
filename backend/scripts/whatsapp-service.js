@@ -27,7 +27,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.WA_PORT || 3001;
-const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
+const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-secret-password';
 
 // ═══════════════════════════════════════════════════
 // State

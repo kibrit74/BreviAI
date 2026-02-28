@@ -15,7 +15,7 @@ const path = require('path');
 // Initialize Express
 const app = express();
 const PORT = process.env.PORT || 3001;
-const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
+const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-secret-password';
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
 app.use(cors());

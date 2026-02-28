@@ -378,6 +378,9 @@ export interface SoundModeConfig {
     mode: 'silent' | 'vibrate' | 'normal';
     saveCurrentMode?: boolean; // Save current mode to variable for restoration
     savedModeVariable?: string;
+    restoreAfterMinutes?: number; // Routine-style temporary mode
+    restoreToPrevious?: boolean; // Restore previous state when duration ends (default true)
+    skipIfAlreadySet?: boolean; // Avoid redundant write
 }
 
 export interface ScreenWakeConfig {
@@ -393,12 +396,19 @@ export interface AppLaunchConfig {
 export interface DNDControlConfig {
     enabled: boolean;
     duration?: number; // minutes
+    restoreToPrevious?: boolean; // Restore previous DND state when duration ends (default true)
+    savePreviousStateVariable?: string; // Save previous state for downstream nodes
+    skipIfAlreadySet?: boolean; // Avoid redundant write
+    openSettingsOnPermissionMissing?: boolean; // Open DND settings when access missing
 }
 
 export interface BrightnessControlConfig {
     level: number; // 0-100
     saveCurrentLevel?: boolean;
     savedLevelVariable?: string;
+    restoreAfterMinutes?: number; // Routine-style temporary brightness
+    restoreToPrevious?: boolean; // Restore previous brightness when duration ends (default true)
+    skipIfAlreadySet?: boolean; // Avoid redundant write
 }
 
 export interface FlashlightControlConfig {
@@ -407,6 +417,9 @@ export interface FlashlightControlConfig {
 
 export interface BluetoothControlConfig {
     mode: 'toggle' | 'on' | 'off';
+    restoreAfterMinutes?: number; // Routine-style temporary bluetooth state
+    restoreToPrevious?: boolean; // Restore previous bluetooth state when duration ends (default true)
+    skipIfAlreadySet?: boolean; // Avoid redundant write
 }
 
 
@@ -494,6 +507,11 @@ export interface NetworkCheckConfig {
 export interface VolumeControlConfig {
     level: number; // 0-100
     type: 'media' | 'ring' | 'alarm' | 'call';
+    saveCurrentLevel?: boolean; // Save current stream level before changing
+    savedLevelVariable?: string;
+    restoreAfterMinutes?: number; // Routine-style temporary volume
+    restoreToPrevious?: boolean; // Restore previous volume when duration ends (default true)
+    skipIfAlreadySet?: boolean; // Avoid redundant write
 }
 
 export interface SpeakTextConfig {

@@ -60,8 +60,6 @@ function shouldProcessNotificationKey(key: string): boolean {
  * This runs in the background even if the app is killed.
  */
 const NotificationHeadlessTask = async (notification: any) => {
-    console.log('[NotificationHeadlessTask] Received notification:', notification);
-
     if (!notification) return;
 
     const normalized = normalizeNotificationPayload(notification);
@@ -79,6 +77,7 @@ const NotificationHeadlessTask = async (notification: any) => {
     if (!shouldProcessNotificationKey(dedupeKey)) {
         return;
     }
+    console.log('[NotificationHeadlessTask] Processing notification:', { packageName, title, text });
 
     try {
         // 1. Load workflows from storage

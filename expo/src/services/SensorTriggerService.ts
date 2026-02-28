@@ -1,4 +1,4 @@
-import { Accelerometer, Pedometer } from 'expo-sensors';
+import { Pedometer } from 'expo-sensors';
 import { workflowEngine } from './WorkflowEngine';
 import { WorkflowStorage } from './WorkflowStorage';
 import { Workflow, GestureTriggerConfig, StepTriggerConfig } from '../types/workflow-types';
@@ -17,6 +17,9 @@ class SensorTriggerService {
     // Step tracking state
     private stepStartDate: Date = new Date();
     private stepStartCount: number = 0;
+    private stepWatchSteps: number = 0;
+    private stepWatchOffset: number = 0;
+    private lastStepResetDate: string = new Date().toDateString();
     private triggeredToday: Set<string> = new Set(); // Track which workflows already triggered
 
     // Configurable thresholds
@@ -42,11 +45,22 @@ class SensorTriggerService {
 
         // Register gestures with Native Service (MotionTriggerModule)
         if (this.activeGestureWorkflows.length > 0) {
-            this.registerNativeGestures();
+            await this.registerNativeGestures(workflows);
         } else {
             // Stop native service if no gestures
             const { MotionTrigger } = require('react-native').NativeModules;
-            MotionTrigger?.stopService();
+            try {
+                if (MotionTrigger?.clearAllTriggers) {
+                    await MotionTrigger.clearAllTriggers();
+                } else {
+                    for (const workflow of workflows) {
+                        await MotionTrigger?.unregisterTrigger?.(workflow.id);
+                    }
+                }
+                await MotionTrigger?.stopService?.();
+            } catch (e) {
+                console.warn('[SensorTriggerService] Failed to clear native gestures:', e);
+            }
         }
 
         // Step listener (keep as is for now, or move to native later)
@@ -57,11 +71,24 @@ class SensorTriggerService {
         }
     }
 
-    private async registerNativeGestures() {
+    private async registerNativeGestures(allWorkflows: Workflow[]) {
         const { MotionTrigger } = require('react-native').NativeModules;
         if (!MotionTrigger) {
             console.warn('[SensorTriggerService] MotionTrigger native module not found');
             return;
+        }
+
+        // Hard sync: clear stale registrations first so deleted/inactive workflows won't keep firing.
+        try {
+            if (MotionTrigger.clearAllTriggers) {
+                await MotionTrigger.clearAllTriggers();
+            } else {
+                for (const workflow of allWorkflows) {
+                    await MotionTrigger.unregisterTrigger?.(workflow.id);
+                }
+            }
+        } catch (e) {
+            console.warn('[SensorTriggerService] Failed to clear native gesture registry, continuing:', e);
         }
 
         // Start the service first
@@ -138,6 +165,8 @@ class SensorTriggerService {
 
         // Check if we need to reset for new day
         await this.checkDailyReset();
+        this.stepWatchSteps = 0;
+        this.stepWatchOffset = 0;
 
         // Get initial step count for today
         const todayStart = new Date();
@@ -153,9 +182,11 @@ class SensorTriggerService {
 
         // Watch for step updates (real-time)
         this.pedometerSubscription = Pedometer.watchStepCount(result => {
-            // result.steps is the count since watchStepCount was called
-            const totalSteps = this.stepStartCount + result.steps;
-            this.checkStepTriggers(totalSteps);
+            // result.steps is cumulative since watchStepCount() subscription start
+            this.stepWatchSteps = Math.max(0, Number(result.steps) || 0);
+            const todayWatchSteps = Math.max(0, this.stepWatchSteps - this.stepWatchOffset);
+            const totalSteps = Math.max(0, this.stepStartCount + todayWatchSteps);
+            void this.checkStepTriggers(totalSteps);
         });
 
         console.log('[SensorTriggerService] Step listening started');
@@ -169,15 +200,53 @@ class SensorTriggerService {
         }
     }
 
-    private async checkStepTriggers(currentSteps: number) {
-        for (const workflow of this.activeStepWorkflows) {
-            // Skip if already triggered today
-            if (this.triggeredToday.has(workflow.id)) continue;
+    private normalizeStepConfig(rawConfig: any): StepTriggerConfig {
+        const target = Number(rawConfig?.targetSteps ?? rawConfig?.stepGoal ?? 10000);
+        return {
+            targetSteps: Number.isFinite(target) && target > 0 ? Math.round(target) : 10000,
+            comparison: rawConfig?.comparison === 'eq' ? 'eq' : 'gte',
+            resetDaily: rawConfig?.resetDaily !== false,
+            variableName: rawConfig?.variableName || 'currentSteps',
+        };
+    }
 
+    private async maybeHandleDailyReset(): Promise<void> {
+        const today = new Date().toDateString();
+        if (today === this.lastStepResetDate) return;
+
+        const keepTriggered = new Set<string>();
+        for (const workflowId of this.triggeredToday) {
+            const workflow = this.activeStepWorkflows.find(w => w.id === workflowId);
+            if (!workflow) continue;
+            const triggerNode = workflow.nodes.find(n => n.type === 'STEP_TRIGGER');
+            if (!triggerNode) continue;
+            const config = this.normalizeStepConfig(triggerNode.config);
+            if (config.resetDaily === false) {
+                keepTriggered.add(workflowId);
+            }
+        }
+
+        this.triggeredToday = keepTriggered;
+        this.stepStartDate = new Date();
+        this.lastStepResetDate = today;
+        // Keep listener alive; just move day boundary to current watch sample.
+        this.stepStartCount = 0;
+        this.stepWatchOffset = this.stepWatchSteps;
+        await this.saveStepState();
+        console.log('[SensorTriggerService] New day detected, step trigger state reset');
+    }
+
+    private async checkStepTriggers(currentSteps: number) {
+        await this.maybeHandleDailyReset();
+
+        for (const workflow of this.activeStepWorkflows) {
             const triggerNode = workflow.nodes.find(n => n.type === 'STEP_TRIGGER');
             if (!triggerNode) continue;
 
-            const config = triggerNode.config as StepTriggerConfig;
+            const config = this.normalizeStepConfig(triggerNode.config);
+            const alreadyTriggered = this.triggeredToday.has(workflow.id);
+            if (alreadyTriggered) continue;
+
             let shouldTrigger = false;
 
             if (config.comparison === 'gte' && currentSteps >= config.targetSteps) {
@@ -195,7 +264,8 @@ class SensorTriggerService {
                     _triggerType: 'step',
                     _currentSteps: currentSteps,
                     _targetSteps: config.targetSteps,
-                    _triggerTime: new Date().toISOString()
+                    _triggerTime: new Date().toISOString(),
+                    [config.variableName || 'currentSteps']: currentSteps,
                 }).catch(err => console.error("Step workflow trigger failed", err));
             }
         }
@@ -204,11 +274,24 @@ class SensorTriggerService {
     private async checkDailyReset() {
         const today = new Date().toDateString();
         const state = await this.loadStepState();
+        this.lastStepResetDate = state.lastResetDate || today;
 
-        if (state.lastResetDate !== today) {
-            console.log('[SensorTriggerService] New day detected, resetting step triggers');
-            this.triggeredToday.clear();
+        if ((state.lastResetDate || '') !== today) {
+            // Startup reset: preserve non-daily goals only
+            const keepTriggered = new Set<string>();
+            for (const workflowId of state.triggeredWorkflows || []) {
+                const workflow = this.activeStepWorkflows.find(w => w.id === workflowId);
+                if (!workflow) continue;
+                const triggerNode = workflow.nodes.find(n => n.type === 'STEP_TRIGGER');
+                if (!triggerNode) continue;
+                const config = this.normalizeStepConfig(triggerNode.config);
+                if (config.resetDaily === false) {
+                    keepTriggered.add(workflowId);
+                }
+            }
+            this.triggeredToday = keepTriggered;
             this.stepStartDate = new Date();
+            this.lastStepResetDate = today;
             await this.saveStepState();
         } else {
             this.triggeredToday = new Set(state.triggeredWorkflows || []);
@@ -227,7 +310,7 @@ class SensorTriggerService {
     private async saveStepState() {
         try {
             const state = {
-                lastResetDate: new Date().toDateString(),
+                lastResetDate: this.lastStepResetDate || new Date().toDateString(),
                 triggeredWorkflows: Array.from(this.triggeredToday)
             };
             await AsyncStorage.setItem(STEP_STORAGE_KEY, JSON.stringify(state));

@@ -22,6 +22,45 @@ interface HeadlessTaskData {
 const headlessInFlight = new Set<string>();
 const headlessLastStartAt = new Map<string, number>();
 const HEADLESS_DEBOUNCE_MS = 12000;
+const HEADLESS_DEBOUNCE_PREFIX = '@headless_task_debounce:';
+
+function buildHeadlessDebounceKey(workflowId: string, data: Record<string, any>): string {
+    const triggerType = String(data?._triggerType || 'unknown');
+    let identity = 'generic';
+
+    if (triggerType === 'call') {
+        identity = `${data?._callTimestamp || 'no_ts'}|${data?._callerNumber || 'unknown'}|${data?._callState || ''}`;
+    } else if (triggerType === 'sms') {
+        identity = `${data?._smsTimestamp || 'no_ts'}|${data?._smsSender || ''}|${String(data?._smsMessage || '').slice(0, 32)}`;
+    } else if (triggerType === 'notification') {
+        identity =
+            `${data?._notificationPackage || ''}|${data?._notificationTitle || ''}|` +
+            `${String(data?._notificationText || '').slice(0, 32)}`;
+    } else if (data?.widgetId) {
+        identity = `widget:${data.widgetId}`;
+    }
+
+    // For event-style triggers, debounce globally across workflows
+    if (triggerType === 'call' || triggerType === 'sms' || triggerType === 'notification') {
+        return `${HEADLESS_DEBOUNCE_PREFIX}global:${triggerType}:${identity}`;
+    }
+
+    return `${HEADLESS_DEBOUNCE_PREFIX}${workflowId}:${triggerType}:${identity}`;
+}
+
+async function isDebouncedByStorage(key: string, now: number): Promise<{ debounced: boolean; deltaMs: number }> {
+    try {
+        const raw = await AsyncStorage.getItem(key);
+        const last = raw ? Number(raw) : 0;
+        if (last > 0 && now - last < HEADLESS_DEBOUNCE_MS) {
+            return { debounced: true, deltaMs: now - last };
+        }
+        await AsyncStorage.setItem(key, String(now));
+    } catch (e) {
+        console.warn('[WidgetHeadlessTask] Persistent debounce check failed:', e);
+    }
+    return { debounced: false, deltaMs: 0 };
+}
 
 async function loadWorkflowsForHeadless(): Promise<Workflow[] | null> {
     const candidateKeys = ['brevi_workflows', 'workflows'];
@@ -53,22 +92,24 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
         return;
     }
 
-    const now = Date.now();
-    const lastStart = headlessLastStartAt.get(workflowId) || 0;
     if (headlessInFlight.has(workflowId)) {
         console.warn(`[WidgetHeadlessTask] Workflow ${workflowId} already in-flight, skipping duplicate trigger`);
         return;
     }
-    if (now - lastStart < HEADLESS_DEBOUNCE_MS) {
-        console.warn(
-            `[WidgetHeadlessTask] Workflow ${workflowId} triggered too soon (${now - lastStart}ms), skipping duplicate`
-        );
-        return;
-    }
-    headlessLastStartAt.set(workflowId, now);
     headlessInFlight.add(workflowId);
 
     try {
+        const now = Date.now();
+        const lastStart = headlessLastStartAt.get(workflowId) || 0;
+        if (now - lastStart < HEADLESS_DEBOUNCE_MS) {
+            console.warn(
+                `[WidgetHeadlessTask] Workflow ${workflowId} triggered too soon (${now - lastStart}ms), skipping duplicate`
+            );
+            return;
+        }
+
+        headlessLastStartAt.set(workflowId, now);
+
         // 1. Load workflow from storage (since we don't have hydrated store)
         const workflows = await loadWorkflowsForHeadless();
         if (!workflows) {
@@ -175,6 +216,15 @@ const WidgetHeadlessTask = async (data: HeadlessTaskData) => {
                     initialVariables._gestureType = gestureConfig.gesture || 'shake';
                 }
             }
+        }
+
+        const debounceKey = buildHeadlessDebounceKey(workflowId, { ...data, ...initialVariables });
+        const persistedDebounce = await isDebouncedByStorage(debounceKey, now);
+        if (persistedDebounce.debounced) {
+            console.warn(
+                `[WidgetHeadlessTask] Persistent debounce for ${workflowId} (${persistedDebounce.deltaMs}ms), skipping duplicate`
+            );
+            return;
         }
 
         // Execute with headless flag

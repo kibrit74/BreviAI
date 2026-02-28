@@ -1,4 +1,4 @@
-import {
+﻿import {
     WorkflowNode,
     VolumeControlConfig,
     SpeakTextConfig,
@@ -18,6 +18,54 @@ try {
     console.log('BreviSettings not available for volume control');
 }
 
+const VOLUME_RESTORE_SCOPE_MS = 24 * 60 * 60 * 1000; // 24h safety cap
+type VolumeRestoreTimer = ReturnType<typeof setTimeout>;
+const volumeRestoreTimers = new Map<string, { token: number; timerId: VolumeRestoreTimer }>();
+let volumeRestoreToken = 0;
+
+function clampPercent(value: number): number {
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function toRestoreMs(minutes?: number): number {
+    const numeric = Number(minutes || 0);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return Math.round(numeric * 60 * 1000);
+}
+
+function getVolumeRestoreKey(variableManager: VariableManager, streamType: string): string {
+    const workflowId = String(variableManager.get('_workflowId') || 'global');
+    return `${workflowId}:volume:${streamType || 'media'}`;
+}
+
+function cancelVolumeRestore(key: string): void {
+    const existing = volumeRestoreTimers.get(key);
+    if (!existing) return;
+    clearTimeout(existing.timerId);
+    volumeRestoreTimers.delete(key);
+}
+
+function scheduleVolumeRestore(
+    key: string,
+    delayMs: number,
+    task: () => Promise<void>
+): void {
+    cancelVolumeRestore(key);
+    const safeDelay = Math.max(0, Math.min(delayMs, VOLUME_RESTORE_SCOPE_MS));
+    const token = ++volumeRestoreToken;
+    const timerId = setTimeout(async () => {
+        const active = volumeRestoreTimers.get(key);
+        if (!active || active.token !== token) return;
+        volumeRestoreTimers.delete(key);
+        try {
+            await task();
+        } catch (e) {
+            console.error(`[VOLUME_CONTROL] Restore failed for ${key}:`, e);
+        }
+    }, safeDelay);
+    volumeRestoreTimers.set(key, { token, timerId });
+}
+
 export async function executeVolumeControl(
     config: VolumeControlConfig,
     variableManager: VariableManager
@@ -29,7 +77,7 @@ export async function executeVolumeControl(
     if (Platform.OS !== 'android') {
         return {
             success: false,
-            error: 'Ses kontrolü sadece Android\'de destekleniyor',
+            error: 'Ses kontrolu sadece Android\'de destekleniyor',
         };
     }
 
@@ -37,42 +85,91 @@ export async function executeVolumeControl(
     if (!BreviSettings || !BreviSettings.setVolume) {
         return {
             success: false,
-            error: 'Ses kontrolü için "brevi-settings" native modülü gerekli (Development build kullanın)',
+            error: 'Ses kontrolu icin "brevi-settings" native modul gerekli (Development build kullanin)',
         };
     }
 
     try {
-        // Special handling for 'call' type - enable speakerphone + max volume
-        if (config.type === 'call' && BreviSettings?.maximizeCallVolume) {
-            await BreviSettings.maximizeCallVolume();
-            return {
-                success: true,
-                level: 100,
-                type: 'call',
-                speakerphone: true,
-            };
+        const streamType = config.type || 'media';
+        const requestedLevel = clampPercent(config.level);
+        const restoreAfterMs = toRestoreMs(config.restoreAfterMinutes);
+        const shouldReadCurrent =
+            !!BreviSettings?.getVolume &&
+            (
+                config.saveCurrentLevel === true ||
+                (config.skipIfAlreadySet !== false) ||
+                restoreAfterMs > 0
+            );
+
+        let previousLevel: number | null = null;
+        if (shouldReadCurrent) {
+            try {
+                previousLevel = clampPercent(await BreviSettings.getVolume(streamType));
+            } catch (e) {
+                console.warn('[VOLUME_CONTROL] Failed to read current volume:', e);
+            }
         }
 
-        await BreviSettings.setVolume(config.level, config.type || 'media');
+        if (config.saveCurrentLevel && config.savedLevelVariable && previousLevel != null) {
+            variableManager.set(config.savedLevelVariable, previousLevel);
+        }
 
-        // Also enable speakerphone if level is high and we might be in a call
-        if (config.level >= 80 && BreviSettings?.setSpeakerphone) {
+        let appliedLevel = requestedLevel;
+        if (streamType === 'call' && BreviSettings?.maximizeCallVolume) {
+            appliedLevel = 100;
+            if ((config.skipIfAlreadySet !== false) && previousLevel != null && previousLevel >= 99) {
+                return {
+                    success: true,
+                    level: previousLevel,
+                    type: streamType,
+                    skipped: true,
+                    reason: 'already_max_call_volume',
+                };
+            }
+            await BreviSettings.maximizeCallVolume();
+        } else {
+            if ((config.skipIfAlreadySet !== false) && previousLevel != null && Math.abs(previousLevel - requestedLevel) <= 1) {
+                return {
+                    success: true,
+                    level: previousLevel,
+                    type: streamType,
+                    skipped: true,
+                    reason: 'already_in_requested_range',
+                };
+            }
+            await BreviSettings.setVolume(requestedLevel, streamType);
+        }
+
+        // Also enable speakerphone if level is high and stream is call
+        if (appliedLevel >= 80 && BreviSettings?.setSpeakerphone && streamType === 'call') {
             await BreviSettings.setSpeakerphone(true);
+        }
+
+        const restoreKey = getVolumeRestoreKey(variableManager, streamType);
+        if (restoreAfterMs > 0 && (config.restoreToPrevious !== false) && previousLevel != null && Math.abs(previousLevel - appliedLevel) > 1) {
+            scheduleVolumeRestore(restoreKey, restoreAfterMs, async () => {
+                if (!BreviSettings?.setVolume) return;
+                await BreviSettings.setVolume(clampPercent(previousLevel as number), streamType);
+                console.log('[VOLUME_CONTROL] Restored previous volume after temporary routine window');
+            });
+        } else {
+            cancelVolumeRestore(restoreKey);
         }
 
         return {
             success: true,
-            level: config.level,
-            type: config.type,
+            level: appliedLevel,
+            type: streamType,
+            previousLevel,
+            temporary: restoreAfterMs > 0,
         };
     } catch (err) {
         return {
             success: false,
-            error: err instanceof Error ? err.message : 'Ses ayarlanırken hata oluştu'
+            error: err instanceof Error ? err.message : 'Ses ayarlanirken hata olustu'
         };
     }
 }
-
 export async function executeSpeakText(
     config: SpeakTextConfig,
     variableManager: VariableManager
@@ -84,9 +181,9 @@ export async function executeSpeakText(
         if (rawVarName) {
             const resolvedPreview = variableManager.resolveValue(`{{${rawVarName}}}`);
             if (resolvedPreview !== undefined) {
-                console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' bulundu. Tipi:`, typeof resolvedPreview);
+                console.log(`[SPEAK_TEXT] DeÄŸiÅŸken '${rawVarName}' bulundu. Tipi:`, typeof resolvedPreview);
             } else {
-                console.log(`[SPEAK_TEXT] Değişken '${rawVarName}' BULUNAMADI. Mevcut anahtarlar:`, Object.keys(variableManager.getAll()));
+                console.log(`[SPEAK_TEXT] DeÄŸiÅŸken '${rawVarName}' BULUNAMADI. Mevcut anahtarlar:`, Object.keys(variableManager.getAll()));
             }
         }
 
@@ -96,15 +193,15 @@ export async function executeSpeakText(
             try {
                 if (BreviSettings.maximizeCallVolume) {
                     await BreviSettings.maximizeCallVolume();
-                    console.log('[SPEAK_TEXT] Arama modu: Hoparlör açıldı + ses maximize edildi');
+                    console.log('[SPEAK_TEXT] Arama modu: HoparlÃ¶r aÃ§Ä±ldÄ± + ses maximize edildi');
                 } else if (BreviSettings.setSpeakerphone) {
                     await BreviSettings.setSpeakerphone(true);
                     await BreviSettings.setVolume(100, 'media');
                     await BreviSettings.setVolume(100, 'call');
-                    console.log('[SPEAK_TEXT] Arama modu: Hoparlör açıldı');
+                    console.log('[SPEAK_TEXT] Arama modu: HoparlÃ¶r aÃ§Ä±ldÄ±');
                 }
             } catch (spkErr) {
-                console.warn('[SPEAK_TEXT] Hoparlör açılamadı:', spkErr);
+                console.warn('[SPEAK_TEXT] HoparlÃ¶r aÃ§Ä±lamadÄ±:', spkErr);
             }
         }
 
@@ -114,10 +211,10 @@ export async function executeSpeakText(
         if (text && (text.trim().startsWith('{') || text.trim().startsWith('['))) {
             try {
                 const parsed = JSON.parse(text);
-                console.log('[SPEAK_TEXT] JSON içeriği algılandı. Okunabilir metne dönüştürülüyor.');
+                console.log('[SPEAK_TEXT] JSON iÃ§eriÄŸi algÄ±landÄ±. Okunabilir metne dÃ¶nÃ¼ÅŸtÃ¼rÃ¼lÃ¼yor.');
 
                 if (Array.isArray(parsed)) {
-                    text = `Liste şunları içeriyor: ${parsed.map(item => typeof item === 'object' ? Object.values(item).join(' ') : item).join(', ')}`;
+                    text = `Liste ÅŸunlarÄ± iÃ§eriyor: ${parsed.map(item => typeof item === 'object' ? Object.values(item).join(' ') : item).join(', ')}`;
                 } else if (typeof parsed === 'object') {
                     // Smart conversion: Only read meaningful keys (skip huge raw data)
                     const keys = Object.keys(parsed);
@@ -128,7 +225,7 @@ export async function executeSpeakText(
                         const dosya = parsed.dosyaNo || parsed.dosya_no;
                         const tarih = parsed.durusmaTarihi || parsed.durusma_tarihi;
                         const saat = parsed.durusmaSaati || parsed.durusma_saati;
-                        text = `Mahkeme Bilgileri Şöyle: ${mahkeme}, Dosya Numarası: ${dosya}. Duruşma Tarihi: ${tarih}, Saat: ${saat}`;
+                        text = `Mahkeme Bilgileri ÅÃ¶yle: ${mahkeme}, Dosya NumarasÄ±: ${dosya}. DuruÅŸma Tarihi: ${tarih}, Saat: ${saat}`;
                     } else {
                         // Generic Fallback: Read up to 5 keys
                         text = keys.slice(0, 5).map(k => `${k}: ${parsed[k]}`).join('. ');
@@ -136,16 +233,16 @@ export async function executeSpeakText(
                 }
             } catch (e) {
                 // Not valid JSON, ignore
-                console.log('[SPEAK_TEXT] JSON ayrıştırma başarısız, ham metin olarak okunuyor.');
+                console.log('[SPEAK_TEXT] JSON ayrÄ±ÅŸtÄ±rma baÅŸarÄ±sÄ±z, ham metin olarak okunuyor.');
             }
         }
 
         if (!text || text.includes('{{')) {
-            console.warn('[SPEAK_TEXT] Uyarı: Değişken çözümü başarısız olmuş olabilir. Sonuç:', text);
+            console.warn('[SPEAK_TEXT] UyarÄ±: DeÄŸiÅŸken Ã§Ã¶zÃ¼mÃ¼ baÅŸarÄ±sÄ±z olmuÅŸ olabilir. SonuÃ§:', text);
         }
 
         if (!text) {
-            return { success: false, error: 'Okunacak metin boş' };
+            return { success: false, error: 'Okunacak metin boÅŸ' };
         }
 
         // Get saved TTS settings as defaults
@@ -166,7 +263,7 @@ export async function executeSpeakText(
                 const voiceList = voices.map(v => `${v.name} (${v.language})`).join(', ');
                 console.log('[SPEAK_TEXT] Cihazdaki Mevcut Sesler:', voiceList.substring(0, 200) + '...');
             } else {
-                console.warn('[SPEAK_TEXT] Cihazda hiç ses paketi bulunamadı!');
+                console.warn('[SPEAK_TEXT] Cihazda hiÃ§ ses paketi bulunamadÄ±!');
             }
 
             // ROBUST VOICE SELECTION STRATEGY
@@ -186,10 +283,10 @@ export async function executeSpeakText(
 
             // 4. Name/Identifier Match (Samsung devices sometimes use names like "Turkish Female")
             if (!targetVoice && requestedLang.startsWith('tr')) {
-                console.log('[SPEAK_TEXT] Dil kodu ile bulunamadı, isimlerde "Turkish/Turk" aranıyor...');
+                console.log('[SPEAK_TEXT] Dil kodu ile bulunamadÄ±, isimlerde "Turkish/Turk" aranÄ±yor...');
                 targetVoice = voices.find(v =>
                     v.name.toLowerCase().includes('turkish') ||
-                    v.name.toLowerCase().includes('türk') ||
+                    v.name.toLowerCase().includes('tÃ¼rk') ||
                     v.identifier.toLowerCase().includes('tr_') ||
                     v.identifier.toLowerCase().includes('tur')
                 );
@@ -200,19 +297,19 @@ export async function executeSpeakText(
                 finalLang = targetVoice.language; // Update lang to match the actual voice
                 console.log(`[SPEAK_TEXT] Ses Bulundu: ${targetVoice.name} (${targetVoice.language}) - ID: ${voiceId}`);
             } else {
-                console.warn(`[SPEAK_TEXT] DIKKAT: '${requestedLang}' için uygun ses bulunamadı.`);
+                console.warn(`[SPEAK_TEXT] DIKKAT: '${requestedLang}' iÃ§in uygun ses bulunamadÄ±.`);
 
                 // Critical Error for Turkish users instead of silent fail
                 if (requestedLang.startsWith('tr')) {
                     return {
                         success: false,
-                        error: 'Cihazda Türkçe Ses Paketi (TTS) bulunamadı. Lütfen "Ayarlar > Erişilebilirlik > Metin Okuma (TTS)" menüsünden Türkçe dilini indirin/seçin.'
+                        error: 'Cihazda TÃ¼rkÃ§e Ses Paketi (TTS) bulunamadÄ±. LÃ¼tfen "Ayarlar > EriÅŸilebilirlik > Metin Okuma (TTS)" menÃ¼sÃ¼nden TÃ¼rkÃ§e dilini indirin/seÃ§in.'
                     };
                 }
             }
 
         } catch (e) {
-            console.warn('[SPEAK_TEXT] Ses listesi alınamadı:', e);
+            console.warn('[SPEAK_TEXT] Ses listesi alÄ±namadÄ±:', e);
         }
 
         const options: Speech.SpeechOptions = {
@@ -235,7 +332,7 @@ export async function executeSpeakText(
     } catch (error) {
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Metin okunamadı',
+            error: error instanceof Error ? error.message : 'Metin okunamadÄ±',
         };
     }
 }
@@ -253,7 +350,7 @@ export async function executeAudioRecord(
         if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
             return {
                 success: false,
-                error: 'Ses kaydı sadece Android ve iOS\'ta destekleniyor',
+                error: 'Ses kaydÄ± sadece Android ve iOS\'ta destekleniyor',
             };
         }
 
@@ -277,7 +374,7 @@ export async function executeAudioRecord(
                     await activeRecording.stopAndUnloadAsync();
                 }
             } catch (cleanupError) {
-                console.warn('[AUDIO_RECORD] Mevcut kayıt temizlenirken hata oluştu:', cleanupError);
+                console.warn('[AUDIO_RECORD] Mevcut kayÄ±t temizlenirken hata oluÅŸtu:', cleanupError);
             } finally {
                 activeRecording = null;
             }
@@ -328,7 +425,8 @@ export async function executeAudioRecord(
 
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Ses kaydı başlatılamadı',
+            error: error instanceof Error ? error.message : 'Ses kaydÄ± baÅŸlatÄ±lamadÄ±',
         };
     }
 }
+

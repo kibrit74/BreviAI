@@ -24,13 +24,19 @@ export async function executeHttpRequest(
 ): Promise<any> {
     const start = Date.now();
     try {
-        let url = variableManager.resolveString(config.url);
+        let url = variableManager.resolveString(config.url).trim();
 
         console.log('[HTTP_REQUEST] Original URL:', config.url);
         console.log('[HTTP_REQUEST] Resolved URL:', url);
 
         if (!url) {
             return { success: false, error: 'URL boş olamaz' };
+        }
+
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(url);
+        if (!hasScheme) {
+            url = url.startsWith('//') ? `https:${url}` : `https://${url}`;
+            console.log('[HTTP_REQUEST] Normalized URL with https:', url);
         }
 
         // --- RUNTIME PATCH: Redirect Placeholder APIs to Local DB ---
@@ -218,7 +224,7 @@ export async function executeHttpRequest(
                 : (fetchError instanceof Error ? fetchError.message : 'Bağlantı hatası');
 
             if (errorMessage.includes('Network request failed')) {
-                errorMessage = "🌐 İnternet Bağlantısı Yok! Lütfen bağlantınızı kontrol edin.";
+                errorMessage = `Ag/DNS baglanti hatasi. URL veya alan adi gecersiz olabilir: ${url}`;
             } else if (errorMessage.includes('SSL')) {
                 errorMessage = "🔒 Güvenli Bağlantı (SSL) Hatası!";
             }
@@ -798,8 +804,16 @@ export async function executeWebAutomation(
     };
 
     try {
-        const url = variableManager.resolveString(config.url).trim();
-        if (!url) return failWithContract('URL boş olamaz');
+        const rawUrl = variableManager.resolveString(config.url).trim();
+        if (!rawUrl) return failWithContract('URL boş olamaz');
+
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(rawUrl);
+        const url = hasScheme
+            ? rawUrl
+            : (rawUrl.startsWith('//') ? `https:${rawUrl}` : `https://${rawUrl}`);
+        if (url !== rawUrl) {
+            console.log('[WEB_AUTOMATION] Normalized URL with https:', url);
+        }
 
         const normalizedActionsResult = normalizeWebAutomationActions((config as any).actions, variableManager);
         if (normalizedActionsResult.error) {

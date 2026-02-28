@@ -166,6 +166,7 @@ export { BatchController };
 
 export class WorkflowEngine {
     private static instance: WorkflowEngine;
+    private static runningWorkflowIds: Set<string> = new Set();
     private variableManager: VariableManager = new VariableManager();
     private conditionEvaluator: ConditionEvaluator = new ConditionEvaluator(this.variableManager);
     private loopController: LoopController = new LoopController();
@@ -308,6 +309,19 @@ export class WorkflowEngine {
 
     async execute(workflow: Workflow, initialVariables?: Record<string, any>): Promise<WorkflowExecutionResult> {
         debugLog('workflow', `Starting Workflow: ${workflow.name}`, { id: workflow.id });
+
+        if (WorkflowEngine.runningWorkflowIds.has(workflow.id)) {
+            debugLog('warning', `Workflow ${workflow.id} is already running. Duplicate execution skipped.`, { workflowId: workflow.id });
+            return {
+                workflowId: workflow.id,
+                success: true,
+                nodeResults: [],
+                totalDuration: 0,
+            };
+        }
+        WorkflowEngine.runningWorkflowIds.add(workflow.id);
+
+        try {
 
         const startTime = Date.now();
         const nodeResults: NodeExecutionResult[] = [];
@@ -516,6 +530,9 @@ export class WorkflowEngine {
                 .catch(err => console.warn('[WorkflowEngine] Telemetry report failed:', err));
 
             return errorResult;
+        }
+        } finally {
+            WorkflowEngine.runningWorkflowIds.delete(workflow.id);
         }
     }
 

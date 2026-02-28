@@ -274,11 +274,13 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'set_bluetooth',
-        description: 'Turns Bluetooth on or off.',
+        description: 'Turns Bluetooth on/off or toggles it. Supports temporary changes with auto-restore.',
         parameters: {
             type: 'OBJECT',
             properties: {
-                mode: { type: 'STRING', description: 'Mode: "on", "off", or "toggle"' }
+                mode: { type: 'STRING', description: 'Mode: "on", "off", or "toggle"' },
+                restoreAfterMinutes: { type: 'INTEGER', description: 'Optional. Auto-restore after N minutes.' },
+                restoreToPrevious: { type: 'BOOLEAN', description: 'Optional. Restore previous state when timer ends. Default: true.' }
             },
             required: ['mode']
         },
@@ -286,11 +288,13 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'set_brightness',
-        description: 'Sets the screen brightness level.',
+        description: 'Sets the screen brightness level. Supports temporary profile-style changes.',
         parameters: {
             type: 'OBJECT',
             properties: {
-                level: { type: 'INTEGER', description: 'Brightness level (0-100)' }
+                level: { type: 'INTEGER', description: 'Brightness level (0-100)' },
+                restoreAfterMinutes: { type: 'INTEGER', description: 'Optional. Auto-restore after N minutes.' },
+                restoreToPrevious: { type: 'BOOLEAN', description: 'Optional. Restore previous brightness when timer ends. Default: true.' }
             },
             required: ['level']
         },
@@ -298,12 +302,14 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'set_volume',
-        description: 'Sets the volume level.',
+        description: 'Sets the volume level. Supports temporary profile-style changes with restore.',
         parameters: {
             type: 'OBJECT',
             properties: {
                 level: { type: 'INTEGER', description: 'Volume level (0-100)' },
-                type: { type: 'STRING', description: 'Stream type: "media", "ring", "alarm"' }
+                type: { type: 'STRING', description: 'Stream type: "media", "ring", "alarm", "call"' },
+                restoreAfterMinutes: { type: 'INTEGER', description: 'Optional. Auto-restore after N minutes.' },
+                restoreToPrevious: { type: 'BOOLEAN', description: 'Optional. Restore previous stream volume when timer ends. Default: true.' }
             },
             required: ['level']
         },
@@ -455,11 +461,13 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'set_dnd',
-        description: 'Enables or disables Do Not Disturb mode.',
+        description: 'Enables/disables Do Not Disturb mode. Supports timed temporary DND with automatic restore.',
         parameters: {
             type: 'OBJECT',
             properties: {
-                enabled: { type: 'BOOLEAN', description: 'true to enable DND, false to disable' }
+                enabled: { type: 'BOOLEAN', description: 'true to enable DND, false to disable' },
+                duration: { type: 'INTEGER', description: 'Optional. Keep DND for N minutes, then restore.' },
+                restoreToPrevious: { type: 'BOOLEAN', description: 'Optional. Restore previous DND state when timer ends. Default: true.' }
             },
             required: ['enabled']
         },
@@ -467,11 +475,13 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'set_sound_mode',
-        description: 'Sets the phone sound mode (silent, vibrate, normal).',
+        description: 'Sets sound mode (silent, vibrate, normal). Supports temporary profile-style mode changes.',
         parameters: {
             type: 'OBJECT',
             properties: {
-                mode: { type: 'STRING', description: 'Mode: "silent", "vibrate", or "normal"' }
+                mode: { type: 'STRING', description: 'Mode: "silent", "vibrate", or "normal"' },
+                restoreAfterMinutes: { type: 'INTEGER', description: 'Optional. Auto-restore after N minutes.' },
+                restoreToPrevious: { type: 'BOOLEAN', description: 'Optional. Restore previous sound mode when timer ends. Default: true.' }
             },
             required: ['mode']
         },

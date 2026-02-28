@@ -375,7 +375,7 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         icon: 'walk',
         color: '#10B981',
         nodes: [
-            { id: '1', type: 'STEP_TRIGGER', label: '10K Adım', config: { stepGoal: 10000, variableName: 'adimlar' }, position: { x: 100, y: 50 } },
+            { id: '1', type: 'STEP_TRIGGER', label: '10K Adım', config: { targetSteps: 10000, comparison: 'gte', resetDaily: true, variableName: 'adimlar' }, position: { x: 100, y: 50 } },
             { id: '2', type: 'NOTIFICATION', label: 'Kutlama!', config: { type: 'push', title: '🎉 Tebrikler!', message: '10.000 adım hedefine ulaştın! Bugün {{adimlar}} adım attın.' }, position: { x: 100, y: 200 } },
             { id: '3', type: 'SPEAK_TEXT', label: 'Sesli Kutlama', config: { text: 'Tebrikler! Bugün 10 bin adım hedefine ulaştınız!', language: 'tr-TR' }, position: { x: 100, y: 350 } }
         ],

@@ -396,7 +396,10 @@ class BrowserService {
         this.activePages = 0;
         this.waitQueue = [];
         this.browserInitPromise = null;
-        this.initBrowser();
+        // Warm-up in background, but never crash hub startup if Chrome launch fails.
+        this.initBrowser().catch((err) => {
+            console.error('[Browser] Warm-up failed, service will retry on demand:', err?.message || err);
+        });
     }
 
     async initBrowser() {

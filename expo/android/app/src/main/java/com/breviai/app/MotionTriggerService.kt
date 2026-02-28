@@ -120,6 +120,21 @@ class MotionTriggerService : Service(), SensorEventListener {
             
             prefs.edit().putString("triggers", newTriggers.toString()).apply()
             Log.d(TAG, "Unregistered gesture trigger for: $workflowId")
+
+            if (newTriggers.length() == 0) {
+                Log.d(TAG, "No gesture triggers left. Stopping motion service.")
+                stop(context)
+            }
+        }
+
+        /**
+         * Clear all gesture trigger registrations (used for full JS-native resync).
+         */
+        fun clearAllGestureTriggers(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs.edit().putString("triggers", "[]").apply()
+            Log.d(TAG, "Cleared all gesture trigger registrations")
+            stop(context)
         }
     }
     
@@ -351,8 +366,8 @@ class MotionTriggerService : Service(), SensorEventListener {
         val shakeTriggers = registeredTriggers.filter { it.gesture == GESTURE_SHAKE }
         
         currentShakeThreshold = when {
-            shakeTriggers.any { it.sensitivity == "high" } -> SHAKE_THRESHOLD_HIGH
             shakeTriggers.any { it.sensitivity == "low" } -> SHAKE_THRESHOLD_LOW
+            shakeTriggers.any { it.sensitivity == "high" } -> SHAKE_THRESHOLD_HIGH
             else -> SHAKE_THRESHOLD_MEDIUM
         }
     }

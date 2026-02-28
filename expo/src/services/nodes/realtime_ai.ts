@@ -11,6 +11,9 @@ import { userSettingsService } from '../UserSettingsService';
 import { interactionService } from '../InteractionService';
 
 const TAG = '[REALTIME_AI]';
+let activeRealtimeSessionOwner: string | null = null;
+let activeRealtimeSessionStartedAt = 0;
+const REALTIME_SESSION_STALE_MS = 5 * 60 * 1000;
 
 export interface RealtimeAIConfig {
     systemPrompt?: string;
@@ -47,6 +50,7 @@ export async function executeRealtimeAI(
     const liveService = new GeminiLiveService();
     const transcript: { role: string; text: string; timestamp: number }[] = [];
     const maxDuration = (config.maxDuration || 300) * 1000; // Convert to ms
+    const connectTimeoutMs = 25000; // Fail fast if setup never completes
     const maxTurns = Math.max(0, Number(config.maxTurns || 0));
     const includeTimestamps = config.includeTimestamps === true;
     const startTime = Date.now();
@@ -74,12 +78,41 @@ export async function executeRealtimeAI(
         ? variableManager.resolveString(config.systemPrompt)
         : 'Sen BreviAI sesli asistanısın. Kullanıcıyla Türkçe konuşuyorsun. Kısa ve doğal cevaplar ver.';
 
-    return new Promise(async (resolve) => {
+    const workflowId = String(variableManager.get('_workflowId') || 'unknown_workflow');
+    if (activeRealtimeSessionOwner) {
+        const lockAge = Date.now() - activeRealtimeSessionStartedAt;
+        if (activeRealtimeSessionStartedAt > 0 && lockAge > REALTIME_SESSION_STALE_MS) {
+            console.warn(
+                `${TAG} Stale REALTIME_AI lock detected (owner=${activeRealtimeSessionOwner}, age=${lockAge}ms). Releasing lock.`
+            );
+            activeRealtimeSessionOwner = null;
+            activeRealtimeSessionStartedAt = 0;
+        }
+    }
+    if (activeRealtimeSessionOwner) {
+        const message = `Another REALTIME_AI session is active (owner=${activeRealtimeSessionOwner}).`;
+        console.warn(`${TAG} ${message}`);
+        return {
+            success: false,
+            error: message,
+            code: 'REALTIME_SESSION_BUSY',
+        };
+    }
+    activeRealtimeSessionOwner = workflowId;
+    activeRealtimeSessionStartedAt = Date.now();
+
+    try {
+        return await new Promise(async (resolve) => {
         let settled = false;
         let hasConnected = false;
         let connectAttemptInProgress = false;
         let stopRequestedByMaxTurns = false;
+        let stopRequestedByMaxDuration = false;
+        let stopRequestedByAbort = false;
         let runtimeError: string | null = null;
+
+        const isGraceful1000Close = (value?: string | null) =>
+            typeof value === 'string' && /websocket closed\s*\(1000\)/i.test(value);
 
         const resolveOnce = (result: any) => {
             if (settled) return;
@@ -88,14 +121,24 @@ export async function executeRealtimeAI(
         };
 
         const timeoutId = setTimeout(() => {
+            stopRequestedByMaxDuration = true;
             console.log(`${TAG} Max duration reached, disconnecting`);
             liveService.disconnect();
         }, maxDuration);
+        const connectTimeoutId = setTimeout(() => {
+            if (!hasConnected) {
+                runtimeError = 'Gemini Live setup timed out before session became ready';
+                console.warn(`${TAG} ${runtimeError}`);
+                liveService.disconnect();
+            }
+        }, connectTimeoutMs);
 
         if (signal) {
             signal.addEventListener('abort', () => {
+                stopRequestedByAbort = true;
                 console.log(`${TAG} Abort signal received`);
                 clearTimeout(timeoutId);
+                clearTimeout(connectTimeoutId);
                 liveService.disconnect();
             });
         }
@@ -132,6 +175,13 @@ export async function executeRealtimeAI(
             },
 
             onError: (error: string) => {
+                if (
+                    isGraceful1000Close(error) &&
+                    (stopRequestedByMaxDuration || stopRequestedByMaxTurns || stopRequestedByAbort)
+                ) {
+                    console.log(`${TAG} Ignoring graceful close error after intentional stop: ${error}`);
+                    return;
+                }
                 runtimeError = error;
                 console.error(`${TAG} Error:`, error);
             },
@@ -141,6 +191,7 @@ export async function executeRealtimeAI(
 
                 if (state === 'connected') {
                     hasConnected = true;
+                    clearTimeout(connectTimeoutId);
                     return;
                 }
 
@@ -152,6 +203,7 @@ export async function executeRealtimeAI(
                     // Wait for connect() result to allow retry logic in the caller.
                     if (connectAttemptInProgress) return;
                     clearTimeout(timeoutId);
+                    clearTimeout(connectTimeoutId);
                     resolveOnce({
                         success: false,
                         error: runtimeError || 'Live session disconnected before setup completed',
@@ -160,6 +212,7 @@ export async function executeRealtimeAI(
                 }
 
                 clearTimeout(timeoutId);
+                clearTimeout(connectTimeoutId);
 
                 if (config.variableName) {
                     const transcriptText = transcript
@@ -221,11 +274,35 @@ export async function executeRealtimeAI(
 
         } catch (error: any) {
             clearTimeout(timeoutId);
+            clearTimeout(connectTimeoutId);
             console.error(`${TAG} Connection failed:`, error);
+
+            const maybeError = runtimeError || error?.message || '';
+            if (
+                isGraceful1000Close(maybeError) &&
+                (stopRequestedByMaxDuration || stopRequestedByMaxTurns || stopRequestedByAbort)
+            ) {
+                const duration = Date.now() - startTime;
+                resolveOnce({
+                    success: true,
+                    duration,
+                    turns: transcript.length,
+                    transcript,
+                    message: `Oturum kontrollu sekilde sonlandi (${Math.round(duration / 1000)}sn, ${transcript.length} mesaj)`
+                });
+                return;
+            }
+
             resolveOnce({
                 success: false,
                 error: runtimeError || error.message || 'Gemini Live baglantisi kurulamadi',
             });
         }
-    });
+        });
+    } finally {
+        if (activeRealtimeSessionOwner === workflowId) {
+            activeRealtimeSessionOwner = null;
+            activeRealtimeSessionStartedAt = 0;
+        }
+    }
 }

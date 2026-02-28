@@ -1,0 +1,200 @@
+{
+  "id": "web-kapsamli-test-otomasyonu",
+  "name": "Web Kapsamli Test Otomasyonu (2 Ajan)",
+  "description": "Hedef veriyi bulmak icin once web arama ajani calisir, sonra birlestirme ajani scrape + arama sonucundan tek deger dondurur.",
+  "nodes": [
+    {
+      "id": "1",
+      "type": "MANUAL_TRIGGER",
+      "label": "Baslat",
+      "position": { "x": 100, "y": 80 },
+      "config": {}
+    },
+    {
+      "id": "2",
+      "type": "TEXT_INPUT",
+      "label": "Hedef URL",
+      "position": { "x": 100, "y": 220 },
+      "config": {
+        "prompt": "Hedef web adresini girin (ornek: finance.yahoo.com)",
+        "placeholder": "finance.yahoo.com",
+        "defaultValue": "finance.yahoo.com",
+        "variableName": "targetUrl"
+      }
+    },
+    {
+      "id": "3",
+      "type": "TEXT_INPUT",
+      "label": "Istenen Veri",
+      "position": { "x": 100, "y": 360 },
+      "config": {
+        "prompt": "Bu siteden hangi bilgiyi istiyorsun? (ornek: USD/TRY anlik kur)",
+        "placeholder": "USD/TRY anlik kur",
+        "defaultValue": "USD/TRY anlik kur",
+        "variableName": "dataGoal"
+      }
+    },
+    {
+      "id": "4",
+      "type": "TEXT_INPUT",
+      "label": "Ek Baglam",
+      "position": { "x": 100, "y": 500 },
+      "config": {
+        "prompt": "Opsiyonel: cikti formatini kisaca belirtin.",
+        "placeholder": "Sadece sayisal deger ve birim don",
+        "defaultValue": "Sadece istenen degeri don, aciklama yazma.",
+        "variableName": "goalContext"
+      }
+    },
+    {
+      "id": "12",
+      "type": "WEB_SEARCH",
+      "label": "Web Arama",
+      "position": { "x": 100, "y": 640 },
+      "config": {
+        "query": "{{dataGoal}} {{targetUrl}}",
+        "variableName": "webSearchData"
+      }
+    },
+    {
+      "id": "5",
+      "type": "HTTP_REQUEST",
+      "label": "URL Saglik Kontrolu",
+      "position": { "x": 100, "y": 780 },
+      "config": {
+        "url": "{{targetUrl}}",
+        "method": "HEAD",
+        "timeout": 10000,
+        "headers": { "User-Agent": "Mozilla/5.0" },
+        "variableName": "httpResult"
+      }
+    },
+    {
+      "id": "6",
+      "type": "WEB_AUTOMATION",
+      "label": "Web Automation Cekim",
+      "position": { "x": 100, "y": 920 },
+      "config": {
+        "url": "{{targetUrl}}",
+        "mode": "script",
+        "headless": true,
+        "actions": [
+          { "id": "wait_1", "type": "wait", "value": "1200" },
+          { "id": "scrape_smart", "type": "scrape", "extract": "smart_data", "variableName": "autoSmart" }
+        ],
+        "variableName": "webAutoRun"
+      }
+    },
+    {
+      "id": "7",
+      "type": "BROWSER_SCRAPE",
+      "label": "Browser Scrape Clean Text",
+      "position": { "x": 100, "y": 1060 },
+      "config": {
+        "url": "{{targetUrl}}",
+        "extract": "clean_text",
+        "preWaitMs": 1200,
+        "scrollSteps": 1,
+        "scrollDelayMs": 600,
+        "variableName": "scrapeText"
+      }
+    },
+    {
+      "id": "8",
+      "type": "BROWSER_SCRAPE",
+      "label": "Browser Scrape Smart Data",
+      "position": { "x": 100, "y": 1200 },
+      "config": {
+        "url": "{{targetUrl}}",
+        "extract": "smart_data",
+        "preWaitMs": 1200,
+        "scrollSteps": 1,
+        "scrollDelayMs": 600,
+        "variableName": "scrapeSmart"
+      }
+    },
+    {
+      "id": "13",
+      "type": "AGENT_AI",
+      "label": "Ajan 1 - Arama Analizi",
+      "position": { "x": 100, "y": 1340 },
+      "config": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "outputFormat": "json",
+        "variableName": "searchAgent",
+        "prompt": "Sen Arama Ajanisin.\n\nHedef URL: {{targetUrl}}\nIstenen veri: {{dataGoal}}\nEk baglam: {{goalContext}}\nWeb arama sonucu: {{webSearchData}}\n\nGorev:\n- Arama sonucundan hedefe en yakin tek degeri cikar.\n- Hedef URL yazim hataliysa suggestedUrl alaniyla duzeltme oner.\n- Veri yoksa found=false don.\n- Sadece JSON don.\n\nJSON semasi:\n{\n  \"found\": true,\n  \"value\": \"deger veya null\",\n  \"asText\": \"tek satir\",\n  \"unit\": \"varsa birim\",\n  \"source\": \"web_search|none\",\n  \"confidence\": 0,\n  \"suggestedUrl\": \"https://... veya null\",\n  \"note\": \"kisa not\"\n}"
+      }
+    },
+    {
+      "id": "9",
+      "type": "AGENT_AI",
+      "label": "Ajan 2 - Birlestirme",
+      "position": { "x": 100, "y": 1480 },
+      "config": {
+        "provider": "gemini",
+        "model": "gemini-2.5-flash",
+        "outputFormat": "json",
+        "variableName": "goalExtract",
+        "prompt": "Sen Sonuc Ajanisin.\n\nKullanici hedefi: {{dataGoal}}\nEk baglam: {{goalContext}}\nURL: {{targetUrl}}\nHTTP status: {{httpResult.status}}, ok: {{httpResult.ok}}\n\nKaynak 1 - Web arama ajani: {{searchAgent}}\nKaynak 2 - BROWSER smart_data: {{scrapeSmart}}\nKaynak 3 - WEB_AUTOMATION smart_data: {{webAutoRun.data.autoSmart}}\nKaynak 4 - BROWSER clean_text: {{scrapeText}}\n\nKurallar:\n- Once arama ajani sonucunu kullan, sonra scrape ile dogrula.\n- Tahmin/uydurma yapma.\n- Sonuc yoksa found=false ve value=null don.\n- Sadece JSON don.\n\nJSON semasi:\n{\n  \"found\": true,\n  \"value\": \"ham deger veya null\",\n  \"asText\": \"tek satirlik final sonuc\",\n  \"unit\": \"varsa birim\",\n  \"source\": \"web_search|browser_scrape|web_automation|mixed|none\",\n  \"confidence\": 0,\n  \"note\": \"kisa teknik not\",\n  \"backendHint\": \"varsa backend/scrape notu\"\n}"
+      }
+    },
+    {
+      "id": "10",
+      "type": "IF_ELSE",
+      "label": "Sonuc Bulundu mu",
+      "position": { "x": 100, "y": 1620 },
+      "config": {
+        "logic": "AND",
+        "conditions": [
+          { "left": "{{goalExtract.found}}", "operator": "==", "right": "true" }
+        ],
+        "left": "{{goalExtract.found}}",
+        "operator": "==",
+        "right": "true"
+      }
+    },
+    {
+      "id": "11",
+      "type": "SHOW_TEXT",
+      "label": "Basarili Sonuc",
+      "position": { "x": 100, "y": 1760 },
+      "config": {
+        "title": "Web Veri Sonucu",
+        "content": "URL: {{targetUrl}}\nIstenen veri: {{dataGoal}}\nSonuc: {{goalExtract.asText}}\nKaynak: {{goalExtract.source}}\nGuven: {{goalExtract.confidence}}\nNot: {{goalExtract.note}}"
+      }
+    },
+    {
+      "id": "18",
+      "type": "SHOW_TEXT",
+      "label": "Veri Bulunamadi",
+      "position": { "x": 440, "y": 1760 },
+      "config": {
+        "title": "Web Veri Bulunamadi",
+        "content": "Hedef veri cikarilamadi.\n\nURL: {{targetUrl}}\nIstenen veri: {{dataGoal}}\nHTTP durum: {{httpResult.status}}\nHTTP hata: {{httpResult.error}}\nAjan1 not: {{searchAgent.note}}\nAjan1 onerilen URL: {{searchAgent.suggestedUrl}}\nAjan2 not: {{goalExtract.note}}\nBackend ipucu: {{goalExtract.backendHint}}"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "sourceNodeId": "1", "targetNodeId": "2", "sourcePort": "default" },
+    { "id": "e2", "sourceNodeId": "2", "targetNodeId": "3", "sourcePort": "default" },
+    { "id": "e3", "sourceNodeId": "3", "targetNodeId": "4", "sourcePort": "default" },
+    { "id": "e4", "sourceNodeId": "4", "targetNodeId": "12", "sourcePort": "default" },
+    { "id": "e12", "sourceNodeId": "12", "targetNodeId": "5", "sourcePort": "default" },
+    { "id": "e12_err", "sourceNodeId": "12", "targetNodeId": "5", "sourcePort": "error" },
+    { "id": "e5", "sourceNodeId": "5", "targetNodeId": "6", "sourcePort": "default" },
+    { "id": "e5_err", "sourceNodeId": "5", "targetNodeId": "6", "sourcePort": "error" },
+    { "id": "e6", "sourceNodeId": "6", "targetNodeId": "7", "sourcePort": "default" },
+    { "id": "e6_err", "sourceNodeId": "6", "targetNodeId": "7", "sourcePort": "error" },
+    { "id": "e7", "sourceNodeId": "7", "targetNodeId": "8", "sourcePort": "default" },
+    { "id": "e7_err", "sourceNodeId": "7", "targetNodeId": "8", "sourcePort": "error" },
+    { "id": "e8", "sourceNodeId": "8", "targetNodeId": "13", "sourcePort": "default" },
+    { "id": "e8_err", "sourceNodeId": "8", "targetNodeId": "13", "sourcePort": "error" },
+    { "id": "e13", "sourceNodeId": "13", "targetNodeId": "9", "sourcePort": "default" },
+    { "id": "e13_err", "sourceNodeId": "13", "targetNodeId": "9", "sourcePort": "error" },
+    { "id": "e9", "sourceNodeId": "9", "targetNodeId": "10", "sourcePort": "default" },
+    { "id": "e9_err", "sourceNodeId": "9", "targetNodeId": "18", "sourcePort": "error" },
+    { "id": "e10_true", "sourceNodeId": "10", "targetNodeId": "11", "sourcePort": "true" },
+    { "id": "e10_false", "sourceNodeId": "10", "targetNodeId": "18", "sourcePort": "false" }
+  ]
+}

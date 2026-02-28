@@ -1,8 +1,8 @@
 import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
+import React from 'react';
 import WidgetHeadlessTask from './src/services/WidgetHeadlessTask';
 import './src/services/BackgroundService'; // Register Background Location Task
-import App from './App';
 
 // Register headless task BEFORE App load
 // This is required for React Native Headless JS to work
@@ -15,5 +15,16 @@ import NotificationHeadlessTask from './src/services/NotificationHeadlessTask';
 // Register headless task to handle notifications in background
 AppRegistry.registerHeadlessTask(RNAndroidNotificationListenerHeadlessJsName, () => NotificationHeadlessTask);
 
+function HeadlessCheck({ isHeadless }) {
+    if (isHeadless) {
+        console.log('[index] Headless launch detected. Skipping App bootstrap.');
+        return null;
+    }
+
+    // Lazy import App so headless executions don't evaluate UI modules.
+    const App = require('./App').default;
+    return <App />;
+}
+
 // Register the main app component
-registerRootComponent(App);
+registerRootComponent(HeadlessCheck);

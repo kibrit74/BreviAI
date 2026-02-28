@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Device Node Executors
  * Sound Mode, Screen Wake, App Launch, DND Control, Brightness Control
  */
@@ -29,6 +29,67 @@ try {
     console.log('BreviSettings not available');
 }
 import { Camera } from 'expo-camera';
+
+const RESTORE_TIMER_SCOPE_MS = 24 * 60 * 60 * 1000; // 24h safety cap
+type RestoreTimer = ReturnType<typeof setTimeout>;
+const restoreTimers = new Map<string, { token: number; timerId: RestoreTimer }>();
+let restoreTimerToken = 0;
+
+function getRestoreKey(variableManager: VariableManager, feature: string): string {
+    const workflowId = String(variableManager.get('_workflowId') || 'global');
+    return `${workflowId}:${feature}`;
+}
+
+function cancelScheduledRestore(key: string): void {
+    const existing = restoreTimers.get(key);
+    if (!existing) return;
+    clearTimeout(existing.timerId);
+    restoreTimers.delete(key);
+}
+
+function scheduleLatestRestore(
+    key: string,
+    delayMs: number,
+    task: () => Promise<void>
+): void {
+    cancelScheduledRestore(key);
+    const safeDelay = Math.max(0, Math.min(delayMs, RESTORE_TIMER_SCOPE_MS));
+    const token = ++restoreTimerToken;
+    const timerId = setTimeout(async () => {
+        const active = restoreTimers.get(key);
+        if (!active || active.token !== token) return;
+        restoreTimers.delete(key);
+        try {
+            await task();
+        } catch (e) {
+            console.error(`[DEVICE_RESTORE] Failed for ${key}:`, e);
+        }
+    }, safeDelay);
+    restoreTimers.set(key, { token, timerId });
+}
+
+function toRestoreMs(minutes?: number): number {
+    const numeric = Number(minutes || 0);
+    if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+    return Math.round(numeric * 60 * 1000);
+}
+
+function clampPercent(value: number): number {
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function toRingerModeValue(mode: SoundModeConfig['mode']): 0 | 1 | 2 {
+    if (mode === 'silent') return 0;
+    if (mode === 'vibrate') return 1;
+    return 2;
+}
+
+function toRingerModeLabel(value: number): SoundModeConfig['mode'] | null {
+    if (value === 0) return 'silent';
+    if (value === 1) return 'vibrate';
+    if (value === 2) return 'normal';
+    return null;
+}
 
 export async function executeDeviceNode(
     node: WorkflowNode,
@@ -73,35 +134,71 @@ export async function executeSoundMode(
     }
 
     try {
-        // Save current mode if requested
-        if (config.saveCurrentMode && config.savedModeVariable && BreviSettings) {
+        if (!BreviSettings || !BreviSettings.setRingerMode) {
+            return { success: false, error: 'Native module not available' };
+        }
+
+        const targetMode = toRingerModeValue(config.mode);
+        const restoreAfterMs = toRestoreMs(config.restoreAfterMinutes);
+        const shouldReadCurrent =
+            !!BreviSettings.getRingerMode &&
+            (
+                config.saveCurrentMode === true ||
+                (config.skipIfAlreadySet !== false) ||
+                restoreAfterMs > 0
+            );
+
+        let previousMode: number | null = null;
+        if (shouldReadCurrent) {
             try {
-                const currentMode = await BreviSettings.getRingerMode();
-                variableManager.set(config.savedModeVariable, currentMode);
+                previousMode = Number(await BreviSettings.getRingerMode());
+                if (!Number.isFinite(previousMode) || previousMode < 0) {
+                    previousMode = null;
+                }
             } catch (e) {
-                console.log('Failed to save current ringer mode');
+                console.warn('[SOUND_MODE] Failed to read current mode:', e);
             }
         }
 
-        // Set new mode
-        if (BreviSettings) {
-            switch (config.mode) {
-                case 'silent':
-                    await BreviSettings.setRingerMode(0); // RINGER_MODE_SILENT
-                    break;
-                case 'vibrate':
-                    await BreviSettings.setRingerMode(1); // RINGER_MODE_VIBRATE
-                    break;
-                case 'normal':
-                    await BreviSettings.setRingerMode(2); // RINGER_MODE_NORMAL
-                    break;
-            }
+        const previousModeLabel = previousMode == null ? null : toRingerModeLabel(previousMode);
+        if (config.saveCurrentMode && config.savedModeVariable && previousMode != null) {
+            variableManager.set(config.savedModeVariable, previousModeLabel ?? previousMode);
+        }
+
+        if ((config.skipIfAlreadySet !== false) && previousMode === targetMode) {
+            return {
+                success: true,
+                mode: config.mode,
+                skipped: true,
+                reason: 'already_in_requested_mode',
+            };
+        }
+
+        const nativeResult = await BreviSettings.setRingerMode(targetMode);
+        if (nativeResult === false) {
+            return {
+                success: false,
+                error: 'Ses modu degistirilemedi (izin/cihaz kisiti olabilir)',
+            };
+        }
+
+        const restoreKey = getRestoreKey(variableManager, 'sound_mode');
+        if (restoreAfterMs > 0 && (config.restoreToPrevious !== false) && previousMode != null && previousMode !== targetMode) {
+            scheduleLatestRestore(restoreKey, restoreAfterMs, async () => {
+                if (!BreviSettings?.setRingerMode) return;
+                await BreviSettings.setRingerMode(previousMode as number);
+                console.log('[SOUND_MODE] Restored previous mode after temporary routine window');
+            });
+        } else {
+            cancelScheduledRestore(restoreKey);
         }
 
         console.log('[SOUND_MODE] Success - mode:', config.mode);
         return {
             success: true,
             mode: config.mode,
+            previousMode: previousModeLabel ?? previousMode,
+            temporary: restoreAfterMs > 0,
         };
     } catch (error) {
         console.error('[SOUND_MODE] Error:', error);
@@ -203,38 +300,7 @@ export async function executeDNDControl(
     }
 
     try {
-        if (BreviSettings && BreviSettings.setDoNotDisturb) {
-            console.log('[DND] Checking DND access...');
-            const hasAccess = await BreviSettings.hasDndAccess();
-            console.log('[DND] hasDndAccess:', hasAccess);
-
-            if (!hasAccess) {
-                console.log('[DND] No DND access, requesting...');
-                await BreviSettings.requestDndAccess();
-                return {
-                    success: false,
-                    error: 'DND izni gerekli. Lütfen ayarlardan izin verin.',
-                    requiresPermission: true
-                };
-            }
-
-            console.log('[DND] Setting DND to:', config.enabled);
-            const result = await BreviSettings.setDoNotDisturb(config.enabled);
-            console.log('[DND] Native result:', result);
-
-            // If duration specified, schedule disable
-            if (config.enabled && config.duration) {
-                console.log('[DND] Scheduling disable after', config.duration, 'minutes');
-                setTimeout(async () => {
-                    try {
-                        await BreviSettings.setDoNotDisturb(false);
-                        console.log('[DND] Auto-disabled after duration');
-                    } catch (e) {
-                        console.error('[DND] Failed to disable after duration:', e);
-                    }
-                }, config.duration * 60 * 1000);
-            }
-        } else {
+        if (!BreviSettings || !BreviSettings.setDoNotDisturb) {
             console.log('[DND] BreviSettings not available or setDoNotDisturb missing');
             return {
                 success: false,
@@ -242,11 +308,76 @@ export async function executeDNDControl(
             };
         }
 
+        console.log('[DND] Checking DND access...');
+        const hasAccess = BreviSettings.hasDndAccess ? await BreviSettings.hasDndAccess() : false;
+        console.log('[DND] hasDndAccess:', hasAccess);
+
+        if (!hasAccess) {
+            console.log('[DND] No DND access');
+            if (config.openSettingsOnPermissionMissing !== false && BreviSettings.requestDndAccess) {
+                await BreviSettings.requestDndAccess();
+            }
+            return {
+                success: false,
+                error: 'DND izni gerekli. Lutfen ayarlardan izin verin.',
+                requiresPermission: true,
+            };
+        }
+
+        let previousEnabled: boolean | null = null;
+        if (BreviSettings.isDoNotDisturbEnabled) {
+            try {
+                previousEnabled = !!(await BreviSettings.isDoNotDisturbEnabled());
+            } catch (e) {
+                console.warn('[DND] Failed to read current DND state:', e);
+            }
+        }
+
+        if (config.savePreviousStateVariable && previousEnabled != null) {
+            variableManager.set(config.savePreviousStateVariable, previousEnabled);
+        }
+
+        if ((config.skipIfAlreadySet !== false) && previousEnabled != null && previousEnabled === config.enabled) {
+            return {
+                success: true,
+                enabled: config.enabled,
+                skipped: true,
+                reason: 'already_in_requested_state',
+            };
+        }
+
+        console.log('[DND] Setting DND to:', config.enabled);
+        const nativeResult = await BreviSettings.setDoNotDisturb(config.enabled);
+        console.log('[DND] Native result:', nativeResult);
+        if (nativeResult === false) {
+            return {
+                success: false,
+                error: 'DND degistirilemedi (izin/cihaz kisiti olabilir)',
+            };
+        }
+
+        const restoreKey = getRestoreKey(variableManager, 'dnd');
+        if (config.enabled && config.duration && config.duration > 0) {
+            const restoreAfterMs = toRestoreMs(config.duration);
+            const restoreState = (config.restoreToPrevious !== false && previousEnabled != null)
+                ? previousEnabled
+                : false;
+            console.log('[DND] Scheduling restore after', config.duration, 'minutes to state:', restoreState);
+            scheduleLatestRestore(restoreKey, restoreAfterMs, async () => {
+                if (!BreviSettings?.setDoNotDisturb) return;
+                await BreviSettings.setDoNotDisturb(restoreState);
+                console.log('[DND] Restored after temporary routine window');
+            });
+        } else {
+            cancelScheduledRestore(restoreKey);
+        }
+
         console.log('[DND] Success');
         return {
             success: true,
             enabled: config.enabled,
             duration: config.duration,
+            previousEnabled,
         };
     } catch (error) {
         console.error('[DND] Error:', error);
@@ -256,7 +387,6 @@ export async function executeDNDControl(
         };
     }
 }
-
 export async function executeBrightnessControl(
     config: BrightnessControlConfig,
     variableManager: VariableManager
@@ -264,26 +394,57 @@ export async function executeBrightnessControl(
     console.log('[BRIGHTNESS] Entry - level:', config.level);
 
     try {
-        // Save current brightness if requested
-        if (config.saveCurrentLevel && config.savedLevelVariable) {
+        const restoreAfterMs = toRestoreMs(config.restoreAfterMinutes);
+        const shouldReadCurrent =
+            config.saveCurrentLevel === true ||
+            (config.skipIfAlreadySet !== false) ||
+            restoreAfterMs > 0;
+
+        let previousLevel: number | null = null;
+        if (shouldReadCurrent) {
             try {
                 const currentBrightness = await Brightness.getBrightnessAsync();
-                console.log('[BRIGHTNESS] Current brightness:', currentBrightness);
-                variableManager.set(config.savedLevelVariable, Math.round(currentBrightness * 100));
+                previousLevel = clampPercent(currentBrightness * 100);
+                console.log('[BRIGHTNESS] Current brightness:', previousLevel);
             } catch (e) {
-                console.error('[BRIGHTNESS] Failed to save current brightness:', e);
+                console.warn('[BRIGHTNESS] Failed to read current brightness:', e);
             }
         }
 
-        // Set new brightness (0-1 range)
-        const brightnessValue = Math.max(0, Math.min(1, config.level / 100));
+        if (config.saveCurrentLevel && config.savedLevelVariable && previousLevel != null) {
+            variableManager.set(config.savedLevelVariable, previousLevel);
+        }
+
+        const targetLevel = clampPercent(config.level);
+        if ((config.skipIfAlreadySet !== false) && previousLevel != null && Math.abs(previousLevel - targetLevel) <= 1) {
+            return {
+                success: true,
+                level: targetLevel,
+                skipped: true,
+                reason: 'already_in_requested_range',
+            };
+        }
+
+        const brightnessValue = targetLevel / 100;
         console.log('[BRIGHTNESS] Setting to:', brightnessValue);
         await Brightness.setBrightnessAsync(brightnessValue);
+
+        const restoreKey = getRestoreKey(variableManager, 'brightness');
+        if (restoreAfterMs > 0 && (config.restoreToPrevious !== false) && previousLevel != null && Math.abs(previousLevel - targetLevel) > 1) {
+            scheduleLatestRestore(restoreKey, restoreAfterMs, async () => {
+                await Brightness.setBrightnessAsync(clampPercent(previousLevel as number) / 100);
+                console.log('[BRIGHTNESS] Restored previous level after temporary routine window');
+            });
+        } else {
+            cancelScheduledRestore(restoreKey);
+        }
 
         console.log('[BRIGHTNESS] Success');
         return {
             success: true,
-            level: config.level,
+            level: targetLevel,
+            previousLevel,
+            temporary: restoreAfterMs > 0,
         };
     } catch (error) {
         console.error('[BRIGHTNESS] Error:', error);
@@ -293,7 +454,6 @@ export async function executeBrightnessControl(
         };
     }
 }
-
 /**
  * Execute flashlight control
  * Exported for use by both WorkflowEngine and ShortcutEngine
@@ -406,7 +566,7 @@ export async function executeGlobalAction(
             await BreviSettings.requestAccessibilityPermission();
             return {
                 success: false,
-                error: 'Erişilebilirlik servisi gerekli',
+                error: 'EriÅŸilebilirlik servisi gerekli',
                 requiresPermission: true
             };
         }
@@ -504,12 +664,12 @@ export async function getAppList(): Promise<{ label: string; packageName: string
     }
 }
 
-// Track Bluetooth state for toggle (approximate, since we can't always read it instantly)
-let bluetoothState = true;
+// Fallback Bluetooth state when native read is unavailable
+let bluetoothStateFallback = true;
 
 export async function executeBluetoothControl(
     config: BluetoothControlConfig,
-    _variableManager: VariableManager
+    variableManager: VariableManager
 ): Promise<any> {
     console.log('[BLUETOOTH] Executing with config:', config);
 
@@ -522,20 +682,77 @@ export async function executeBluetoothControl(
             return { success: false, error: 'Native module not ready' };
         }
 
-        let enable: boolean;
+        let currentState: boolean | null = null;
+        if (BreviSettings.isBluetoothEnabled) {
+            try {
+                currentState = !!(await BreviSettings.isBluetoothEnabled());
+                bluetoothStateFallback = currentState;
+            } catch (e) {
+                console.warn('[BLUETOOTH] Failed to read current state:', e);
+            }
+        }
 
+        let enable: boolean;
         if (config.mode === 'toggle') {
-            bluetoothState = !bluetoothState;
-            enable = bluetoothState;
+            if (currentState != null) {
+                enable = !currentState;
+            } else {
+                bluetoothStateFallback = !bluetoothStateFallback;
+                enable = bluetoothStateFallback;
+            }
         } else {
-            enable = (config.mode === 'on');
-            bluetoothState = enable;
+            enable = config.mode === 'on';
+        }
+
+        if ((config.skipIfAlreadySet !== false) && currentState != null && currentState === enable) {
+            return {
+                success: true,
+                mode: config.mode,
+                state: currentState,
+                skipped: true,
+                reason: 'already_in_requested_state',
+            };
         }
 
         console.log('[BLUETOOTH] Setting Bluetooth to:', enable);
-        await BreviSettings.setBluetooth(enable);
+        const nativeResult = await BreviSettings.setBluetooth(enable);
+        if (nativeResult === false) {
+            return {
+                success: false,
+                error: 'Bluetooth degistirilemedi (Android kisiti olabilir)',
+            };
+        }
 
-        return { success: true, mode: config.mode, state: enable };
+        let finalState: boolean = enable;
+        if (BreviSettings.isBluetoothEnabled) {
+            try {
+                finalState = !!(await BreviSettings.isBluetoothEnabled());
+                bluetoothStateFallback = finalState;
+            } catch {
+                finalState = enable;
+            }
+        }
+
+        const restoreAfterMs = toRestoreMs(config.restoreAfterMinutes);
+        const restoreKey = getRestoreKey(variableManager, 'bluetooth');
+        if (restoreAfterMs > 0 && (config.restoreToPrevious !== false) && currentState != null && currentState !== enable) {
+            scheduleLatestRestore(restoreKey, restoreAfterMs, async () => {
+                if (!BreviSettings?.setBluetooth) return;
+                await BreviSettings.setBluetooth(currentState as boolean);
+                console.log('[BLUETOOTH] Restored previous state after temporary routine window');
+            });
+        } else {
+            cancelScheduledRestore(restoreKey);
+        }
+
+        const requiresManualConfirmation = finalState !== enable;
+        return {
+            success: true,
+            mode: config.mode,
+            state: finalState,
+            previousState: currentState,
+            requiresManualConfirmation,
+        };
     } catch (error) {
         console.error('[BLUETOOTH] Error:', error);
         return {

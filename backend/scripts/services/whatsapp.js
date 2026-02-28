@@ -13,7 +13,7 @@ const MAX_SESSIONS = Number(process.env.WA_MAX_SESSIONS || 25);
 const REQUIRE_SESSION_ID = String(process.env.WA_REQUIRE_SESSION_ID || 'true').toLowerCase() !== 'false';
 const DEFAULT_SESSION_ID = String(process.env.WA_DEFAULT_SESSION_ID || 'default').trim() || 'default';
 const SESSION_ID_HELP = "Her cihaz için benzersiz bir sessionId gönderin (x-session-id header veya sessionId query).";
-const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-whatsapp-2024';
+const AUTH_KEY = process.env.WA_AUTH_KEY || 'breviai-secret-password';
 const CONNECT_TOKEN_SECRET = process.env.WA_CONNECT_TOKEN_SECRET || AUTH_KEY;
 const CONNECT_TOKEN_TTL_MINUTES = Number(process.env.WA_CONNECT_TOKEN_TTL_MINUTES || 15);
 const DATA_DIR = path.join(__dirname, '../../.data');

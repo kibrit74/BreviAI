@@ -20,6 +20,15 @@ class TriggerNativeService {
 
         // 1. Unregister everything for this workflow first (clean state)
         BreviHelperModule.unregisterTrigger(workflow.id);
+        try {
+            const { MotionTrigger } = NativeModules;
+            if (MotionTrigger?.unregisterTrigger) {
+                // Keep motion registry in sync for gesture triggers as well.
+                MotionTrigger.unregisterTrigger(workflow.id).catch?.(() => { });
+            }
+        } catch (e) {
+            // no-op
+        }
 
         // Also cancel any scheduled alarms
         const { TriggerScheduler } = NativeModules;

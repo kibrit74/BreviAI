@@ -6,12 +6,42 @@ import { secureStorage } from '../SecureStorage';
 const DEFAULT_BACKEND_URL = 'http://136.109.124.154:3001';
 const DEFAULT_AUTH_KEY = 'breviai-secret-password';
 
+function normalizeBackendBaseUrl(rawUrl?: string | null): string {
+    const candidate = String(rawUrl || '').trim();
+    if (!candidate) return DEFAULT_BACKEND_URL;
+
+    const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(candidate);
+    const withScheme = hasScheme ? candidate : `http://${candidate}`;
+    return withScheme.replace(/\/+$/, '');
+}
+
+function normalizeTargetUrl(rawUrl?: string | null): string {
+    const candidate = String(rawUrl || '').trim();
+    if (!candidate) return '';
+
+    const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(candidate);
+    if (hasScheme) return candidate;
+    return candidate.startsWith('//') ? `https:${candidate}` : `https://${candidate}`;
+}
+
+function isLikelyNetworkError(error: any): boolean {
+    const message = String(error?.message || '').toLowerCase();
+    return (
+        message.includes('network request failed') ||
+        message.includes('failed to fetch') ||
+        message.includes('econnrefused') ||
+        message.includes('connection refused') ||
+        message.includes('networkerror')
+    );
+}
+
 /**
  * Backend yapılandırmasını güvenli depolamadan çeker.
  * SecureStore'da değer yoksa fallback kullanır.
  */
 export async function getBackendConfig() {
-    const url = await secureStorage.getSecure('backendUrl') || DEFAULT_BACKEND_URL;
+    const storedUrl = await secureStorage.getSecure('backendUrl');
+    const url = normalizeBackendBaseUrl(storedUrl || DEFAULT_BACKEND_URL);
     const key = await secureStorage.getSecure('backendAuthKey') || DEFAULT_AUTH_KEY;
     return { url, key };
 }
@@ -236,7 +266,8 @@ export async function executeBrowserScrape(
     config: BrowserScrapeConfig,
     variableManager: VariableManager
 ): Promise<any> {
-    const url = variableManager.resolveString(config.url);
+    const rawUrl = variableManager.resolveString(config.url);
+    const url = normalizeTargetUrl(rawUrl);
     const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
     const selector = config.selector ? variableManager.resolveString(config.selector) : undefined;
     const extract = (config.extract || 'text') as 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
@@ -250,43 +281,102 @@ export async function executeBrowserScrape(
         ? Math.max(100, Math.min(Math.round(Number(config.scrollDelayMs)), 5000))
         : undefined;
 
+    if (!url) {
+        throw new Error('Scraping URL bos olamaz');
+    }
+    if (String(rawUrl || '').trim() !== url) {
+        console.log('[BrowserScrape] Normalized URL with https:', url);
+    }
     console.log('[BrowserScrape] Scraping URL:', url);
 
     try {
-        const { url: BACKEND_URL, key: AUTH_KEY } = await getBackendConfig();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for scraping
+        const { url: configuredBackendUrl, key: AUTH_KEY } = await getBackendConfig();
+        const fallbackBackendUrl = normalizeBackendBaseUrl(DEFAULT_BACKEND_URL);
+        const backendCandidates =
+            configuredBackendUrl === fallbackBackendUrl
+                ? [configuredBackendUrl]
+                : [configuredBackendUrl, fallbackBackendUrl];
 
-        const response = await fetch(`${BACKEND_URL}/browser/scrape`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-auth-key': AUTH_KEY,
-            },
-            body: JSON.stringify({
-                url,
-                waitForSelector,
-                selector,
-                extract,
-                preWaitMs,
-                scrollSteps,
-                scrollDelayMs,
-            }),
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        let response: any = null;
+        let usedBackendUrl = configuredBackendUrl;
 
-        if (!response.ok) {
-            throw new Error(`Backend error: ${response.status} ${response.statusText}`);
+        for (let i = 0; i < backendCandidates.length; i++) {
+            const backendUrl = backendCandidates[i];
+            const canFallback = i === 0 && backendCandidates.length > 1;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for scraping
+
+            try {
+                const candidateResponse = await fetch(`${backendUrl}/browser/scrape`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-key': AUTH_KEY,
+                    },
+                    body: JSON.stringify({
+                        url,
+                        waitForSelector,
+                        selector,
+                        extract,
+                        preWaitMs,
+                        scrollSteps,
+                        scrollDelayMs,
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (!candidateResponse.ok) {
+                    let backendError = `Backend error: ${candidateResponse.status} ${candidateResponse.statusText}`;
+                    try {
+                        const errorPayload = await candidateResponse.json();
+                        if (errorPayload?.error) {
+                            backendError = `Backend error: ${candidateResponse.status} ${errorPayload.error}`;
+                        }
+                    } catch {
+                        // keep default error string
+                    }
+                    throw new Error(backendError);
+                }
+
+                response = candidateResponse;
+                usedBackendUrl = backendUrl;
+
+                if (backendUrl !== configuredBackendUrl) {
+                    console.warn(`[BrowserScrape] Primary backend failed, fallback used: ${backendUrl}`);
+                }
+                break;
+            } catch (requestError: any) {
+                clearTimeout(timeoutId);
+
+                if (requestError?.name === 'AbortError') {
+                    throw requestError;
+                }
+
+                if (canFallback && isLikelyNetworkError(requestError)) {
+                    console.warn(`[BrowserScrape] Backend unreachable (${backendUrl}), retrying fallback ${fallbackBackendUrl}`);
+                    continue;
+                }
+
+                throw requestError;
+            }
+        }
+
+        if (!response) {
+            throw new Error('Backend scrape request failed');
         }
 
         const payload = await response.json();
         const result = unwrapScrapeEnvelope(payload);
         const empty = isEmptyScrapeValue(result);
-        const meta =
+        const payloadMeta =
             payload && typeof payload === 'object' && !Array.isArray(payload) && hasOwnKey(payload, 'meta')
                 ? payload.meta
                 : undefined;
+        const meta =
+            payloadMeta && typeof payloadMeta === 'object'
+                ? { ...payloadMeta, backendUrl: usedBackendUrl }
+                : { backendUrl: usedBackendUrl };
 
         if (empty) {
             console.warn('[BrowserScrape] Scrape completed but returned empty data', {
