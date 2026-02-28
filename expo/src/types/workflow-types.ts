@@ -537,10 +537,14 @@ export interface WebAutomationConfig {
     userAgent?: string;
     mode?: 'script' | 'interactive' | 'smart'; // Default: 'script'
     smartGoal?: string; // Goal for 'smart' mode
+    maxSmartSteps?: number; // Smart mode guardrail (default 12)
+    maxSmartDurationMs?: number; // Smart mode guardrail (default 45000ms)
     actions: {
         type: 'click' | 'type' | 'wait' | 'scrape' | 'scroll';
+        id?: string; // Optional step id for telemetry
         selector?: string; // CSS Selector
         value?: string; // For type or wait (ms)
+        extract?: 'text' | 'html' | 'list' | 'clean_text' | 'smart_data'; // For scrape actions
         variableName?: string; // For scrape result
         description?: string;
     }[];
@@ -801,10 +805,15 @@ export interface RealtimeAIConfig {
     voice?: string; // 'Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede'
     model?: string;
     tools?: boolean; // Enable tool calling
+    retryWithoutTools?: boolean; // Retry once without tools on setup validation errors
     maxDuration?: number; // Seconds
+    maxTurns?: number; // 0/undefined = unlimited
     variableName?: string;
+    transcriptJsonVariable?: string; // Store raw transcript array
+    includeTimestamps?: boolean; // Prefix each transcript line with [mm:ss]
     apiKey?: string;
     speakerMode?: boolean;
+    clearPlaybackOnInterrupt?: boolean; // Drop pending audio when user interrupts
 }
 
 // Backend Service Configs
@@ -830,6 +839,9 @@ export interface BrowserScrapeConfig {
     waitForSelector?: string;
     selector?: string; // CSS selector to extract text from
     extract?: 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
+    preWaitMs?: number; // Optional wait before extraction
+    scrollSteps?: number; // Optional number of viewport scrolls before extraction
+    scrollDelayMs?: number; // Delay between scroll steps
     variableName: string;
 }
 
@@ -2632,6 +2644,16 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'HTTP_REQUEST': return { url: '', method: 'GET', variableName: 'response' };
         case 'HTML_EXTRACT': return { htmlSource: '{{response}}', variableName: 'extractedData', extracts: [] };
         case 'OPEN_URL': return { url: 'https://' };
+        case 'WEB_AUTOMATION': return {
+            url: 'https://example.com',
+            mode: 'script',
+            maxSmartSteps: 12,
+            maxSmartDurationMs: 45000,
+            actions: [],
+            headless: false,
+            variableName: 'automationResult',
+            interactive: false
+        };
         case 'RSS_READ': return { url: '', limit: 5, variableName: 'rssItems' };
         case 'FILE_WRITE': return { filename: 'note.txt', content: '' };
         case 'FILE_READ': return { filename: '', variableName: 'fileContent' };
@@ -2716,9 +2738,13 @@ function getDefaultConfig(type: NodeType): NodeConfig {
         case 'REALTIME_AI': return {
             systemPrompt: 'Sen BreviAI sesli asistanısın ve Türkçe konuşuyorsun.',
             voice: 'Kore',
-            model: 'gemini-2.0-flash-live-001',
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             tools: true,
+            retryWithoutTools: true,
             maxDuration: 300,
+            maxTurns: 0,
+            includeTimestamps: false,
+            clearPlaybackOnInterrupt: true,
             speakerMode: false
         };
 

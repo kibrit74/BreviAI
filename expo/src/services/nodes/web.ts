@@ -8,7 +8,8 @@ import {
     HttpRequestConfig,
     OpenUrlConfig,
     RssReadConfig,
-    WebAutomationConfig
+    WebAutomationConfig,
+    BrowserScrapeConfig
 } from '../../types/workflow-types';
 import { VariableManager } from '../VariableManager';
 import { interactionService } from '../InteractionService';
@@ -243,39 +244,44 @@ export async function executeOpenUrl(
     variableManager: VariableManager
 ): Promise<any> {
     try {
-        const url = variableManager.resolveString(config.url);
-
-        if (!url) {
+        const rawUrl = variableManager.resolveString(config.url).trim();
+        if (!rawUrl) {
             return { success: false, error: 'URL boş olamaz' };
         }
 
-        const canOpen = await Linking.canOpenURL(url);
+        const hasScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(rawUrl);
+        const normalizedUrl = hasScheme ? rawUrl : `https://${rawUrl}`;
+        const addedHttpsPrefix = normalizedUrl !== rawUrl;
+
+        const canOpen = await Linking.canOpenURL(normalizedUrl);
         if (!canOpen) {
-            // Try prefixing https:// if missing
-            if (!url.startsWith('http')) {
-                const fixedUrl = 'https://' + url;
-                if (await Linking.canOpenURL(fixedUrl)) {
-                    await Linking.openURL(fixedUrl);
-                    return { success: true, url: fixedUrl, note: 'Added https prefix' };
-                }
-            }
-            return { success: false, error: 'Bu URL açılamıyor: ' + url };
+            return { success: false, error: 'Bu URL açılamıyor: ' + normalizedUrl };
         }
 
-        // Use WebBrowser if preferred and not forced external
-        if (!config.openExternal) {
+        const preferInApp = !config.openExternal;
+        if (preferInApp) {
             try {
-                await WebBrowser.openBrowserAsync(url);
-                return { success: true, url, method: 'web_browser' };
+                await WebBrowser.openBrowserAsync(normalizedUrl);
+                return {
+                    success: true,
+                    url: normalizedUrl,
+                    method: 'web_browser',
+                    openedInApp: true,
+                    note: addedHttpsPrefix ? 'Added https prefix' : undefined,
+                };
             } catch (browserError) {
-                // Fallback to Linking
                 console.warn('WebBrowser failed, falling back to Linking', browserError);
             }
         }
 
-        // Fallback or forced external
-        await Linking.openURL(url);
-        return { success: true, url, method: 'linking_external' };
+        await Linking.openURL(normalizedUrl);
+        return {
+            success: true,
+            url: normalizedUrl,
+            method: preferInApp ? 'linking_external_fallback' : 'linking_external',
+            openedInApp: false,
+            note: addedHttpsPrefix ? 'Added https prefix' : undefined,
+        };
     } catch (error) {
         return {
             success: false,
@@ -283,7 +289,6 @@ export async function executeOpenUrl(
         };
     }
 }
-
 export async function executeRssRead(
     config: RssReadConfig,
     variableManager: VariableManager
@@ -339,42 +344,539 @@ export async function executeRssRead(
     }
 }
 
+type WebAutomationAction = WebAutomationConfig['actions'][number];
+type WebAutomationMode = 'script' | 'interactive' | 'smart';
+type WebAutomationStepStatus = 'ok' | 'error' | 'skipped';
+type WebAutomationExecutorKind = 'interaction_modal' | 'fallback_browser_scrape';
+
+interface WebAutomationStepResult {
+    id: string;
+    type: string;
+    status: WebAutomationStepStatus;
+    durationMs: number;
+    selector?: string;
+    variableName?: string;
+    note?: string;
+    error?: string;
+}
+
+interface NormalizedWebAutomationResult {
+    success: boolean;
+    data: Record<string, any>;
+    steps: WebAutomationStepResult[];
+    warnings: string[];
+    error?: string;
+    finalUrl?: string;
+    executor: WebAutomationExecutorKind;
+}
+
+const WEB_AUTOMATION_FALLBACK_MAX_WAIT_MS = 30000;
+const WEB_AUTOMATION_FALLBACK_SCROLL_DELAY_MS = 800;
+
+function resolveWebAutomationMode(config: WebAutomationConfig): WebAutomationMode {
+    const mode = String(config.mode || '').trim().toLowerCase();
+    if (mode === 'interactive' || config.interactive) return 'interactive';
+    if (mode === 'smart') return 'smart';
+    return 'script';
+}
+
+function canUseBrowserScrapeFallback(config: WebAutomationConfig): boolean {
+    return resolveWebAutomationMode(config) === 'script';
+}
+
+function normalizeWebAutomationActions(
+    rawActions: unknown,
+    variableManager: VariableManager
+): { actions: WebAutomationAction[]; error?: string } {
+    if (Array.isArray(rawActions)) {
+        return { actions: rawActions as WebAutomationAction[] };
+    }
+
+    if (typeof rawActions === 'string') {
+        const resolved = variableManager.resolveString(rawActions).trim();
+        if (!resolved) {
+            return { actions: [] };
+        }
+
+        try {
+            const parsed = JSON.parse(resolved);
+            if (!Array.isArray(parsed)) {
+                return {
+                    actions: [],
+                    error: 'WEB_AUTOMATION actions JSON bir dizi olmalidir.',
+                };
+            }
+            return { actions: parsed as WebAutomationAction[] };
+        } catch (error) {
+            return {
+                actions: [],
+                error: `WEB_AUTOMATION actions JSON parse hatasi: ${error instanceof Error ? error.message : 'gecersiz JSON'}`,
+            };
+        }
+    }
+
+    if (rawActions == null) {
+        return { actions: [] };
+    }
+
+    return {
+        actions: [],
+        error: 'WEB_AUTOMATION actions alani dizi veya JSON string olmalidir.',
+    };
+}
+
+function parseWaitMs(rawValue: string | undefined, defaultValue = 1000): number {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return defaultValue;
+    return Math.max(0, Math.min(Math.round(parsed), WEB_AUTOMATION_FALLBACK_MAX_WAIT_MS));
+}
+
+function parseScrollSteps(rawValue: string | undefined): number {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) return 1;
+    return Math.max(1, Math.min(Math.round(parsed), 10));
+}
+
+function resolveBrowserExtractMode(value: string | undefined): BrowserScrapeConfig['extract'] {
+    const normalized = (value || '').trim().toLowerCase();
+    if (
+        normalized === 'html' ||
+        normalized === 'list' ||
+        normalized === 'clean_text' ||
+        normalized === 'smart_data'
+    ) {
+        return normalized as BrowserScrapeConfig['extract'];
+    }
+    return 'text';
+}
+
+function resolveActionExtractMode(
+    action: WebAutomationAction,
+    variableManager: VariableManager
+): BrowserScrapeConfig['extract'] {
+    const rawExtract = (action as any).extract !== undefined
+        ? String((action as any).extract)
+        : action.value !== undefined
+            ? String(action.value)
+            : undefined;
+    const resolvedExtract = rawExtract ? variableManager.resolveString(rawExtract) : undefined;
+    return resolveBrowserExtractMode(resolvedExtract);
+}
+
+function normalizeWebAutomationData(rawResult: any): Record<string, any> {
+    if (!rawResult || typeof rawResult !== 'object') return {};
+
+    const cloned = { ...(rawResult as Record<string, any>) };
+    delete cloned.success;
+    delete cloned.error;
+
+    // Compatibility: if result payload is wrapped in `results`, merge them to top level as well.
+    const resultMap = cloned.results;
+    if (resultMap && typeof resultMap === 'object' && !Array.isArray(resultMap)) {
+        return {
+            ...(resultMap as Record<string, any>),
+            ...cloned,
+        };
+    }
+
+    return cloned;
+}
+
+function normalizeInteractionWebAutomationResult(
+    rawResult: any,
+    mode: WebAutomationMode
+): NormalizedWebAutomationResult {
+    const success = Boolean(rawResult?.success);
+    const data = normalizeWebAutomationData(rawResult);
+    const warnings = Array.isArray(rawResult?.warnings)
+        ? rawResult.warnings.map((warning: unknown) => String(warning))
+        : [];
+
+    const rawSteps = Array.isArray(rawResult?.steps) ? rawResult.steps : [];
+    const parsedSteps: WebAutomationStepResult[] = rawSteps
+        .filter((step: any) => step && typeof step === 'object')
+        .map((step: any, index: number) => ({
+            id: step.id ? String(step.id) : `step_${index + 1}`,
+            type: step.type ? String(step.type) : (mode === 'smart' ? 'smart' : 'interaction'),
+            status: step.status === 'error' ? 'error' : (step.status === 'skipped' ? 'skipped' : 'ok'),
+            durationMs: Number.isFinite(Number(step.durationMs)) ? Math.max(0, Math.round(Number(step.durationMs))) : 0,
+            selector: step.selector ? String(step.selector) : undefined,
+            variableName: step.variableName ? String(step.variableName) : undefined,
+            note: step.note ? String(step.note) : undefined,
+            error: step.error ? String(step.error) : undefined,
+        }));
+
+    const steps: WebAutomationStepResult[] = parsedSteps.length > 0
+        ? parsedSteps
+        : [{
+            id: 'interaction_1',
+            type: mode === 'smart' ? 'smart' : (mode === 'interactive' ? 'interactive' : 'script'),
+            status: (success ? 'ok' : 'error') as WebAutomationStepStatus,
+            durationMs: 0,
+            note: mode === 'interactive' ? 'User driven interaction result.' : 'Interaction modal result.',
+            error: !success && rawResult?.error ? String(rawResult.error) : undefined,
+        }];
+
+    return {
+        success,
+        data,
+        steps,
+        warnings,
+        error: !success ? (rawResult?.error ? String(rawResult.error) : 'Web automation failed') : undefined,
+        finalUrl: rawResult?.finalUrl ? String(rawResult.finalUrl) : undefined,
+        executor: 'interaction_modal',
+    };
+}
+
+function buildWebAutomationContract(params: {
+    success: boolean;
+    runId: string;
+    mode: WebAutomationMode;
+    url: string;
+    startedAtMs: number;
+    normalized: NormalizedWebAutomationResult;
+}) {
+    const finishedAtMs = Date.now();
+    const reservedTopLevel = new Set([
+        'success',
+        'runId',
+        'nodeType',
+        'mode',
+        'url',
+        'finalUrl',
+        'steps',
+        'data',
+        'meta',
+        'warnings',
+        'error',
+    ]);
+
+    const compatibilityData = Object.entries(params.normalized.data || {}).reduce<Record<string, any>>((acc, [key, value]) => {
+        if (!reservedTopLevel.has(key)) {
+            acc[key] = value;
+        }
+        return acc;
+    }, {});
+
+    return {
+        success: params.success,
+        runId: params.runId,
+        nodeType: 'WEB_AUTOMATION',
+        mode: params.mode,
+        url: params.url,
+        finalUrl: params.normalized.finalUrl || params.url,
+        steps: params.normalized.steps,
+        data: params.normalized.data,
+        meta: {
+            startedAt: new Date(params.startedAtMs).toISOString(),
+            finishedAt: new Date(finishedAtMs).toISOString(),
+            durationMs: Math.max(0, finishedAtMs - params.startedAtMs),
+            retries: 0,
+            executor: params.normalized.executor,
+            warningCount: params.normalized.warnings.length,
+        },
+        warnings: params.normalized.warnings.length > 0 ? params.normalized.warnings : undefined,
+        error: params.success ? null : (params.normalized.error || 'Web automation failed'),
+        ...compatibilityData,
+    };
+}
+
+async function runWebAutomationBrowserFallback(
+    config: WebAutomationConfig,
+    variableManager: VariableManager
+): Promise<NormalizedWebAutomationResult> {
+    const actions: WebAutomationAction[] = Array.isArray(config.actions) ? config.actions : [];
+    const steps: WebAutomationStepResult[] = [];
+    const warnings: string[] = [];
+
+    const hasUnsupportedActions = actions.some(action => action?.type === 'click' || action?.type === 'type');
+    if (hasUnsupportedActions) {
+        return {
+            success: false,
+            data: {},
+            steps,
+            warnings,
+            error: 'Backend scrape fallback sadece scrape/wait/scroll aksiyonlarini destekliyor. Click/Type icin interactive WEB_AUTOMATION kullanin.',
+            finalUrl: config.url,
+            executor: 'fallback_browser_scrape',
+        };
+    }
+
+    if (actions.length === 0) {
+        return {
+            success: false,
+            data: {},
+            steps,
+            warnings,
+            error: 'Backend scrape fallback icin actions zorunludur.',
+            finalUrl: config.url,
+            executor: 'fallback_browser_scrape',
+        };
+    }
+
+    const { executeBrowserScrape } = await import('./backend');
+    const output: Record<string, any> = {};
+    const fallbackRunId = Date.now();
+    let scrapeCount = 0;
+    let pendingWaitMs = 0;
+    let pendingScrollSteps = 0;
+
+    for (let index = 0; index < actions.length; index++) {
+        const action = actions[index];
+        const stepStartedAt = Date.now();
+        const actionId = (action as any)?.id ? String((action as any).id) : `a${index + 1}`;
+
+        if (!action?.type) {
+            warnings.push(`Action #${index + 1} gecersiz, atlandi.`);
+            steps.push({
+                id: actionId,
+                type: 'unknown',
+                status: 'skipped',
+                durationMs: Date.now() - stepStartedAt,
+                note: 'Action type gecersiz oldugu icin atlandi.',
+            });
+            continue;
+        }
+
+        if (action.type === 'wait') {
+            const waitValue = action.value ? variableManager.resolveString(String(action.value)) : undefined;
+            const waitMs = parseWaitMs(waitValue);
+            pendingWaitMs += waitMs;
+            steps.push({
+                id: actionId,
+                type: 'wait',
+                status: 'ok',
+                durationMs: Date.now() - stepStartedAt,
+                note: `Bekleme birikti: +${waitMs}ms`,
+            });
+            continue;
+        }
+
+        if (action.type === 'scroll') {
+            const scrollValue = action.value ? variableManager.resolveString(String(action.value)) : undefined;
+            const scrollStepCount = parseScrollSteps(scrollValue);
+            pendingScrollSteps += scrollStepCount;
+            steps.push({
+                id: actionId,
+                type: 'scroll',
+                status: 'ok',
+                durationMs: Date.now() - stepStartedAt,
+                note: `Kaydirma birikti: +${scrollStepCount} adim`,
+            });
+            continue;
+        }
+
+        if (action.type !== 'scrape') {
+            warnings.push(`Action #${index + 1} (${action.type}) fallback modunda desteklenmiyor, atlandi.`);
+            steps.push({
+                id: actionId,
+                type: String(action.type),
+                status: 'skipped',
+                durationMs: Date.now() - stepStartedAt,
+                note: 'Fallback modunda desteklenmeyen action.',
+            });
+            continue;
+        }
+
+        scrapeCount += 1;
+        const resolvedVariableName = action.variableName
+            ? variableManager.resolveString(String(action.variableName)).trim()
+            : '';
+        const outputKey = resolvedVariableName || `scrape_${scrapeCount}`;
+        const selector = action.selector ? variableManager.resolveString(String(action.selector)) : undefined;
+        const extract = resolveActionExtractMode(action, variableManager);
+        const tempVariableName = `__web_automation_fallback_${fallbackRunId}_${index}`;
+
+        const scrapeResult = await executeBrowserScrape({
+            url: config.url,
+            waitForSelector: selector,
+            selector,
+            extract,
+            preWaitMs: pendingWaitMs > 0 ? pendingWaitMs : undefined,
+            scrollSteps: pendingScrollSteps > 0 ? pendingScrollSteps : undefined,
+            scrollDelayMs: pendingScrollSteps > 0 ? WEB_AUTOMATION_FALLBACK_SCROLL_DELAY_MS : undefined,
+            variableName: tempVariableName,
+        }, variableManager);
+
+        variableManager.delete(tempVariableName);
+
+        if (!scrapeResult?.success) {
+            const stepError = scrapeResult?.error || `Scrape fallback failed at action #${index + 1}`;
+            steps.push({
+                id: actionId,
+                type: 'scrape',
+                status: 'error',
+                durationMs: Date.now() - stepStartedAt,
+                selector,
+                variableName: outputKey,
+                error: stepError,
+            });
+            return {
+                success: false,
+                data: output,
+                steps,
+                warnings,
+                error: stepError,
+                finalUrl: config.url,
+                executor: 'fallback_browser_scrape',
+            };
+        }
+
+        output[outputKey] = scrapeResult.data;
+        steps.push({
+            id: actionId,
+            type: 'scrape',
+            status: 'ok',
+            durationMs: Date.now() - stepStartedAt,
+            selector,
+            variableName: outputKey,
+            note: `extract=${extract}`,
+        });
+
+        pendingWaitMs = 0;
+        pendingScrollSteps = 0;
+    }
+
+    if (scrapeCount === 0) {
+        return {
+            success: false,
+            data: output,
+            steps,
+            warnings,
+            error: 'Backend scrape fallback icin en az bir scrape aksiyonu gerekli.',
+            finalUrl: config.url,
+            executor: 'fallback_browser_scrape',
+        };
+    }
+
+    if (pendingWaitMs > 0 || pendingScrollSteps > 0) {
+        warnings.push('Sondaki wait/scroll aksiyonlari scrape olmadigi icin etkisiz kaldi.');
+    }
+
+    return {
+        success: true,
+        data: output,
+        steps,
+        warnings,
+        finalUrl: config.url,
+        executor: 'fallback_browser_scrape',
+    };
+}
+
 export async function executeWebAutomation(
     config: WebAutomationConfig,
     variableManager: VariableManager
 ): Promise<any> {
-    try {
-        const url = variableManager.resolveString(config.url);
-        if (!url) return { success: false, error: 'URL boş olamaz' };
+    const startedAtMs = Date.now();
+    const runId = `webrun_${startedAtMs}_${Math.random().toString(36).slice(2, 8)}`;
+    const mode = resolveWebAutomationMode(config);
 
-        // Process config to resolve variables inside actions if needed
-        // For now, assume actions are static or simple
-        const resolvedConfig = { ...config, url };
+    const persistResultVariable = (result: any) => {
+        if (!result?.success || !config.variableName) return;
+        const { success, ...data } = result;
+        variableManager.set(config.variableName, data);
+    };
+
+    const failWithContract = (message: string, executor: WebAutomationExecutorKind = 'interaction_modal') => {
+        const failureResult = buildWebAutomationContract({
+            success: false,
+            runId,
+            mode,
+            url: config.url,
+            startedAtMs,
+            normalized: {
+                success: false,
+                data: {},
+                steps: [],
+                warnings: [],
+                error: message,
+                finalUrl: config.url,
+                executor,
+            },
+        });
+        return failureResult;
+    };
+
+    try {
+        const url = variableManager.resolveString(config.url).trim();
+        if (!url) return failWithContract('URL boş olamaz');
+
+        const normalizedActionsResult = normalizeWebAutomationActions((config as any).actions, variableManager);
+        if (normalizedActionsResult.error) {
+            return failWithContract(normalizedActionsResult.error);
+        }
+
+        const resolvedActions = normalizedActionsResult.actions
+            .filter((action: any) => !!action && typeof action === 'object' && typeof action.type === 'string')
+            .map((action: any) => ({
+                ...action,
+                selector: action.selector !== undefined ? variableManager.resolveString(String(action.selector)) : action.selector,
+                value: action.value !== undefined ? variableManager.resolveString(String(action.value)) : action.value,
+                extract: action.extract !== undefined ? variableManager.resolveString(String(action.extract)) : action.extract,
+                variableName: action.variableName !== undefined ? variableManager.resolveString(String(action.variableName)) : action.variableName,
+            })) as WebAutomationAction[];
+
+        const resolvedConfig: WebAutomationConfig = {
+            ...config,
+            url,
+            mode,
+            interactive: mode === 'interactive',
+            smartGoal: config.smartGoal ? variableManager.resolveString(config.smartGoal) : config.smartGoal,
+            actions: resolvedActions,
+        };
+
+        if (resolvedConfig.headless && canUseBrowserScrapeFallback(resolvedConfig)) {
+            const fallbackResult = await runWebAutomationBrowserFallback(resolvedConfig, variableManager);
+            const contractResult = buildWebAutomationContract({
+                success: fallbackResult.success,
+                runId,
+                mode,
+                url,
+                startedAtMs,
+                normalized: fallbackResult,
+            });
+            persistResultVariable(contractResult);
+            return contractResult;
+        }
 
         const result = await interactionService.requestWebAutomation(resolvedConfig);
 
+        // requestWebAutomation returns undefined when no UI interaction handler is registered.
+        if (result === undefined && canUseBrowserScrapeFallback(resolvedConfig)) {
+            const fallbackResult = await runWebAutomationBrowserFallback(resolvedConfig, variableManager);
+            const contractResult = buildWebAutomationContract({
+                success: fallbackResult.success,
+                runId,
+                mode,
+                url,
+                startedAtMs,
+                normalized: fallbackResult,
+            });
+            persistResultVariable(contractResult);
+            return contractResult;
+        }
+
         if (!result) {
-            return { success: false, error: 'Kullanıcı işlemi iptal etti veya görünüm kapandı.' };
+            return failWithContract('Kullanıcı işlemi iptal etti veya görünüm kapandı.');
         }
 
-        if (result.success && config.variableName) {
-            // result is the full object {success: true, ...scrapeData}
-            // Scrape data is usually keys in result.
-            // Let's store the whole result minus success
-            const { success, error, ...data } = result;
-            variableManager.set(config.variableName, data);
-        }
+        const normalizedInteractionResult = normalizeInteractionWebAutomationResult(result, mode);
+        const contractResult = buildWebAutomationContract({
+            success: normalizedInteractionResult.success,
+            runId,
+            mode,
+            url,
+            startedAtMs,
+            normalized: normalizedInteractionResult,
+        });
 
-        return result;
+        persistResultVariable(contractResult);
+        return contractResult;
 
     } catch (error) {
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Web otomasyon hatası',
-        };
+        return failWithContract(error instanceof Error ? error.message : 'Web otomasyon hatası');
     }
 }
-
 export async function executeWebSearch(
     config: { query: string; variableName?: string },
     variableManager: VariableManager
@@ -429,3 +931,6 @@ export async function executeWebSearch(
         };
     }
 }
+
+
+

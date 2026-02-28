@@ -483,6 +483,8 @@ export class WorkflowEngine {
                 result,
                 nodeLabels
             ).catch(err => console.warn('[WorkflowEngine] Log failed:', err));
+            this.reportWorkflowExecutionTelemetry(workflow, result)
+                .catch(err => console.warn('[WorkflowEngine] Telemetry report failed:', err));
 
             return result;
         } catch (error) {
@@ -510,9 +512,176 @@ export class WorkflowEngine {
                 errorResult,
                 nodeLabels
             ).catch(err => console.warn('[WorkflowEngine] Log failed:', err));
+            this.reportWorkflowExecutionTelemetry(workflow, errorResult)
+                .catch(err => console.warn('[WorkflowEngine] Telemetry report failed:', err));
 
             return errorResult;
         }
+    }
+
+    private async reportWorkflowExecutionTelemetry(workflow: Workflow, result: WorkflowExecutionResult): Promise<void> {
+        const webNodes = this.buildWebNodeTelemetry(workflow, result.nodeResults);
+        if (webNodes.length === 0) return;
+
+        const stepDurationTotal = webNodes.reduce((acc, node) => {
+            if (node.stepCount && node.avgStepDurationMs) {
+                return acc + (node.stepCount * node.avgStepDurationMs);
+            }
+            return acc + node.durationMs;
+        }, 0);
+        const stepCountTotal = webNodes.reduce((acc, node) => acc + Math.max(1, node.stepCount || 1), 0);
+        const emptyScrapeCandidates = webNodes.filter((node) => (node.scrapeCount || 0) > 0);
+        const webAutomationRuns = webNodes.filter((node) => node.nodeType === 'WEB_AUTOMATION').length;
+
+        await this.sendWorkflowExecutionToBackend({
+            workflowId: workflow.id,
+            workflowName: workflow.name,
+            success: result.success,
+            durationMs: result.totalDuration,
+            errorCode: result.success ? undefined : 'WORKFLOW_FAILED',
+            errorMessage: result.error,
+            meta: {
+                source: 'workflow_engine',
+                webNodes,
+                webSummary: {
+                    totalWebNodeRuns: webNodes.length,
+                    webNodeSuccessRate: Number(((webNodes.filter((node) => node.success).length / webNodes.length) * 100).toFixed(2)),
+                    avgWebNodeStepDurationMs: stepCountTotal > 0 ? Math.round(stepDurationTotal / stepCountTotal) : 0,
+                    emptyScrapeRate: emptyScrapeCandidates.length > 0
+                        ? Number(((emptyScrapeCandidates.filter((node) => node.emptyScrape).length / emptyScrapeCandidates.length) * 100).toFixed(2))
+                        : 0,
+                    fallbackRate: webAutomationRuns > 0
+                        ? Number(((webNodes.filter((node) => node.nodeType === 'WEB_AUTOMATION' && node.fallbackUsed).length / webAutomationRuns) * 100).toFixed(2))
+                        : 0,
+                },
+            },
+        });
+    }
+
+    private async sendWorkflowExecutionToBackend(payload: {
+        workflowId: string;
+        workflowName?: string;
+        success: boolean;
+        durationMs: number;
+        errorCode?: string;
+        errorMessage?: string;
+        meta?: Record<string, unknown>;
+    }): Promise<void> {
+        const configuredBaseUrl =
+            process.env.EXPO_PUBLIC_API_URL?.trim() ||
+            process.env.EXPO_PUBLIC_API_BASE_URL?.trim() ||
+            'https://breviai.vercel.app';
+        const baseUrl = configuredBaseUrl.replace(/\/$/, '');
+        const appSecret = process.env.EXPO_PUBLIC_APP_SECRET || '';
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+        };
+        if (appSecret) {
+            headers['x-app-secret'] = appSecret;
+        }
+
+        await fetch(`${baseUrl}/api/workflows/executions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+        });
+    }
+
+    private buildWebNodeTelemetry(workflow: Workflow, nodeResults: NodeExecutionResult[]) {
+        const nodeTypeById = new Map<string, NodeType>();
+        workflow.nodes.forEach((node) => nodeTypeById.set(node.id, node.type));
+
+        const telemetry: Array<{
+            nodeId: string;
+            nodeType: 'WEB_AUTOMATION' | 'BROWSER_SCRAPE';
+            success: boolean;
+            durationMs: number;
+            stepCount?: number;
+            avgStepDurationMs?: number;
+            scrapeCount?: number;
+            emptyScrape?: boolean;
+            fallbackUsed?: boolean;
+            mode?: string;
+            executor?: string;
+        }> = [];
+
+        for (const nodeResult of nodeResults) {
+            const nodeType = nodeTypeById.get(nodeResult.nodeId);
+            if (nodeType !== 'WEB_AUTOMATION' && nodeType !== 'BROWSER_SCRAPE') {
+                continue;
+            }
+
+            const output = nodeResult.output && typeof nodeResult.output === 'object'
+                ? nodeResult.output as Record<string, any>
+                : {};
+
+            if (nodeType === 'BROWSER_SCRAPE') {
+                telemetry.push({
+                    nodeId: nodeResult.nodeId,
+                    nodeType: 'BROWSER_SCRAPE',
+                    success: nodeResult.success,
+                    durationMs: Math.max(0, nodeResult.duration),
+                    stepCount: 1,
+                    avgStepDurationMs: Math.max(0, nodeResult.duration),
+                    scrapeCount: 1,
+                    emptyScrape: Boolean(output.empty),
+                    fallbackUsed: false,
+                    mode: 'scrape',
+                    executor: 'browser_scrape',
+                });
+                continue;
+            }
+
+            const steps = Array.isArray(output.steps) ? output.steps : [];
+            const scrapeCount = steps.filter((step: any) => step && String(step.type || '').toLowerCase() === 'scrape').length;
+            const stepDurations = steps
+                .map((step: any) => Number(step?.durationMs))
+                .filter((value: number) => Number.isFinite(value) && value >= 0);
+            const stepCount = steps.length;
+            const avgStepDurationMs = stepDurations.length > 0
+                ? Math.round(stepDurations.reduce((acc: number, value: number) => acc + value, 0) / stepDurations.length)
+                : undefined;
+
+            telemetry.push({
+                nodeId: nodeResult.nodeId,
+                nodeType: 'WEB_AUTOMATION',
+                success: nodeResult.success,
+                durationMs: Math.max(0, nodeResult.duration),
+                stepCount: stepCount > 0 ? stepCount : undefined,
+                avgStepDurationMs,
+                scrapeCount: scrapeCount > 0 ? scrapeCount : undefined,
+                emptyScrape: this.isWebAutomationEmpty(output, scrapeCount),
+                fallbackUsed: String(output?.meta?.executor || '') === 'fallback_browser_scrape',
+                mode: output.mode ? String(output.mode) : undefined,
+                executor: output?.meta?.executor ? String(output.meta.executor) : undefined,
+            });
+        }
+
+        return telemetry;
+    }
+
+    private isWebAutomationEmpty(output: Record<string, any>, scrapeCount: number): boolean {
+        if (output && typeof output.empty === 'boolean') {
+            return output.empty;
+        }
+        if (scrapeCount <= 0) return false;
+
+        const data = output?.data && typeof output.data === 'object'
+            ? output.data
+            : {};
+
+        const values = Object.values(data);
+        if (values.length === 0) return true;
+        return values.every((value) => this.isEmptyScrapeValue(value));
+    }
+
+    private isEmptyScrapeValue(value: any): boolean {
+        if (value == null) return true;
+        if (typeof value === 'string') return value.trim().length === 0;
+        if (Array.isArray(value)) return value.length === 0 || value.every((item) => this.isEmptyScrapeValue(item));
+        if (typeof value === 'object') return Object.keys(value).length === 0;
+        return false;
     }
 
     private findTriggerNode(workflow: Workflow): WorkflowNode | undefined {
@@ -1399,7 +1568,7 @@ export class WorkflowEngine {
                     result = await executeRssRead(args, this.variableManager);
                     break;
                 case 'WEB_AUTOMATION':
-                    result = await executeWebAutomation({ config: args } as any, this.variableManager);
+                    result = await executeWebAutomation(args as any, this.variableManager);
                     break;
                 case 'WEB_SEARCH':
                     result = await executeWebSearch({ query: args.query } as any, this.variableManager);

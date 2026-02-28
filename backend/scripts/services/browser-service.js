@@ -576,8 +576,20 @@ class BrowserService {
         const fieldPath = isOptionsObject ? selectorOrOptions.fieldPath : null;
         const fieldMode = isOptionsObject ? (selectorOrOptions.fieldMode || 'text') : 'text';
         const attribute = isOptionsObject ? selectorOrOptions.attribute : null;
+        const preWaitMsRaw = isOptionsObject ? selectorOrOptions.preWaitMs : 0;
+        const scrollStepsRaw = isOptionsObject ? selectorOrOptions.scrollSteps : 0;
+        const scrollDelayMsRaw = isOptionsObject ? selectorOrOptions.scrollDelayMs : 800;
         const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data', 'field', 'json_path'].includes(extract) ? extract : 'text';
         const targetSelector = selector || waitForSelector;
+        const preWaitMs = Number.isFinite(Number(preWaitMsRaw))
+            ? Math.max(0, Math.min(Math.round(Number(preWaitMsRaw)), 30000))
+            : 0;
+        const scrollSteps = Number.isFinite(Number(scrollStepsRaw))
+            ? Math.max(0, Math.min(Math.round(Number(scrollStepsRaw)), 10))
+            : 0;
+        const scrollDelayMs = Number.isFinite(Number(scrollDelayMsRaw))
+            ? Math.max(100, Math.min(Math.round(Number(scrollDelayMsRaw)), 5000))
+            : 800;
 
         // CHECK CACHE FIRST (for clean_text and smart_data only to be safe)
         if (extractMode === 'clean_text' || extractMode === 'smart_data') {
@@ -635,6 +647,19 @@ class BrowserService {
 
             if (waitForSelector) {
                 await page.waitForSelector(waitForSelector, { timeout: 30000 });
+            }
+
+            if (preWaitMs > 0) {
+                await page.waitForTimeout(preWaitMs);
+            }
+
+            if (scrollSteps > 0) {
+                for (let i = 0; i < scrollSteps; i++) {
+                    await page.evaluate(() => {
+                        window.scrollBy({ top: window.innerHeight * 0.85, behavior: 'instant' });
+                    });
+                    await page.waitForTimeout(scrollDelayMs);
+                }
             }
 
             let result;
@@ -1047,7 +1072,7 @@ const service = new BrowserService();
 
 router.post('/scrape', scrapeRateLimit, async (req, res) => {
     try {
-        const { url, selector, waitForSelector, extract, fieldPath, fieldMode, attribute } = req.body || {};
+        const { url, selector, waitForSelector, extract, fieldPath, fieldMode, attribute, preWaitMs, scrollSteps, scrollDelayMs } = req.body || {};
         if (!url) return res.status(400).json({ error: 'url required' });
         const extractMode = ['text', 'html', 'list', 'clean_text', 'smart_data', 'field', 'json_path'].includes(extract) ? extract : 'text';
         const startedAt = Date.now();
@@ -1059,6 +1084,9 @@ router.post('/scrape', scrapeRateLimit, async (req, res) => {
             fieldPath,
             fieldMode,
             attribute,
+            preWaitMs,
+            scrollSteps,
+            scrollDelayMs,
         });
         const durationMs = Date.now() - startedAt;
 
@@ -1073,6 +1101,9 @@ router.post('/scrape', scrapeRateLimit, async (req, res) => {
                 fieldPath: fieldPath || null,
                 fieldMode: fieldMode || null,
                 attribute: attribute || null,
+                preWaitMs: Number.isFinite(Number(preWaitMs)) ? Number(preWaitMs) : null,
+                scrollSteps: Number.isFinite(Number(scrollSteps)) ? Number(scrollSteps) : null,
+                scrollDelayMs: Number.isFinite(Number(scrollDelayMs)) ? Number(scrollDelayMs) : null,
                 durationMs,
                 empty: isEmptyScrapeData(data),
             },

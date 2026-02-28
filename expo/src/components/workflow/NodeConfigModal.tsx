@@ -5525,6 +5525,15 @@ const ImageEditFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) 
 
 const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
     const showAdvanced = !!isAdvanced;
+    const currentMode = ((config.mode || (config.interactive ? 'interactive' : 'script')) as 'script' | 'smart' | 'interactive');
+
+    const setMode = (mode: 'script' | 'smart' | 'interactive') => {
+        updateConfig('mode', mode);
+        updateConfig('interactive', mode === 'interactive');
+        if (mode === 'interactive') {
+            updateConfig('headless', false);
+        }
+    };
 
     return (
         <>
@@ -5540,26 +5549,84 @@ const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
                 />
             </View>
 
-            {!showAdvanced && (
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Calisma Modu</Text>
+                <View style={styles.buttonRow}>
+                    {[
+                        { key: 'script', label: 'Script' },
+                        { key: 'smart', label: 'Smart' },
+                        { key: 'interactive', label: 'Interactive' },
+                    ].map((modeOption) => (
+                        <TouchableOpacity
+                            key={modeOption.key}
+                            style={[styles.unitButton, currentMode === modeOption.key && styles.unitButtonSelected]}
+                            onPress={() => setMode(modeOption.key as 'script' | 'smart' | 'interactive')}
+                        >
+                            <Text style={[styles.unitButtonText, currentMode === modeOption.key && styles.unitButtonTextSelected]}>
+                                {modeOption.label}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+
+            {currentMode === 'smart' && (
                 <View style={styles.field}>
-                    <Text style={styles.fieldLabel}>Hedef (Ne yapılacak?)</Text>
+                    <Text style={styles.fieldLabel}>Hedef (Ne yapilacak?)</Text>
                     <TextInput
                         style={styles.input}
                         value={config.smartGoal || ''}
-                        onChangeText={(t) => {
-                            updateConfig('smartGoal', t);
-                            updateConfig('mode', 'smart');
-                        }}
-                        placeholder="Örn: Sayfadaki fiyatı bul ve kaydet"
+                        onChangeText={(t) => updateConfig('smartGoal', t)}
+                        placeholder="Orn: Sayfadaki fiyati bul ve kaydet"
                         placeholderTextColor="#666"
                     />
                 </View>
             )}
 
-            {showAdvanced && (
+            {currentMode === 'script' && !showAdvanced && (
+                <Text style={styles.fieldHint}>
+                    Script action listesi icin Gelismis modunu acin.
+                </Text>
+            )}
+
+            {currentMode === 'interactive' && (
+                <Text style={styles.fieldHint}>
+                    Bu modda kullanici sayfada manuel islem yapar ve is bitince tamamlar.
+                </Text>
+            )}
+
+            {showAdvanced && currentMode === 'smart' && (
+                <View style={styles.rowField}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Maks Adim</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={String(config.maxSmartSteps ?? 12)}
+                            onChangeText={(t) => updateConfig('maxSmartSteps', Math.max(1, parseInt(t, 10) || 12))}
+                            keyboardType="numeric"
+                            placeholder="12"
+                            placeholderTextColor="#666"
+                        />
+                    </View>
+                    <View style={{ width: 10 }} />
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.fieldLabel}>Maks Sure (ms)</Text>
+                        <TextInput
+                            style={styles.input}
+                            value={String(config.maxSmartDurationMs ?? 45000)}
+                            onChangeText={(t) => updateConfig('maxSmartDurationMs', Math.max(5000, parseInt(t, 10) || 45000))}
+                            keyboardType="numeric"
+                            placeholder="45000"
+                            placeholderTextColor="#666"
+                        />
+                    </View>
+                </View>
+            )}
+
+            {showAdvanced && currentMode === 'script' && (
                 <>
                     <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>İşlemler (JSON)</Text>
+                        <Text style={styles.fieldLabel}>Islemler (JSON)</Text>
                         <ExpandableTextInput
                             value={typeof config.actions === 'string' ? config.actions : JSON.stringify(config.actions || [], null, 2)}
                             onChangeText={(t) => {
@@ -5570,25 +5637,28 @@ const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
                                     // ignore until valid JSON
                                 }
                             }}
-                            placeholder='[{"type": "click", "selector": "#btn"}, {"type": "wait", "value": "2000"}]'
+                            placeholder='[{"id":"a1","type":"click","selector":"#btn"},{"id":"a2","type":"scrape","selector":".price","extract":"text","variableName":"price"}]'
                             label="Actions JSON"
                             minHeight={150}
-                            hint="Örnek: [{'type': 'click', 'selector': 'button.submit'}, {'type': 'scrape', 'selector': 'h1', 'variableName': 'title'}]"
+                            hint='Ornek: [{"type":"scrape","selector":"h1","extract":"text","variableName":"title"}]'
                         />
-                        <Text style={styles.fieldHint}>Tıklama, Yazma, Bekleme ve Veri Çekme işlemleri.</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
-                        <Text style={{ ...styles.fieldLabel, marginBottom: 0, marginRight: 10 }}>Arka Planda Çalıştır (Headless)</Text>
-                        <Switch
-                            value={config.headless || false}
-                            onValueChange={(v) => updateConfig('headless', v)}
-                        />
+                        <Text style={styles.fieldHint}>Tiklama, yazma, bekleme, kaydirma ve scrape islemleri. Scrape icin extract alanini kullanin.</Text>
                     </View>
                 </>
             )}
 
+            {showAdvanced && currentMode !== 'interactive' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 15 }}>
+                    <Text style={{ ...styles.fieldLabel, marginBottom: 0, marginRight: 10 }}>Arka Planda Calistir (Headless)</Text>
+                    <Switch
+                        value={config.headless || false}
+                        onValueChange={(v) => updateConfig('headless', v)}
+                    />
+                </View>
+            )}
+
             <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Sonuç Değişkeni</Text>
+                <Text style={styles.fieldLabel}>Sonuc Degiskeni</Text>
                 <TextInput
                     style={styles.input}
                     value={config.variableName || ''}
@@ -5603,12 +5673,9 @@ const WebAutomationFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig
 
 
 
-// ═══════════════════════════════════════════════════════════════
+// -------------------------------------------------------------------------------
 // NEW FIELD COMPONENTS
-// ═══════════════════════════════════════════════════════════════
-
-
-
+// -------------------------------------------------------------------------------
 const DatabaseReadFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
     <>
         <View style={styles.field}>
@@ -6204,90 +6271,167 @@ const ClearMemoryFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }
 // REALTIME AI FIELDS
 // ═══════════════════════════════════════════════════════════════
 
-const RealtimeAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig }) => (
-    <>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Sistem Mesajı (Persona)</Text>
-            <ExpandableTextInput
-                value={config.systemPrompt || ''}
-                onChangeText={(t) => updateConfig('systemPrompt', t)}
-                placeholder="Sen yardımsever bir asistansın..."
-                label="Sistem Mesajı"
-                minHeight={100}
-            />
-        </View>
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Ses (Voice)</Text>
-            <View style={styles.buttonRow}>
-                {['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede'].map(v => (
-                    <TouchableOpacity
-                        key={v}
-                        style={[styles.unitButton, (config.voice || 'Kore') === v && styles.unitButtonSelected]}
-                        onPress={() => updateConfig('voice', v)}
-                    >
-                        <Text style={[styles.unitButtonText, (config.voice || 'Kore') === v && styles.unitButtonTextSelected]}>
-                            {v}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
+const RealtimeAIFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, isAdvanced }) => {
+    const showAdvanced = !!isAdvanced;
+
+    return (
+        <>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Sistem Mesajı (Persona)</Text>
+                <ExpandableTextInput
+                    value={config.systemPrompt || ''}
+                    onChangeText={(t) => updateConfig('systemPrompt', t)}
+                    placeholder="Sen yardımsever bir asistansın..."
+                    label="Sistem Mesajı"
+                    minHeight={100}
+                />
             </View>
-        </View>
-        <View style={styles.rowField}>
-            <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Model</Text>
+            <View style={styles.field}>
+                <Text style={styles.fieldLabel}>Ses (Voice)</Text>
+                <View style={styles.buttonRow}>
+                    {['Kore', 'Puck', 'Charon', 'Fenrir', 'Aoede'].map(v => (
+                        <TouchableOpacity
+                            key={v}
+                            style={[styles.unitButton, (config.voice || 'Kore') === v && styles.unitButtonSelected]}
+                            onPress={() => updateConfig('voice', v)}
+                        >
+                            <Text style={[styles.unitButtonText, (config.voice || 'Kore') === v && styles.unitButtonTextSelected]}>
+                                {v}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+            </View>
+            <View style={styles.rowField}>
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Model</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.model || 'gemini-2.5-flash-native-audio-preview-12-2025'}
+                        onChangeText={(t) => updateConfig('model', t)}
+                        placeholder="gemini-2.5-flash-native-audio-preview-12-2025"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+                <View style={{ width: 10 }} />
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Süre (Sn)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={String(config.maxDuration || 300)}
+                        onChangeText={(t) => updateConfig('maxDuration', parseInt(t, 10) || 300)}
+                        keyboardType="numeric"
+                    />
+                </View>
+            </View>
+            <View style={styles.switchRow}>
+                <Text style={styles.fieldLabel}>Araçları Kullan (Tools)</Text>
+                <Switch
+                    value={config.tools !== false}
+                    onValueChange={(v) => updateConfig('tools', v)}
+                    trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                    thumbColor={config.tools !== false ? '#FFF' : '#999'}
+                />
+            </View>
+            <Text style={styles.fieldHint}>Hava durumu, borsa vb. araçlara erişim izni verir.</Text>
+
+            <View style={[styles.switchRow, { marginTop: 15 }]}>
+                <Text style={styles.fieldLabel}>Hoparlör Modu</Text>
+                <Switch
+                    value={config.speakerMode || false}
+                    onValueChange={(v) => updateConfig('speakerMode', v)}
+                    trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                    thumbColor={config.speakerMode ? '#FFF' : '#999'}
+                />
+            </View>
+            <Text style={styles.fieldHint}>Telefon görüşmesi senaryolarında önerilir.</Text>
+
+            <View style={[styles.field, { marginTop: 15 }]}>
+                <Text style={styles.fieldLabel}>Transcript Değişkeni (Metin)</Text>
                 <TextInput
                     style={styles.input}
-                    value={config.model || 'gemini-2.0-flash-live-001'}
-                    onChangeText={(t) => updateConfig('model', t)}
-                    placeholder="gemini-2.0-flash-live-001"
+                    value={config.variableName || ''}
+                    onChangeText={(t) => updateConfig('variableName', t)}
+                    placeholder="realtimeTranscript"
                     placeholderTextColor="#666"
                 />
+                <Text style={styles.fieldHint}>Oturum bittiğinde konuşma metnini bu değişkene kaydeder.</Text>
             </View>
-            <View style={{ width: 10 }} />
-            <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Süre (Sn)</Text>
+
+            {showAdvanced && (
+                <>
+                    <View style={styles.rowField}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Maks. Tur (0=sınırsız)</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={String(config.maxTurns ?? 0)}
+                                onChangeText={(t) => updateConfig('maxTurns', parseInt(t, 10) || 0)}
+                                keyboardType="numeric"
+                            />
+                        </View>
+                        <View style={{ width: 10 }} />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Transcript JSON Değişkeni</Text>
+                            <TextInput
+                                style={styles.input}
+                                value={config.transcriptJsonVariable || ''}
+                                onChangeText={(t) => updateConfig('transcriptJsonVariable', t)}
+                                placeholder="realtimeTranscriptRaw"
+                                placeholderTextColor="#666"
+                            />
+                        </View>
+                    </View>
+
+                    <View style={styles.switchRow}>
+                        <Text style={styles.fieldLabel}>Zaman Damgası Ekle</Text>
+                        <Switch
+                            value={config.includeTimestamps || false}
+                            onValueChange={(v) => updateConfig('includeTimestamps', v)}
+                            trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                            thumbColor={config.includeTimestamps ? '#FFF' : '#999'}
+                        />
+                    </View>
+                    <Text style={styles.fieldHint}>Transcript satırlarını [mm:ss] ön ekiyle yazar.</Text>
+
+                    <View style={[styles.switchRow, { marginTop: 12 }]}>
+                        <Text style={styles.fieldLabel}>Tools Hatasında Yeniden Dene</Text>
+                        <Switch
+                            value={config.retryWithoutTools !== false}
+                            onValueChange={(v) => updateConfig('retryWithoutTools', v)}
+                            trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                            thumbColor={config.retryWithoutTools !== false ? '#FFF' : '#999'}
+                        />
+                    </View>
+                    <Text style={styles.fieldHint}>Setup sırasında tools hatası olursa tools kapatılıp bir kez daha dener.</Text>
+
+                    <View style={[styles.switchRow, { marginTop: 12 }]}>
+                        <Text style={styles.fieldLabel}>Kesmede Ses Kuyruğunu Temizle</Text>
+                        <Switch
+                            value={config.clearPlaybackOnInterrupt !== false}
+                            onValueChange={(v) => updateConfig('clearPlaybackOnInterrupt', v)}
+                            trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
+                            thumbColor={config.clearPlaybackOnInterrupt !== false ? '#FFF' : '#999'}
+                        />
+                    </View>
+                    <Text style={styles.fieldHint}>Kullanıcı araya girdiğinde bekleyen sesleri temizler.</Text>
+                </>
+            )}
+
+            <View style={[styles.field, { marginTop: 20 }]}>
+                <Text style={styles.fieldLabel}>API Key (Opsiyonel)</Text>
                 <TextInput
                     style={styles.input}
-                    value={String(config.maxDuration || 300)}
-                    onChangeText={(t) => updateConfig('maxDuration', parseInt(t) || 300)}
-                    keyboardType="numeric"
+                    value={config.apiKey || ''}
+                    onChangeText={(t) => updateConfig('apiKey', t)}
+                    placeholder="Varsayılan anahtarı kullan"
+                    placeholderTextColor="#666"
+                    secureTextEntry
                 />
             </View>
-        </View>
-        <View style={styles.switchRow}>
-            <Text style={styles.fieldLabel}>Araçları Kullan (Tools)</Text>
-            <Switch
-                value={config.tools !== false}
-                onValueChange={(v) => updateConfig('tools', v)}
-                trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
-                thumbColor={config.tools !== false ? '#FFF' : '#999'}
-            />
-        </View>
-        <Text style={styles.fieldHint}>Hava durumu, borsa vb. araçlara erişim izni verir.</Text>
-
-        <View style={[styles.switchRow, { marginTop: 15 }]}>
-            <Text style={styles.fieldLabel}>Hoparlör Modu</Text>
-            <Switch
-                value={config.speakerMode || false}
-                onValueChange={(v) => updateConfig('speakerMode', v)}
-                trackColor={{ false: '#3A3A5A', true: '#8B5CF6' }}
-                thumbColor={config.speakerMode ? '#FFF' : '#999'}
-            />
-        </View>
-
-        <View style={[styles.field, { marginTop: 20 }]}>
-            <Text style={styles.fieldLabel}>API Key (Opsiyonel)</Text>
-            <TextInput
-                style={styles.input}
-                value={config.apiKey || ''}
-                onChangeText={(t) => updateConfig('apiKey', t)}
-                placeholder="Varsayılan anahtarı kullan"
-                placeholderTextColor="#666"
-                secureTextEntry
-            />
-        </View>
-    </>
-);
+        </>
+    );
+};
 
 // ═══════════════════════════════════════════════════════════════
 // DISCORD SEND FIELDS
@@ -6778,7 +6922,7 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
             case 'CLEAR_MEMORY':
                 return <ClearMemoryFields config={config} updateConfig={updateConfig} />;
             case 'REALTIME_AI':
-                return <RealtimeAIFields config={config} updateConfig={updateConfig} />;
+                return <RealtimeAIFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'DISCORD_SEND':
                 return <DiscordSendFields config={config} updateConfig={updateConfig} isAdvanced={isAdvanced} />;
             case 'NOTION_CREATE':
@@ -6869,3 +7013,4 @@ export const NodeConfigModal: React.FC<NodeConfigModalProps> = ({
 };
 
 export default NodeConfigModal;
+

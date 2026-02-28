@@ -240,6 +240,15 @@ export async function executeBrowserScrape(
     const waitForSelector = config.waitForSelector ? variableManager.resolveString(config.waitForSelector) : undefined;
     const selector = config.selector ? variableManager.resolveString(config.selector) : undefined;
     const extract = (config.extract || 'text') as 'text' | 'html' | 'list' | 'clean_text' | 'smart_data';
+    const preWaitMs = Number.isFinite(Number(config.preWaitMs))
+        ? Math.max(0, Math.min(Math.round(Number(config.preWaitMs)), 30000))
+        : undefined;
+    const scrollSteps = Number.isFinite(Number(config.scrollSteps))
+        ? Math.max(0, Math.min(Math.round(Number(config.scrollSteps)), 10))
+        : undefined;
+    const scrollDelayMs = Number.isFinite(Number(config.scrollDelayMs))
+        ? Math.max(100, Math.min(Math.round(Number(config.scrollDelayMs)), 5000))
+        : undefined;
 
     console.log('[BrowserScrape] Scraping URL:', url);
 
@@ -259,6 +268,9 @@ export async function executeBrowserScrape(
                 waitForSelector,
                 selector,
                 extract,
+                preWaitMs,
+                scrollSteps,
+                scrollDelayMs,
             }),
             signal: controller.signal
         });

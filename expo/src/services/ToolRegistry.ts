@@ -700,15 +700,17 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
     {
         name: 'web_automation',
-        description: 'Automates web browser interactions like clicking elements, typing text, and scraping data. REQUIRED: "actions" must be a JSON string array. Examples: [{"type": "click", "selector": "#btn-id"}, {"type": "type", "selector": "input.user", "value": "johndoe"}, {"type": "scrape", "selector": ".price-tag", "variableName": "price"}]',
+        description: 'Automates web browser interactions in script/smart/interactive modes. Actions can be passed as JSON string array. Scrape actions support first-class "extract" field.',
         parameters: {
             type: 'OBJECT',
             properties: {
                 url: { type: 'STRING', description: 'Target website URL' },
-                actions: { type: 'STRING', description: 'JSON string of actions. Types: "click", "type", "scrape", "wait", "scroll". For scrape, include "variableName".' },
+                mode: { type: 'STRING', description: 'Optional: "script" (default), "smart", or "interactive"' },
+                smartGoal: { type: 'STRING', description: 'Required when mode is "smart". Describes target outcome.' },
+                actions: { type: 'STRING', description: 'JSON string array of actions. Fields: {type, selector?, value?, extract?, variableName?}. For scrape, use extract: "text"|"html"|"list"|"clean_text"|"smart_data".' },
                 headless: { type: 'BOOLEAN', description: 'Run in background (default false). Use false to see the browser.' }
             },
-            required: ['url', 'actions']
+            required: ['url']
         },
         nodeType: 'WEB_AUTOMATION',
         permissions: { requiresConfirmation: true, isSensitive: false }
@@ -719,7 +721,8 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         parameters: {
             type: 'OBJECT',
             properties: {
-                url: { type: 'STRING', description: 'URL to open' }
+                url: { type: 'STRING', description: 'URL to open' },
+                openExternal: { type: 'BOOLEAN', description: 'Optional. true = force external browser/app, false = prefer in-app browser.' }
             },
             required: ['url']
         },

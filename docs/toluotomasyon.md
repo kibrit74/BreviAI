@@ -90,7 +90,7 @@ Not:
   "name": "Rakip Fiyat Degisim Radari",
   "nodes": [
     { "id": "1", "type": "TIME_TRIGGER", "label": "Gunluk 08:00", "config": { "hour": 8, "minute": 0, "repeat": true, "days": [1,2,3,4,5,6,0] }, "position": { "x": 100, "y": 50 } },
-    { "id": "2", "type": "WEB_AUTOMATION", "label": "Rakip fiyat cek", "config": { "url": "https://competitor.example.com/pricing", "actions": [{ "type": "wait", "value": "1500" }], "headless": true }, "position": { "x": 100, "y": 150 } },
+    { "id": "2", "type": "WEB_AUTOMATION", "label": "Rakip fiyat cek", "config": { "url": "https://competitor.example.com/pricing", "mode": "script", "actions": [{ "type": "wait", "value": "1500" }, { "type": "scrape", "selector": ".price-card .amount", "extract": "text", "variableName": "competitorPrice" }], "headless": true }, "position": { "x": 100, "y": 150 } },
     { "id": "3", "type": "SHEETS_READ", "label": "Bizim fiyatlar", "config": { "spreadsheetId": "PRICE_SHEET_ID", "range": "Prices!A:D", "variableName": "ourPrices" }, "position": { "x": 100, "y": 250 } },
     { "id": "4", "type": "AGENT_AI", "label": "Fark analizi", "config": { "prompt": "Rakip ve bizim fiyatlari karsilastir, kritik degisimleri cikar: Rakip={{previous_output}}, Biz={{ourPrices}}", "provider": "gemini", "variableName": "priceDiff" }, "position": { "x": 100, "y": 350 } },
     { "id": "5", "type": "NOTIFICATION", "label": "Fiyat alarmi", "config": { "title": "Rakip fiyat degisimi", "message": "{{priceDiff.summary}}" }, "position": { "x": 100, "y": 450 } }
@@ -339,6 +339,9 @@ Not:
 Not:
 - Bu senaryodaki `WEB_SEARCH` node'u artik MCP `breviai.web_search` araci uzerinden calisir.
 - MCP tarafinda sorun olursa istemci otomatik olarak eski `/api/search` fallback yoluna gecer.
+- `WEB_AUTOMATION` headless fallback modunda `wait`, `scroll`, `scrape` aksiyonlari sirayla uygulanir; `click/type` icin interactive mod gereklidir.
+- `WEB_AUTOMATION` scrape aksiyonlarinda `extract` alani first-class'tir (`text|html|list|clean_text|smart_data`).
+- `WEB_AUTOMATION` sonucu standart contract ile doner (`runId`, `mode`, `steps`, `data`, `meta`).
 
 ```json
 {

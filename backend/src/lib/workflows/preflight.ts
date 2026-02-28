@@ -81,6 +81,8 @@ const BUILT_IN_VARIABLES = new Set([
 
 const REQUIRED_FIELDS_BY_NODE: Record<string, string[]> = {
     HTTP_REQUEST: ['url'],
+    OPEN_URL: ['url'],
+    BROWSER_SCRAPE: ['url', 'variableName'],
     SMS_SEND: ['phoneNumber', 'message'],
     WHATSAPP_SEND: ['phoneNumber', 'message'],
     EMAIL_SEND: ['to', 'subject'],
@@ -169,6 +171,34 @@ function extractVariableRefs(value: unknown, collector: Set<string>) {
 
 function issue(params: PreflightIssue): PreflightIssue {
     return params;
+}
+
+function parseNodeActions(rawActions: unknown): { actions: any[]; parseError: boolean } {
+    if (Array.isArray(rawActions)) {
+        return { actions: rawActions, parseError: false };
+    }
+
+    if (typeof rawActions === 'string') {
+        const trimmed = rawActions.trim();
+        if (!trimmed) {
+            return { actions: [], parseError: false };
+        }
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+                return { actions: parsed, parseError: false };
+            }
+            return { actions: [], parseError: true };
+        } catch {
+            return { actions: [], parseError: true };
+        }
+    }
+
+    if (rawActions == null) {
+        return { actions: [], parseError: false };
+    }
+
+    return { actions: [], parseError: true };
 }
 
 export function runWorkflowPreflight(input: PreflightInput): PreflightResult {
@@ -305,6 +335,148 @@ export function runWorkflowPreflight(input: PreflightInput): PreflightResult {
                         fix: `${requiredAnyFields.join(' veya ')} alanlarÄ±ndan birini doldurun.`,
                     })
                 );
+            }
+        }
+
+        if (nodeType === 'WEB_AUTOMATION') {
+            const mode = String(config.mode || 'script').trim().toLowerCase();
+            const interactive = Boolean(config.interactive) || mode === 'interactive';
+            const smart = mode === 'smart';
+            const { actions, parseError } = parseNodeActions(config.actions);
+            const allowedScrapeExtractModes = new Set(['text', 'html', 'list', 'clean_text', 'smart_data']);
+
+            if (!['script', 'interactive', 'smart'].includes(mode)) {
+                warnings.push(
+                    issue({
+                        severity: 'warning',
+                        code: 'WEB_AUTOMATION_MODE_UNKNOWN',
+                        message: `WEB_AUTOMATION mode degeri taninmiyor: ${mode}`,
+                        nodeId,
+                        nodeType,
+                        fix: "mode alanini 'script', 'interactive' veya 'smart' olarak ayarlayin.",
+                    })
+                );
+            }
+
+            if (parseError) {
+                errors.push(
+                    issue({
+                        severity: 'error',
+                        code: 'WEB_AUTOMATION_ACTIONS_INVALID',
+                        message: 'WEB_AUTOMATION actions alani gecerli bir JSON dizi veya dizi tipinde olmali.',
+                        nodeId,
+                        nodeType,
+                        fix: 'actions alanini [ { "type": "..." } ] formatinda duzeltin.',
+                    })
+                );
+            }
+
+            actions.forEach((action, index) => {
+                if (!action || typeof action !== 'object') return;
+                const actionType = String((action as Record<string, unknown>).type || '').toLowerCase();
+                if (actionType !== 'scrape') return;
+
+                const extractRaw = (action as Record<string, unknown>).extract;
+                const legacyExtractRaw = (action as Record<string, unknown>).value;
+
+                if (extractRaw !== undefined && extractRaw !== null && String(extractRaw).trim()) {
+                    const normalizedExtract = String(extractRaw).trim().toLowerCase();
+                    if (!allowedScrapeExtractModes.has(normalizedExtract)) {
+                        errors.push(
+                            issue({
+                                severity: 'error',
+                                code: 'WEB_AUTOMATION_SCRAPE_EXTRACT_INVALID',
+                                message: `WEB_AUTOMATION scrape action #${index + 1} gecersiz extract degeri iceriyor: ${normalizedExtract}`,
+                                nodeId,
+                                nodeType,
+                                fix: "extract alanini text|html|list|clean_text|smart_data olarak duzenleyin.",
+                            })
+                        );
+                    }
+                    return;
+                }
+
+                if (legacyExtractRaw !== undefined && legacyExtractRaw !== null && String(legacyExtractRaw).trim()) {
+                    const normalizedLegacyExtract = String(legacyExtractRaw).trim().toLowerCase();
+                    if (allowedScrapeExtractModes.has(normalizedLegacyExtract)) {
+                        warnings.push(
+                            issue({
+                                severity: 'warning',
+                                code: 'WEB_AUTOMATION_SCRAPE_EXTRACT_LEGACY',
+                                message: `WEB_AUTOMATION scrape action #${index + 1} extract degeri legacy value alaninda. extract alanina tasinmasi onerilir.`,
+                                nodeId,
+                                nodeType,
+                                fix: 'Scrape action icinde extract alanini first-class olarak kullanin.',
+                            })
+                        );
+                    }
+                }
+            });
+
+            if (smart) {
+                const goal = String(config.smartGoal || '').trim();
+                if (!goal) {
+                    missingConfigFields += 1;
+                    errors.push(
+                        issue({
+                            severity: 'error',
+                            code: 'CONFIG_FIELD_MISSING',
+                            message: "WEB_AUTOMATION smart mode icin 'smartGoal' zorunlu.",
+                            nodeId,
+                            nodeType,
+                            fix: 'smartGoal alanini doldurun veya mode degerini degistirin.',
+                        })
+                    );
+                }
+            }
+
+            if (!interactive && !smart && actions.length === 0) {
+                missingConfigFields += 1;
+                errors.push(
+                    issue({
+                        severity: 'error',
+                        code: 'WEB_AUTOMATION_ACTIONS_EMPTY',
+                        message: 'WEB_AUTOMATION script mode icin en az bir action gerekli.',
+                        nodeId,
+                        nodeType,
+                        fix: 'actions listesine en az bir adim ekleyin.',
+                    })
+                );
+            }
+
+            if (config.headless && interactive) {
+                errors.push(
+                    issue({
+                        severity: 'error',
+                        code: 'WEB_AUTOMATION_MODE_CONFLICT',
+                        message: 'WEB_AUTOMATION headless ve interactive ayni anda kullanilamaz.',
+                        nodeId,
+                        nodeType,
+                        fix: 'headless veya interactive seceneklerinden birini kapatin.',
+                    })
+                );
+            }
+
+            if (config.headless) {
+                const hasClickOrType = actions.some((action) =>
+                    action &&
+                    typeof action === 'object' &&
+                    (String((action as Record<string, unknown>).type || '').toLowerCase() === 'click' ||
+                        String((action as Record<string, unknown>).type || '').toLowerCase() === 'type')
+                );
+
+                if (hasClickOrType) {
+                    errors.push(
+                        issue({
+                            severity: 'error',
+                            code: 'WEB_AUTOMATION_HEADLESS_UNSUPPORTED_ACTION',
+                            message: 'WEB_AUTOMATION headless fallback click/type aksiyonlarini desteklemez.',
+                            nodeId,
+                            nodeType,
+                            fix: 'Headless modunu kapatin veya click/type yerine scrape/wait/scroll kullanin.',
+                        })
+                    );
+                }
             }
         }
 

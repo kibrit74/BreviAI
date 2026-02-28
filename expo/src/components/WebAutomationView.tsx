@@ -1,5 +1,5 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, StyleSheet, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { WebAutomationConfig } from '../types/workflow-types';
 
@@ -14,17 +14,25 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
     const [currentUrl, setCurrentUrl] = useState(config.url);
     const [status, setStatus] = useState('Yükleniyor...');
     const [executed, setExecuted] = useState(false);
-
-    // Smart Mode State
-    const [isSmartRunning, setIsSmartRunning] = useState(false);
+    const smartStepRef = useRef(0);
+    const smartStartedAtRef = useRef<number | null>(null);
+    const maxSmartSteps = Math.max(1, Number(config.maxSmartSteps || 12));
+    const maxSmartDurationMs = Math.max(5000, Number(config.maxSmartDurationMs || 45000));
 
     // script to extract Interactable Elements (Simulated Accessibility Tree)
     const extractionScript = `
     (function() {
-        function getPageState() {
-            const interactables = [];
-            
-            // Helper to get visibility
+        try {
+            function safeEscape(value) {
+                if (!value) return '';
+                try {
+                    if (window.CSS && typeof window.CSS.escape === 'function') {
+                        return window.CSS.escape(value);
+                    }
+                } catch (_) {}
+                return String(value).replace(/[^a-zA-Z0-9_-]/g, '\\\\$&');
+            }
+
             function isVisible(el) {
                 if (!el) return false;
                 const style = window.getComputedStyle(el);
@@ -33,50 +41,66 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                 return rect.width > 0 && rect.height > 0;
             }
 
-            // Find all inputs, buttons, links
-            const elements = document.querySelectorAll('input, button, a, select, textarea, [role="button"]');
-            
-            elements.forEach((el, index) => {
-                if (isVisible(el)) {
-                    // Create a unique partial selector
-                    let selector = el.tagName.toLowerCase();
-                    if (el.id) {
-                        // Escape ID just in case
-                        selector += '#' + CSS.escape(el.id);
-                    } else if (el.className && typeof el.className === 'string') {
-                        // Compact class logic: take first 3 classes, escape them
-                        const classes = el.className.split(/\s+/).filter(c => c).slice(0, 3);
-                        if (classes.length > 0) {
-                            selector += '.' + classes.map(c => CSS.escape(c)).join('.');
-                        }
+            const interactables = [];
+            const selector = 'input, button, a, select, textarea, [role="button"], [role="link"], [tabindex]';
+            const elements = document.querySelectorAll(selector);
+
+            for (let index = 0; index < elements.length && interactables.length < 30; index++) {
+                const el = elements[index];
+                if (!isVisible(el)) continue;
+
+                let cssSelector = el.tagName.toLowerCase();
+                if (el.id) {
+                    cssSelector += '#' + safeEscape(el.id);
+                } else if (typeof el.className === 'string' && el.className.trim()) {
+                    const classes = el.className
+                        .trim()
+                        .split(' ')
+                        .filter(Boolean)
+                        .slice(0, 3)
+                        .map(safeEscape);
+                    if (classes.length > 0) {
+                        cssSelector += '.' + classes.join('.');
                     }
-                    
-                    // Fallback to simpler path if class is too long or weird
-                    if (selector.length > 50) selector = el.tagName.toLowerCase();
-
-                    interactables.push({
-                        tag: el.tagName.toLowerCase(),
-                        text: (el.innerText || el.value || '').substring(0, 50).replace(/\\n/g, ' '),
-                        id: el.id || '',
-                        type: el.type || '',
-                        href: el.href || '',
-                        selector: selector,
-                        // Add index for fallback targeting
-                        index: index 
-                    });
                 }
-            });
 
-            // ... (rest of headers logic)
-            // ...
-            return JSON.stringify({
+                if (cssSelector.length > 120) cssSelector = el.tagName.toLowerCase();
+
+                interactables.push({
+                    tag: el.tagName.toLowerCase(),
+                    text: String(el.innerText || el.value || el.getAttribute('aria-label') || '')
+                        .substring(0, 80)
+                        .replace(/[\\r\\n]+/g, ' ')
+                        .trim(),
+                    id: el.id || '',
+                    type: el.type || '',
+                    href: el.href || '',
+                    selector: cssSelector,
+                    index: index
+                });
+            }
+
+            const headers = Array.from(document.querySelectorAll('h1, h2, h3'))
+                .map((el) => String(el.textContent || '').trim())
+                .filter(Boolean)
+                .slice(0, 5);
+
+            const state = JSON.stringify({
                 url: window.location.href,
-                title: document.title,
-                headers: headers.slice(0, 5),
-                interactables: interactables.slice(0, 30)
+                title: document.title || '',
+                headers: headers,
+                interactables: interactables
             });
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'page_state',
+                state: state
+            }));
+        } catch (err) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'error',
+                message: 'State extraction failed: ' + (err && err.message ? err.message : String(err))
+            }));
         }
-        // ...
     })();
     true;
     `;
@@ -87,7 +111,23 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
             // ... (goal check)
             if (!config.smartGoal) return;
 
-            setStatus('Agent düşünülüyor...');
+            if (!smartStartedAtRef.current) {
+                smartStartedAtRef.current = Date.now();
+            }
+
+            const elapsedMs = Date.now() - smartStartedAtRef.current;
+            if (elapsedMs > maxSmartDurationMs) {
+                onError(`Smart mode zaman asimi: ${maxSmartDurationMs}ms sinirina ulasildi.`);
+                return;
+            }
+
+            smartStepRef.current += 1;
+            if (smartStepRef.current > maxSmartSteps) {
+                onError(`Smart mode adim limiti asildi: ${maxSmartSteps}`);
+                return;
+            }
+
+            setStatus(`Agent dusunuluyor... (${smartStepRef.current}/${maxSmartSteps})`);
             const { action } = await import('../services/ApiService').then(m => m.apiService.decideWebAction(config.smartGoal!, pageStateJson));
 
             console.log('[WebSmart] Agent decided:', action);
@@ -99,15 +139,16 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
 
             if (action.type === 'finish') {
                 setStatus('Tamamlandı: ' + action.value);
-                onSuccess({ success: true, ...action });
+                onSuccess({ steps: smartStepRef.current, elapsedMs, finalUrl: currentUrl, ...action });
                 return;
             }
 
             if (action.type === 'wait') {
-                setStatus('Bekleniyor (' + action.value + 'ms)...');
+                const waitMs = Math.max(0, Math.min(parseInt(action.value) || 2000, 30000));
+                setStatus('Bekleniyor (' + waitMs + 'ms)...');
                 setTimeout(() => {
                     webViewRef.current?.injectJavaScript(extractionScript);
-                }, parseInt(action.value) || 2000);
+                }, waitMs);
             }
             else if (action.type === 'scroll') {
                 setStatus('Kaydırılıyor...');
@@ -124,11 +165,15 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
 
                 // Enhanced Execution Script
                 let execScript = '';
+                const selectorJson = JSON.stringify(action.selector || '');
+                const valueJson = JSON.stringify(action.value || '');
                 if (action.type === 'click') {
                     execScript = `
                         (function() {
                             try {
-                                const el = document.querySelector('${action.selector}');
+                                const selector = ${selectorJson};
+                                if (!selector) return;
+                                const el = document.querySelector(selector);
                                 if (el) {
                                     // Visual highlight before click
                                     el.style.border = '2px solid red';
@@ -152,7 +197,7 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                                         if (el.click) el.click();
                                     }, 200);
                                 } else {
-                                    console.log('Element not found: ${action.selector}');
+                                    console.log('Element not found:', selector);
                                 }
                             } catch (err) {
                                 console.error('Click error:', err);
@@ -163,10 +208,13 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                     // ... same type logic ...
                     execScript = `
                         (function() {
-                             const el = document.querySelector('${action.selector}');
-                             if (el) { 
+                             const selector = ${selectorJson};
+                             const value = ${valueJson};
+                             if (!selector) return;
+                             const el = document.querySelector(selector);
+                             if (el) {
                                  el.focus();
-                                 el.value = '${action.value}';
+                                 el.value = value;
                                  el.dispatchEvent(new Event('input', {bubbles:true}));
                                  el.dispatchEvent(new Event('change', {bubbles:true}));
                                  el.blur();
@@ -199,6 +247,7 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
             try {
                 const actions = ${actionsJson};
                 const results = {};
+                const steps = [];
                 
                 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
                 
@@ -207,55 +256,103 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                 
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'Script started with ' + actions.length + ' actions' }));
 
-                for (const action of actions) {
+                for (let index = 0; index < actions.length; index++) {
+                    const action = actions[index] || {};
+                    const stepStartedAt = Date.now();
+                    const step = {
+                        id: action.id || ('a' + (index + 1)),
+                        type: action.type || 'unknown',
+                        status: 'ok',
+                        durationMs: 0
+                    };
                     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'Running: ' + action.type }));
-                    
-                    if (action.type === 'wait') {
-                        await wait(parseInt(action.value) || 1000);
-                    }
-                    else if (action.type === 'click') {
-                        const el = getEl(action.selector);
-                        if (el) {
-                            el.click();
+
+                    try {
+                        if (action.type === 'wait') {
+                            const waitMs = Math.max(0, Math.min(parseInt(action.value) || 1000, 30000));
+                            await wait(waitMs);
+                            step.note = 'wait=' + waitMs + 'ms';
+                        }
+                        else if (action.type === 'click') {
+                            const el = getEl(action.selector);
+                            if (el) {
+                                el.click();
+                                await wait(1000);
+                            } else {
+                                step.status = 'skipped';
+                                step.note = 'Element not found: ' + action.selector;
+                                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: step.note }));
+                            }
+                        }
+                        else if (action.type === 'type') {
+                            const el = getEl(action.selector);
+                            if (el) {
+                                el.value = action.value;
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                            } else {
+                                step.status = 'skipped';
+                                step.note = 'Element not found: ' + action.selector;
+                            }
+                        }
+                        else if (action.type === 'scrape') {
+                            const selector = action.selector || 'body';
+                            const elements = document.querySelectorAll(selector);
+                            const extractMode = String(action.extract || action.value || 'text').toLowerCase();
+                            const key = action.variableName || ('scrape_' + (index + 1));
+                            step.selector = selector;
+                            step.variableName = key;
+
+                            if (elements && elements.length > 0) {
+                                let extracted;
+                                if (extractMode === 'html') {
+                                    extracted = Array.from(elements).map(el => el.innerHTML || '').join('\\n\\n');
+                                } else if (extractMode === 'list') {
+                                    extracted = Array.from(elements)
+                                        .map(el => String(el.innerText || el.textContent || el.value || '').trim())
+                                        .filter(Boolean);
+                                } else {
+                                    extracted = Array.from(elements)
+                                        .map(el => String(el.innerText || el.textContent || el.value || '').trim())
+                                        .filter(Boolean)
+                                        .join('\\n\\n');
+                                }
+                                results[key] = extracted;
+                                step.note = 'extract=' + extractMode;
+                            } else {
+                                step.status = 'skipped';
+                                step.note = 'Scrape found 0 items for: ' + selector;
+                                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: step.note }));
+                            }
+                        }
+                        else if (action.type === 'scroll') {
+                            window.scrollBy({
+                                top: window.innerHeight * 0.8,
+                                behavior: 'smooth'
+                            });
                             await wait(1000);
                         } else {
-                             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'Element not found: ' + action.selector }));
+                            step.status = 'skipped';
+                            step.note = 'Unsupported action type: ' + action.type;
                         }
+                    } catch (stepError) {
+                        step.status = 'error';
+                        step.error = stepError && stepError.message ? stepError.message : String(stepError);
+                        step.durationMs = Math.max(0, Date.now() - stepStartedAt);
+                        steps.push(step);
+                        throw stepError;
                     }
-                    else if (action.type === 'type') {
-                        const el = getEl(action.selector);
-                        if (el) {
-                            el.value = action.value;
-                            el.dispatchEvent(new Event('input', { bubbles: true }));
-                            el.dispatchEvent(new Event('change', { bubbles: true }));
-                        }
-                    }
-                    else if (action.type === 'scrape') {
-                        const elements = document.querySelectorAll(action.selector);
-                        if (elements && elements.length > 0) {
-                            // Collect text from all matching elements
-                            const contents = Array.from(elements).map(el => el.innerText || el.textContent || el.value).filter(t => t && t.trim().length > 0);
-                            
-                            // Join with newlines
-                            const content = contents.join('\n\n');
-                            
-                            if (action.variableName) {
-                                results[action.variableName] = content;
-                            }
-                        } else {
-                             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'log', message: 'Scrape found 0 items for: ' + action.selector }));
-                        }
-                    }
-                    else if (action.type === 'scroll') {
-                        window.scrollBy({
-                            top: window.innerHeight * 0.8,
-                            behavior: 'smooth'
-                        });
-                        await wait(1000);
-                    }
+
+                    step.durationMs = Math.max(0, Date.now() - stepStartedAt);
+                    steps.push(step);
                 }
                 
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'success', results }));
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'success',
+                    results,
+                    steps,
+                    finalUrl: window.location.href
+                }));
             } catch (err) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: err.toString() }));
             }
@@ -279,7 +376,13 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
             }
             else if (data.type === 'success') {
                 console.log('[Web Automation Success]', data.results);
-                onSuccess(data.results);
+                const results = (data.results && typeof data.results === 'object') ? data.results : {};
+                onSuccess({
+                    ...results,
+                    results,
+                    steps: Array.isArray(data.steps) ? data.steps : [],
+                    finalUrl: typeof data.finalUrl === 'string' ? data.finalUrl : currentUrl,
+                });
             }
             else if (data.type === 'error') {
                 console.error('[Web Automation Error]', data.message);
@@ -297,7 +400,7 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                 {(config.interactive || config.mode === 'interactive') && (
                     <Text
                         style={styles.doneButton}
-                        onPress={() => onSuccess({ message: 'User completed interaction' })}
+                        onPress={() => onSuccess({ message: 'User completed interaction', finalUrl: currentUrl })}
                     >
                         Tamamlandı
                     </Text>
@@ -311,6 +414,11 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
                 javaScriptEnabled={true}
                 domStorageEnabled={true}
                 userAgent={config.userAgent || "Mozilla/5.0 (Linux; Android 10; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"}
+                onNavigationStateChange={(navState) => {
+                    if (navState?.url) {
+                        setCurrentUrl(navState.url);
+                    }
+                }}
                 onLoadEnd={() => {
                     if (!executed) {
                         setExecuted(true);
@@ -325,7 +433,8 @@ export const WebAutomationView: React.FC<WebAutomationViewProps> = ({ config, on
 
                         if (mode === 'smart') {
                             setStatus('Smart Agent başlıyor...');
-                            setIsSmartRunning(true);
+                            smartStepRef.current = 0;
+                            smartStartedAtRef.current = Date.now();
                             // Start Loop: Capture Initial State
                             setTimeout(() => {
                                 webViewRef.current?.injectJavaScript(extractionScript);
@@ -381,3 +490,4 @@ const styles = StyleSheet.create({
         zIndex: 10
     }
 });
+

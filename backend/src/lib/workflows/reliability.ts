@@ -13,6 +13,30 @@ export interface WorkflowRunEvent {
     meta?: Record<string, unknown>;
 }
 
+export interface WebNodeRunEvent {
+    nodeId?: string;
+    nodeType: 'WEB_AUTOMATION' | 'BROWSER_SCRAPE';
+    success: boolean;
+    durationMs: number;
+    stepCount?: number;
+    avgStepDurationMs?: number;
+    scrapeCount?: number;
+    emptyScrape?: boolean;
+    fallbackUsed?: boolean;
+    mode?: string;
+    executor?: string;
+}
+
+export interface WebNodeTelemetrySummary {
+    totalWebNodeRuns: number;
+    webNodeSuccessRate: number;
+    avgWebNodeStepDurationMs: number;
+    emptyScrapeRate: number;
+    fallbackRate: number;
+    webAutomationRuns: number;
+    browserScrapeRuns: number;
+}
+
 export interface WorkflowReliabilitySummary {
     workflowId: string;
     workflowName?: string;
@@ -27,9 +51,11 @@ export interface WorkflowReliabilitySummary {
     reliabilityScore: number;
     riskLevel: 'low' | 'medium' | 'high' | 'critical';
     grade: 'A' | 'B' | 'C' | 'D';
+    webNodeTelemetry?: WebNodeTelemetrySummary;
 }
 
 declare global {
+    // eslint-disable-next-line no-var
     var __breviaiWorkflowRunStore: WorkflowRunEvent[] | undefined;
 }
 
@@ -80,6 +106,91 @@ function computeGrade(score: number): WorkflowReliabilitySummary['grade'] {
     if (score >= 70) return 'B';
     if (score >= 50) return 'C';
     return 'D';
+}
+
+function asObject(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    return value as Record<string, unknown>;
+}
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseWebNodeRunEvent(value: unknown): WebNodeRunEvent | null {
+    const obj = asObject(value);
+    if (!obj) return null;
+
+    const nodeTypeRaw = String(obj.nodeType || '').trim().toUpperCase();
+    if (nodeTypeRaw !== 'WEB_AUTOMATION' && nodeTypeRaw !== 'BROWSER_SCRAPE') {
+        return null;
+    }
+
+    return {
+        nodeId: obj.nodeId ? String(obj.nodeId) : undefined,
+        nodeType: nodeTypeRaw as WebNodeRunEvent['nodeType'],
+        success: Boolean(obj.success),
+        durationMs: Math.max(0, toFiniteNumber(obj.durationMs, 0)),
+        stepCount: Math.max(0, Math.round(toFiniteNumber(obj.stepCount, 0))) || undefined,
+        avgStepDurationMs: Math.max(0, toFiniteNumber(obj.avgStepDurationMs, 0)) || undefined,
+        scrapeCount: Math.max(0, Math.round(toFiniteNumber(obj.scrapeCount, 0))) || undefined,
+        emptyScrape: obj.emptyScrape === undefined ? undefined : Boolean(obj.emptyScrape),
+        fallbackUsed: obj.fallbackUsed === undefined ? undefined : Boolean(obj.fallbackUsed),
+        mode: obj.mode ? String(obj.mode) : undefined,
+        executor: obj.executor ? String(obj.executor) : undefined,
+    };
+}
+
+function extractWebNodeRunEvents(meta?: Record<string, unknown>): WebNodeRunEvent[] {
+    const metaObj = asObject(meta);
+    if (!metaObj) return [];
+
+    const rawWebNodes = metaObj.webNodes;
+    if (!Array.isArray(rawWebNodes)) return [];
+
+    return rawWebNodes
+        .map(parseWebNodeRunEvent)
+        .filter((item): item is WebNodeRunEvent => item !== null);
+}
+
+function summarizeWebNodeRuns(runs: WebNodeRunEvent[]): WebNodeTelemetrySummary | undefined {
+    if (!runs.length) return undefined;
+
+    const totalWebNodeRuns = runs.length;
+    const successRuns = runs.filter((run) => run.success).length;
+    const webAutomationRuns = runs.filter((run) => run.nodeType === 'WEB_AUTOMATION').length;
+    const browserScrapeRuns = runs.filter((run) => run.nodeType === 'BROWSER_SCRAPE').length;
+
+    const totalStepWeightedDuration = runs.reduce((acc, run) => {
+        if (run.stepCount && run.avgStepDurationMs) {
+            return acc + run.stepCount * run.avgStepDurationMs;
+        }
+        return acc + run.durationMs;
+    }, 0);
+
+    const totalStepCount = runs.reduce((acc, run) => {
+        if (run.stepCount && run.stepCount > 0) return acc + run.stepCount;
+        return acc + 1;
+    }, 0);
+
+    const emptyScrapeCandidates = runs.filter((run) => (run.scrapeCount || 0) > 0);
+    const emptyScrapeRuns = emptyScrapeCandidates.filter((run) => run.emptyScrape === true).length;
+    const fallbackRuns = runs.filter((run) => run.fallbackUsed === true).length;
+
+    return {
+        totalWebNodeRuns,
+        webNodeSuccessRate: Number(((successRuns / totalWebNodeRuns) * 100).toFixed(2)),
+        avgWebNodeStepDurationMs: totalStepCount > 0 ? Math.round(totalStepWeightedDuration / totalStepCount) : 0,
+        emptyScrapeRate: emptyScrapeCandidates.length > 0
+            ? Number(((emptyScrapeRuns / emptyScrapeCandidates.length) * 100).toFixed(2))
+            : 0,
+        fallbackRate: webAutomationRuns > 0
+            ? Number(((fallbackRuns / webAutomationRuns) * 100).toFixed(2))
+            : 0,
+        webAutomationRuns,
+        browserScrapeRuns,
+    };
 }
 
 function computeReliabilityScore(input: {
@@ -150,6 +261,8 @@ export function getWorkflowReliability(options?: {
             totalRuns,
             recentFailureRate,
         });
+        const webNodeRuns = sortedRuns.flatMap((run) => extractWebNodeRunEvents(run.meta));
+        const webNodeTelemetry = summarizeWebNodeRuns(webNodeRuns);
 
         const lastFailure = sortedRuns.find((run) => !run.success);
         const insight = inferErrorInsight({
@@ -171,6 +284,7 @@ export function getWorkflowReliability(options?: {
             reliabilityScore,
             riskLevel: computeRiskLevel(reliabilityScore),
             grade: computeGrade(reliabilityScore),
+            webNodeTelemetry,
         });
     });
 
@@ -191,11 +305,15 @@ export function getWorkflowRunStats() {
     const totalRuns = workflowRunStore.length;
     const successRuns = workflowRunStore.filter((run) => run.success).length;
     const failedRuns = totalRuns - successRuns;
+    const allWebNodeRuns = workflowRunStore.flatMap((run) => extractWebNodeRunEvents(run.meta));
+    const webNodeStats = summarizeWebNodeRuns(allWebNodeRuns);
+
     return {
         totalRuns,
         successRuns,
         failedRuns,
         successRate: totalRuns ? Number(((successRuns / totalRuns) * 100).toFixed(2)) : 0,
         workflowsTracked: new Set(workflowRunStore.map((run) => run.workflowId)).size,
+        webNodeStats,
     };
 }
