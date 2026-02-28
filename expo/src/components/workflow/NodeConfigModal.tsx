@@ -2163,6 +2163,54 @@ const SlackSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig, is
                     />
                 </View>
             )}
+            {showAdvanced && selectedMode === 'bot' && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Thread TS (Opsiyonel)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.threadTs || ''}
+                        onChangeText={(t) => updateConfig('threadTs', t)}
+                        placeholder="1741301628.123456"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            )}
+
+            {showAdvanced && selectedMode === 'bot' && (
+                <>
+                    <View style={styles.rowField}>
+                        <Text style={styles.fieldLabel}>Link Unfurl</Text>
+                        <Switch
+                            value={config.unfurlLinks !== false}
+                            onValueChange={(v) => updateConfig('unfurlLinks', v)}
+                            trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                            thumbColor="#FFF"
+                        />
+                    </View>
+                    <View style={styles.rowField}>
+                        <Text style={styles.fieldLabel}>Medya Unfurl</Text>
+                        <Switch
+                            value={config.unfurlMedia !== false}
+                            onValueChange={(v) => updateConfig('unfurlMedia', v)}
+                            trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                            thumbColor="#FFF"
+                        />
+                    </View>
+                </>
+            )}
+
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Sonuc Degiskeni (Opsiyonel)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.variableName || ''}
+                        onChangeText={(t) => updateConfig('variableName', t)}
+                        placeholder="slackResult"
+                        placeholderTextColor="#666"
+                    />
+                </View>
+            )}
         </>
     );
 };
@@ -4042,7 +4090,7 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig,
                 <View style={styles.field}>
                     <Text style={styles.fieldLabel}>Format</Text>
                     <View style={styles.buttonRow}>
-                        {['Markdown', 'HTML'].map(mode => (
+                        {['Markdown', 'MarkdownV2', 'HTML'].map(mode => (
                             <TouchableOpacity
                                 key={mode}
                                 style={[styles.unitButton, config.parseMode === mode && styles.unitButtonSelected]}
@@ -4054,6 +4102,42 @@ const TelegramSendFields: React.FC<ConfigFieldsProps> = ({ config, updateConfig,
                             </TouchableOpacity>
                         ))}
                     </View>
+                </View>
+            )}
+            {showAdvanced && operation === 'sendMessage' && (
+                <View style={styles.rowField}>
+                    <Text style={styles.fieldLabel}>Link Onizlemesini Kapat</Text>
+                    <Switch
+                        value={!!config.disableWebPagePreview}
+                        onValueChange={(v) => updateConfig('disableWebPagePreview', v)}
+                        trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                        thumbColor="#FFF"
+                    />
+                </View>
+            )}
+
+            {showAdvanced && (
+                <View style={styles.rowField}>
+                    <Text style={styles.fieldLabel}>Sessiz Gonder</Text>
+                    <Switch
+                        value={!!config.disableNotification}
+                        onValueChange={(v) => updateConfig('disableNotification', v)}
+                        trackColor={{ false: '#2A2A4A', true: '#6366F1' }}
+                        thumbColor="#FFF"
+                    />
+                </View>
+            )}
+
+            {showAdvanced && (
+                <View style={styles.field}>
+                    <Text style={styles.fieldLabel}>Sonuc Degiskeni (Opsiyonel)</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={config.variableName || ''}
+                        onChangeText={(t) => updateConfig('variableName', t)}
+                        placeholder="telegramResult"
+                        placeholderTextColor="#666"
+                    />
                 </View>
             )}
 

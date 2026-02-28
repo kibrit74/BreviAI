@@ -585,7 +585,10 @@ export interface TelegramSendConfig {
     filePath?: string; // For Photo/Document
     latitude?: number; // For Location
     longitude?: number; // For Location
-    parseMode?: 'Markdown' | 'HTML';
+    parseMode?: 'Markdown' | 'MarkdownV2' | 'HTML';
+    disableWebPagePreview?: boolean;
+    disableNotification?: boolean;
+    variableName?: string; // Optional result variable
 }
 
 export interface SlackSendConfig {
@@ -597,6 +600,9 @@ export interface SlackSendConfig {
     apiToken?: string; // Alias for botToken (UI-friendly label)
     botToken?: string;
     apiUrl?: string; // Optional override, default chat.postMessage
+    threadTs?: string; // Optional thread timestamp (bot mode)
+    unfurlLinks?: boolean; // Optional link unfurl toggle (bot mode)
+    unfurlMedia?: boolean; // Optional media unfurl toggle (bot mode)
     variableName?: string; // Optional result variable
 }
 

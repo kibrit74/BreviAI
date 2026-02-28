@@ -742,14 +742,23 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     // --- COMMUNICATION (Extended) ---
     {
         name: 'send_telegram',
-        description: 'Sends a Telegram message via bot.',
+        description: 'Sends Telegram bot message/location/media and returns delivery result.',
         parameters: {
             type: 'OBJECT',
             properties: {
+                botToken: { type: 'STRING', description: 'Telegram bot token (optional if stored in node)' },
                 chatId: { type: 'STRING', description: 'Telegram chat ID' },
-                message: { type: 'STRING', description: 'Message content' }
+                operation: { type: 'STRING', description: 'sendMessage | sendPhoto | sendDocument | sendLocation (default sendMessage)' },
+                message: { type: 'STRING', description: 'Message content or media caption' },
+                filePath: { type: 'STRING', description: 'Local file URI/path for sendPhoto/sendDocument' },
+                latitude: { type: 'NUMBER', description: 'Latitude for sendLocation' },
+                longitude: { type: 'NUMBER', description: 'Longitude for sendLocation' },
+                parseMode: { type: 'STRING', description: 'Markdown | MarkdownV2 | HTML (optional)' },
+                disableWebPagePreview: { type: 'BOOLEAN', description: 'Disable web preview for links in sendMessage' },
+                disableNotification: { type: 'BOOLEAN', description: 'Send silently (no notification sound)' },
+                variableName: { type: 'STRING', description: 'Optional variable to store Telegram response payload' }
             },
-            required: ['chatId', 'message']
+            required: ['chatId']
         },
         nodeType: 'TELEGRAM_SEND'
     },
@@ -766,7 +775,11 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
                 channel: { type: 'STRING', description: 'Slack channel ID or name (for bot mode)' },
                 apiUrl: { type: 'STRING', description: 'Slack API URL override (optional)' },
                 message: { type: 'STRING', description: 'Message content (optional if blocks provided)' },
-                blocks: { type: 'STRING', description: 'Slack Block Kit JSON array string (optional)' }
+                blocks: { type: 'STRING', description: 'Slack Block Kit JSON array string (optional)' },
+                threadTs: { type: 'STRING', description: 'Thread timestamp to reply in a thread (bot mode)' },
+                unfurlLinks: { type: 'BOOLEAN', description: 'Enable/disable link unfurling (bot mode)' },
+                unfurlMedia: { type: 'BOOLEAN', description: 'Enable/disable media unfurling (bot mode)' },
+                variableName: { type: 'STRING', description: 'Optional variable to store Slack response payload' }
             },
             required: []
         },

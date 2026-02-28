@@ -21,6 +21,9 @@ class SensorTriggerService {
     private stepWatchOffset: number = 0;
     private lastStepResetDate: string = new Date().toDateString();
     private triggeredToday: Set<string> = new Set(); // Track which workflows already triggered
+    private refreshInFlight: boolean = false;
+    private refreshRequested: boolean = false;
+    private stepListeningStarting: boolean = false;
 
     // Configurable thresholds
     private readonly SHAKE_THRESHOLD = 1.8; // G-force
@@ -31,43 +34,56 @@ class SensorTriggerService {
     }
 
     async refreshTriggers() {
-        const workflows = await WorkflowStorage.getAll();
+        if (this.refreshInFlight) {
+            this.refreshRequested = true;
+            return;
+        }
+        this.refreshInFlight = true;
 
-        // Gesture workflows
-        this.activeGestureWorkflows = workflows.filter(w =>
-            w.isActive && w.nodes.some(n => n.type === 'GESTURE_TRIGGER')
-        );
+        try {
+            do {
+                this.refreshRequested = false;
+                const workflows = await WorkflowStorage.getAll();
 
-        // Step workflows
-        this.activeStepWorkflows = workflows.filter(w =>
-            w.isActive && w.nodes.some(n => n.type === 'STEP_TRIGGER')
-        );
+                // Gesture workflows
+                this.activeGestureWorkflows = workflows.filter(w =>
+                    w.isActive && w.nodes.some(n => n.type === 'GESTURE_TRIGGER')
+                );
 
-        // Register gestures with Native Service (MotionTriggerModule)
-        if (this.activeGestureWorkflows.length > 0) {
-            await this.registerNativeGestures(workflows);
-        } else {
-            // Stop native service if no gestures
-            const { MotionTrigger } = require('react-native').NativeModules;
-            try {
-                if (MotionTrigger?.clearAllTriggers) {
-                    await MotionTrigger.clearAllTriggers();
+                // Step workflows
+                this.activeStepWorkflows = workflows.filter(w =>
+                    w.isActive && w.nodes.some(n => n.type === 'STEP_TRIGGER')
+                );
+
+                // Register gestures with Native Service (MotionTriggerModule)
+                if (this.activeGestureWorkflows.length > 0) {
+                    await this.registerNativeGestures(workflows);
                 } else {
-                    for (const workflow of workflows) {
-                        await MotionTrigger?.unregisterTrigger?.(workflow.id);
+                    // Stop native service if no gestures
+                    const { MotionTrigger } = require('react-native').NativeModules;
+                    try {
+                        if (MotionTrigger?.clearAllTriggers) {
+                            await MotionTrigger.clearAllTriggers();
+                        } else {
+                            for (const workflow of workflows) {
+                                await MotionTrigger?.unregisterTrigger?.(workflow.id);
+                            }
+                        }
+                        await MotionTrigger?.stopService?.();
+                    } catch (e) {
+                        console.warn('[SensorTriggerService] Failed to clear native gestures:', e);
                     }
                 }
-                await MotionTrigger?.stopService?.();
-            } catch (e) {
-                console.warn('[SensorTriggerService] Failed to clear native gestures:', e);
-            }
-        }
 
-        // Step listener (keep as is for now, or move to native later)
-        if (this.activeStepWorkflows.length > 0) {
-            this.startStepListening();
-        } else {
-            this.stopStepListening();
+                // Step listener (keep as is for now, or move to native later)
+                if (this.activeStepWorkflows.length > 0) {
+                    void this.startStepListening();
+                } else {
+                    this.stopStepListening();
+                }
+            } while (this.refreshRequested);
+        } finally {
+            this.refreshInFlight = false;
         }
     }
 
@@ -155,41 +171,46 @@ class SensorTriggerService {
     // STEP MONITORING
     // ========================
     private async startStepListening() {
-        if (this.pedometerSubscription) return;
-
-        const isAvailable = await Pedometer.isAvailableAsync();
-        if (!isAvailable) {
-            console.warn('[SensorTriggerService] Pedometer not available on this device');
-            return;
-        }
-
-        // Check if we need to reset for new day
-        await this.checkDailyReset();
-        this.stepWatchSteps = 0;
-        this.stepWatchOffset = 0;
-
-        // Get initial step count for today
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+        if (this.pedometerSubscription || this.stepListeningStarting) return;
+        this.stepListeningStarting = true;
 
         try {
-            const result = await Pedometer.getStepCountAsync(todayStart, new Date());
-            this.stepStartCount = result.steps;
-            console.log(`[SensorTriggerService] Initial step count today: ${this.stepStartCount}`);
-        } catch (e) {
-            console.warn('[SensorTriggerService] Failed to get initial step count:', e);
+            const isAvailable = await Pedometer.isAvailableAsync();
+            if (!isAvailable) {
+                console.warn('[SensorTriggerService] Pedometer not available on this device');
+                return;
+            }
+
+            // Check if we need to reset for new day
+            await this.checkDailyReset();
+            this.stepWatchSteps = 0;
+            this.stepWatchOffset = 0;
+
+            // Get initial step count for today
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            try {
+                const result = await Pedometer.getStepCountAsync(todayStart, new Date());
+                this.stepStartCount = result.steps;
+                console.log(`[SensorTriggerService] Initial step count today: ${this.stepStartCount}`);
+            } catch (e) {
+                console.warn('[SensorTriggerService] Failed to get initial step count:', e);
+            }
+
+            // Watch for step updates (real-time)
+            this.pedometerSubscription = Pedometer.watchStepCount(result => {
+                // result.steps is cumulative since watchStepCount() subscription start
+                this.stepWatchSteps = Math.max(0, Number(result.steps) || 0);
+                const todayWatchSteps = Math.max(0, this.stepWatchSteps - this.stepWatchOffset);
+                const totalSteps = Math.max(0, this.stepStartCount + todayWatchSteps);
+                void this.checkStepTriggers(totalSteps);
+            });
+
+            console.log('[SensorTriggerService] Step listening started');
+        } finally {
+            this.stepListeningStarting = false;
         }
-
-        // Watch for step updates (real-time)
-        this.pedometerSubscription = Pedometer.watchStepCount(result => {
-            // result.steps is cumulative since watchStepCount() subscription start
-            this.stepWatchSteps = Math.max(0, Number(result.steps) || 0);
-            const todayWatchSteps = Math.max(0, this.stepWatchSteps - this.stepWatchOffset);
-            const totalSteps = Math.max(0, this.stepStartCount + todayWatchSteps);
-            void this.checkStepTriggers(totalSteps);
-        });
-
-        console.log('[SensorTriggerService] Step listening started');
     }
 
     private stopStepListening() {
@@ -198,6 +219,7 @@ class SensorTriggerService {
             this.pedometerSubscription = null;
             console.log('[SensorTriggerService] Step listening stopped');
         }
+        this.stepListeningStarting = false;
     }
 
     private normalizeStepConfig(rawConfig: any): StepTriggerConfig {

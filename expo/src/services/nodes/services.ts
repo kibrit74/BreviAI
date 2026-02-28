@@ -119,154 +119,207 @@ export async function executeGoogleTranslate(
 }
 
 // --- Telegram ---
+const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
+const TELEGRAM_MAX_CAPTION_LENGTH = 1024;
+const SLACK_MAX_TEXT_LENGTH = 40000;
+
+function waitMs(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function splitTelegramMessage(text: string, maxLen = TELEGRAM_MAX_MESSAGE_LENGTH): string[] {
+    const normalized = String(text || '');
+    if (normalized.length <= maxLen) return [normalized];
+
+    const chunks: string[] = [];
+    let rest = normalized;
+    while (rest.length > maxLen) {
+        let splitIndex = rest.lastIndexOf('\n', maxLen);
+        if (splitIndex < Math.floor(maxLen * 0.6)) {
+            splitIndex = rest.lastIndexOf(' ', maxLen);
+        }
+        if (splitIndex < Math.floor(maxLen * 0.6)) {
+            splitIndex = maxLen;
+        }
+        chunks.push(rest.slice(0, splitIndex).trim());
+        rest = rest.slice(splitIndex).trimStart();
+    }
+    if (rest.length > 0) chunks.push(rest);
+    return chunks.filter(Boolean);
+}
+
+async function sendTelegramJsonWithRetry(
+    url: string,
+    payload: Record<string, any>
+): Promise<{ ok: boolean; result?: any; description?: string; error_code?: number; parameters?: any }> {
+    const makeRequest = async () => {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        return { response, data };
+    };
+
+    let { response, data } = await makeRequest();
+    if ((response.status === 429 || data?.error_code === 429) && Number.isFinite(Number(data?.parameters?.retry_after))) {
+        const retryAfter = Math.max(1, Math.min(30, Number(data.parameters.retry_after)));
+        await waitMs((retryAfter + 1) * 1000);
+        ({ response, data } = await makeRequest());
+    }
+    return data || {};
+}
+
 // --- Telegram ---
 export async function executeTelegramSend(
     config: TelegramSendConfig,
     variableManager: VariableManager
 ): Promise<any> {
+    const persistResult = (result: any) => {
+        if (config.variableName) {
+            variableManager.set(config.variableName, result);
+        }
+        return result;
+    };
+
     try {
-        const token = variableManager.resolveString(config.botToken);
-        const chatId = variableManager.resolveString(config.chatId);
+        const token = variableManager.resolveString(config.botToken || '').trim();
+        const chatId = variableManager.resolveString(config.chatId || '').trim();
         const operation = config.operation || 'sendMessage';
 
         if (!token || !chatId) {
-            return { success: false, error: 'Telegram ayarlarÄ± eksik (Token veya ChatID)' };
+            return persistResult({ success: false, error: 'Telegram ayarlari eksik (Token veya ChatID)' });
         }
 
         const baseUrl = `https://api.telegram.org/bot${token}`;
-        let url = '';
-        let body: any;
-        let headers: Record<string, string> = {};
 
         if (operation === 'sendMessage') {
-            // Support both 'message' and 'text' properties for compatibility
-            let message = variableManager.resolveString(config.message || config.text);
-            if (!message) return { success: false, error: 'Mesaj boÅŸ olamaz' };
+            let message = variableManager.resolveString(config.message || config.text || '').trim();
+            if (!message) return persistResult({ success: false, error: 'Mesaj bos olamaz' });
 
-            // Strip markdown code blocks that cause Telegram parsing errors
-            message = message.replace(/```[\w]*\n?/g, '').replace(/```/g, '');
-            // Strip inline backticks for safety
-            message = message.replace(/`/g, '');
+            // Reduce common formatting failures in Telegram parsers.
+            message = message.replace(/```[\w]*\n?/g, '').replace(/```/g, '').replace(/`/g, '');
+            const chunks = splitTelegramMessage(message);
+            const parseMode = config.parseMode;
+            const sentIds: Array<number | string> = [];
+            const details: any[] = [];
 
-            url = `${baseUrl}/sendMessage`;
-            headers['Content-Type'] = 'application/json';
-
-            // Try with Markdown first, then fallback to plain text
-            const parseMode = config.parseMode || 'Markdown';
-            body = JSON.stringify({
-                chat_id: chatId,
-                text: message,
-                parse_mode: parseMode
-            });
-
-            console.log(`[Telegram] Executing ${operation} to ${url}`);
-
-            let response = await fetch(url, {
-                method: 'POST',
-                headers: headers,
-                body: body
-            });
-
-            let data = await response.json();
-
-            // If Markdown parsing fails, retry without parse_mode
-            if (!data.ok && data.description?.includes("can't parse entities")) {
-                console.warn('[Telegram] Markdown parse failed, retrying without parse_mode...');
-                body = JSON.stringify({
+            for (const chunk of chunks) {
+                const payload: Record<string, any> = {
                     chat_id: chatId,
-                    text: message
-                    // No parse_mode = plain text
-                });
-                response = await fetch(url, {
-                    method: 'POST',
-                    headers: headers,
-                    body: body
-                });
-                data = await response.json();
+                    text: chunk
+                };
+                if (parseMode) payload.parse_mode = parseMode;
+                if (config.disableWebPagePreview) {
+                    payload.link_preview_options = { is_disabled: true };
+                    payload.disable_web_page_preview = true; // backward compatibility
+                }
+                if (config.disableNotification) payload.disable_notification = true;
+
+                let data = await sendTelegramJsonWithRetry(`${baseUrl}/sendMessage`, payload);
+
+                // Fallback to plain text when entity parsing fails.
+                if (!data.ok && parseMode && String(data.description || '').toLowerCase().includes("can't parse entities")) {
+                    delete payload.parse_mode;
+                    data = await sendTelegramJsonWithRetry(`${baseUrl}/sendMessage`, payload);
+                }
+
+                if (!data.ok) {
+                    throw new Error(data.description || `Telegram API Error (${data.error_code || 'unknown'})`);
+                }
+
+                sentIds.push(data?.result?.message_id);
+                details.push(data?.result);
             }
 
-            if (!data.ok) {
-                throw new Error(data.description || `Telegram API Error (${data.error_code})`);
-            }
-
-            return {
+            return persistResult({
                 success: true,
-                messageId: data.result.message_id,
-                details: data.result
-            };
+                operation,
+                sentCount: sentIds.length,
+                messageId: sentIds[0],
+                messageIds: sentIds,
+                details: sentIds.length === 1 ? details[0] : details
+            });
         }
-        else if (operation === 'sendLocation') {
-            const lat = Number(variableManager.resolveString(String(config.latitude || '')));
-            const long = Number(variableManager.resolveString(String(config.longitude || '')));
 
-            if (isNaN(lat) || isNaN(long)) return { success: false, error: 'GeÃ§ersiz konum (Lat/Long)' };
+        if (operation === 'sendLocation') {
+            const lat = Number(variableManager.resolveString(String(config.latitude ?? '')));
+            const lon = Number(variableManager.resolveString(String(config.longitude ?? '')));
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                return persistResult({ success: false, error: 'Gecersiz konum (Lat/Long)' });
+            }
 
-            url = `${baseUrl}/sendLocation`;
-            headers['Content-Type'] = 'application/json';
-            body = JSON.stringify({
+            const payload: Record<string, any> = {
                 chat_id: chatId,
                 latitude: lat,
-                longitude: long
-            });
-        }
-        else if (operation === 'sendPhoto' || operation === 'sendDocument') {
-            const filePath = variableManager.resolveString(config.filePath);
-            const caption = variableManager.resolveString(config.message);
+                longitude: lon
+            };
+            if (config.disableNotification) payload.disable_notification = true;
 
-            if (!filePath) return { success: false, error: 'Dosya yolu belirtilmedi' };
-
-            url = `${baseUrl}/${operation}`;
-
-            // FormData oluÅŸtur
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            if (caption) {
-                formData.append('caption', caption);
-                formData.append('parse_mode', config.parseMode || 'Markdown');
+            const data = await sendTelegramJsonWithRetry(`${baseUrl}/sendLocation`, payload);
+            if (!data.ok) {
+                throw new Error(data.description || `Telegram API Error (${data.error_code || 'unknown'})`);
             }
 
-            // Dosya ekle
+            return persistResult({
+                success: true,
+                operation,
+                messageId: data?.result?.message_id,
+                details: data?.result
+            });
+        }
+
+        if (operation === 'sendPhoto' || operation === 'sendDocument') {
+            const filePath = variableManager.resolveString(config.filePath || '').trim();
+            if (!filePath) return persistResult({ success: false, error: 'Dosya yolu belirtilmedi' });
+
+            let caption = variableManager.resolveString(config.message || '').trim();
+            if (caption) {
+                caption = caption.replace(/```[\w]*\n?/g, '').replace(/```/g, '').replace(/`/g, '');
+                if (caption.length > TELEGRAM_MAX_CAPTION_LENGTH) {
+                    caption = caption.slice(0, TELEGRAM_MAX_CAPTION_LENGTH - 1);
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('chat_id', chatId);
+            if (caption) formData.append('caption', caption);
+            if (caption && config.parseMode) formData.append('parse_mode', config.parseMode);
+            if (config.disableNotification) formData.append('disable_notification', 'true');
+
             const fileName = filePath.split('/').pop() || 'file';
             const fileType = operation === 'sendPhoto' ? 'image/jpeg' : 'application/octet-stream';
-
-            // React Native'de FormData dosya formatÄ±: { uri, name, type }
             formData.append(operation === 'sendPhoto' ? 'photo' : 'document', {
                 uri: filePath,
                 name: fileName,
                 type: fileType,
             } as any);
 
-            body = formData;
-            // Content-Type: multipart/form-data browser/RN tarafÄ±ndan otomatik set edilir boundary ile birlikte.
-            // Bu yÃ¼zden headers'a eklemiyoruz.
+            const response = await fetch(`${baseUrl}/${operation}`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!data.ok) {
+                throw new Error(data.description || `Telegram API Error (${data.error_code || 'unknown'})`);
+            }
+
+            return persistResult({
+                success: true,
+                operation,
+                messageId: data?.result?.message_id,
+                details: data?.result
+            });
         }
 
-        console.log(`[Telegram] Executing ${operation} to ${url}`);
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: body
-        });
-
-        const data = await response.json();
-
-        if (!data.ok) {
-            throw new Error(data.description || `Telegram API Error (${data.error_code})`);
-        }
-
-        return {
-            success: true,
-            messageId: data.result.message_id,
-            details: data.result
-        };
-
+        return persistResult({ success: false, error: `Desteklenmeyen Telegram operasyonu: ${operation}` });
     } catch (error) {
         console.error('[Telegram] Error:', error);
-        return {
+        return persistResult({
             success: false,
             error: error instanceof Error ? error.message : 'Telegram send failed'
-        };
+        });
     }
 }
 
@@ -275,39 +328,61 @@ export async function executeSlackSend(
     config: SlackSendConfig,
     variableManager: VariableManager
 ): Promise<any> {
+    const persistResult = (result: any) => {
+        if (config.variableName) {
+            variableManager.set(config.variableName, result);
+        }
+        return result;
+    };
+
     try {
-        const webhookUrl = variableManager.resolveString(config.webhookUrl);
-        const message = variableManager.resolveString(config.message);
+        const webhookUrl = variableManager.resolveString(config.webhookUrl || '').trim();
+        let message = variableManager.resolveString(config.message || '').trim();
         const mode = (config.mode || (((config.apiToken || config.botToken) && config.channel) ? 'bot' : 'webhook')) as 'webhook' | 'bot';
-        const token = variableManager.resolveString(config.apiToken || config.botToken);
-        const channel = variableManager.resolveString(config.channel);
-        const apiUrl = variableManager.resolveString(config.apiUrl) || 'https://slack.com/api/chat.postMessage';
-        const blocksStr = variableManager.resolveString(config.blocks);
+        const token = variableManager.resolveString(config.apiToken || config.botToken || '').trim();
+        const channel = variableManager.resolveString(config.channel || '').trim();
+        const apiUrl = variableManager.resolveString(config.apiUrl || '').trim() || 'https://slack.com/api/chat.postMessage';
+        const blocksStr = variableManager.resolveString(config.blocks || '').trim();
+        const warnings: string[] = [];
 
         let parsedBlocks: any[] | undefined;
         if (blocksStr) {
             try {
                 const parsed = JSON.parse(blocksStr);
                 if (!Array.isArray(parsed)) {
-                    return { success: false, error: 'Slack Blocks JSON bir dizi (array) olmali' };
+                    return persistResult({ success: false, error: 'Slack Blocks JSON bir dizi (array) olmali' });
                 }
                 parsedBlocks = parsed;
             } catch {
-                return { success: false, error: 'Slack Blocks JSON gecersiz' };
+                return persistResult({ success: false, error: 'Slack Blocks JSON gecersiz' });
             }
+        }
+
+        if (message.length > SLACK_MAX_TEXT_LENGTH) {
+            message = message.slice(0, SLACK_MAX_TEXT_LENGTH);
+            warnings.push(`Slack mesaji ${SLACK_MAX_TEXT_LENGTH} karaktere kisaltildi.`);
         }
 
         if (mode === 'bot') {
             if (!token || !channel) {
-                return { success: false, error: 'Slack API modu icin API Token ve Kanal gerekli' };
+                return persistResult({ success: false, error: 'Slack API modu icin API Token ve Kanal gerekli' });
             }
             if (!message && !parsedBlocks) {
-                return { success: false, error: 'Mesaj veya Blocks JSON bos olamaz' };
+                return persistResult({ success: false, error: 'Mesaj veya Blocks JSON bos olamaz' });
             }
 
             const payload: any = { channel };
-            if (message) payload.text = message;
+            if (message) {
+                payload.text = message;
+            } else if (parsedBlocks) {
+                // Slack accessibility recommendation: provide text fallback when using blocks.
+                payload.text = 'Workflow notification';
+                warnings.push('Blocks kullanildigi icin erisilebilirlik amacli fallback text eklendi.');
+            }
             if (parsedBlocks) payload.blocks = parsedBlocks;
+            if (config.threadTs) payload.thread_ts = variableManager.resolveString(config.threadTs);
+            if (typeof config.unfurlLinks === 'boolean') payload.unfurl_links = config.unfurlLinks;
+            if (typeof config.unfurlMedia === 'boolean') payload.unfurl_media = config.unfurlMedia;
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -321,31 +396,41 @@ export async function executeSlackSend(
             const data = await response.json().catch(() => null);
             if (!response.ok || !data?.ok) {
                 const errText = data?.error || `HTTP ${response.status}`;
-                throw new Error(`Slack API Error: ${errText}`);
+                return persistResult({
+                    success: false,
+                    mode: 'bot',
+                    error: `Slack API Error: ${errText}`,
+                    details: data || null
+                });
             }
 
-            const botResult = {
+            return persistResult({
                 success: true,
                 mode: 'bot',
                 channel: data.channel,
                 ts: data.ts,
+                warnings: warnings.length > 0 ? warnings : undefined,
                 response: data
-            };
-            if (config.variableName) {
-                variableManager.set(config.variableName, botResult);
-            }
-            return botResult;
+            });
         }
 
         if (!webhookUrl) {
-            return { success: false, error: 'Webhook URL bos olamaz' };
+            return persistResult({ success: false, error: 'Webhook URL bos olamaz' });
         }
         if (!message && !parsedBlocks) {
-            return { success: false, error: 'Mesaj veya Blocks JSON bos olamaz' };
+            return persistResult({ success: false, error: 'Mesaj veya Blocks JSON bos olamaz' });
+        }
+        if (channel) {
+            warnings.push('Webhook modunda channel parametresi yok sayilir (Slack webhook ayari kullanilir).');
         }
 
         const webhookPayload: any = {};
-        if (message) webhookPayload.text = message;
+        if (message) {
+            webhookPayload.text = message;
+        } else if (parsedBlocks) {
+            webhookPayload.text = 'Workflow notification';
+            warnings.push('Blocks kullanildigi icin erisilebilirlik amacli fallback text eklendi.');
+        }
         if (parsedBlocks) webhookPayload.blocks = parsedBlocks;
 
         const response = await fetch(webhookUrl, {
@@ -354,26 +439,26 @@ export async function executeSlackSend(
             body: JSON.stringify(webhookPayload)
         });
 
+        const responseText = await response.text().catch(() => '');
         if (!response.ok) {
-            const errText = await response.text();
-            throw new Error(`Slack API Error: ${errText}`);
+            return persistResult({
+                success: false,
+                mode: 'webhook',
+                error: `Slack API Error: ${responseText || `HTTP ${response.status}`}`
+            });
         }
 
-        const webhookResult = { success: true, mode: 'webhook' };
-        if (config.variableName) {
-            variableManager.set(config.variableName, webhookResult);
-        }
-        return webhookResult;
-
+        return persistResult({
+            success: true,
+            mode: 'webhook',
+            warnings: warnings.length > 0 ? warnings : undefined,
+            responseText: responseText || 'ok'
+        });
     } catch (error) {
-        const errorResult = {
+        return persistResult({
             success: false,
             error: error instanceof Error ? error.message : 'Slack send failed'
-        };
-        if (config.variableName) {
-            variableManager.set(config.variableName, errorResult);
-        }
-        return errorResult;
+        });
     }
 }
 // --- Discord ---
